@@ -1,0 +1,143 @@
+[tool.poetry]
+name = "awslabs.lza-mcp-server"
+version = "0.1.0"
+description = "An AWS Labs Model Context Protocol (MCP) server for AWS Landing Zone Accelerator"
+authors = ["Amazon Web Services"]
+license = "Apache-2.0"
+# readme = "README.md"  # Commented out to avoid Docker build context issues
+homepage = "https://github.com/awslabs/landing-zone-accelerator-on-aws"
+packages = [{include = "awslabs"}]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+boto3 = ">=1.37.27"
+mcp = {extras = ["cli"], version = ">=1.6.0"}
+pydantic = ">=2.10.6"
+PyYAML = ">=6.0"
+loguru = ">=0.7.0"
+psutil = ">=5.9.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0.0"
+pytest-asyncio = ">=0.26.0"
+pytest-cov = ">=4.1.0"
+pytest-mock = ">=3.12.0"
+pytest-xdist = ">=3.5.0"
+pytest-timeout = ">=2.2.0"
+pytest-html = ">=4.1.0"
+pytest-benchmark = ">=4.0.0"
+coverage = {extras = ["toml"], version = ">=7.4.0"}
+moto = {extras = ["s3", "codepipeline", "cloudformation"], version = ">=4.2.0"}
+factory-boy = ">=3.3.0"
+faker = ">=22.0.0"
+
+[tool.poetry.scripts]
+"awslabs.lza-mcp-server" = "awslabs.lza_mcp_server.server:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_default_fixture_loop_scope = "function"
+minversion = "7.0"
+timeout = 300
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--strict-config",
+    "--color=yes",
+    "--tb=short",
+    "--cov=awslabs.lza_mcp_server",
+    "--cov-report=html:htmlcov",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-branch",
+    "--cov-fail-under=80"
+]
+markers = [
+    "unit: Unit tests (no external dependencies)",
+    "integration: Integration tests (require AWS credentials)",
+    "fastmcp: FastMCP framework integration tests",
+    "aws: Tests that interact with AWS services",
+    "config: Configuration validation tests",
+    "schema: Schema validation and search tests",
+    "pipeline: Pipeline operation tests"
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning:boto3.*",
+    "ignore::DeprecationWarning:botocore.*",
+    "ignore::PendingDeprecationWarning"
+]
+
+[tool.coverage.run]
+source = ["awslabs.lza_mcp_server"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/conftest.py",
+    "*/.pytest_cache/*",
+    "*/htmlcov/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/build/*",
+    "*/dist/*",
+    "*/.tox/*",
+    "*/migrations/*",
+    "*/node_modules/*",
+    "*/__main__.py",
+    "*/setup.py"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __str__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstract",
+    "@abstractmethod",
+    "class .*\\bProtocol\\):",
+    "@overload",
+    "\\.\\.\\.",
+    "pass",
+    "except ImportError:",
+    "except ModuleNotFoundError:",
+    "# pragma: no cover",
+    "# nocov",
+    "if 0:",
+    "if False:"
+]
+show_missing = true
+precision = 2
+skip_covered = false
+skip_empty = false
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "LZA MCP Server Coverage Report"
+
+[tool.coverage.xml]
+output = "coverage.xml"
