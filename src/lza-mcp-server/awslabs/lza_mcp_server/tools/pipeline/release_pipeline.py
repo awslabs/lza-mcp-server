@@ -18,18 +18,21 @@ from typing import Dict, Any
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
-from .manage_pipeline_tools import validate_pipeline_name, format_success_response
-from ...aws_access import format_error_response, get_codepipeline_client, retry_with_exponential_backoff, \
-    handle_aws_error
+from .common import validate_pipeline_name_local
+from ...aws_access import (
+    format_error_response,
+    get_codepipeline_client,
+    retry_with_exponential_backoff,
+    handle_aws_error,
+)
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 
 
 async def tool_release_pipeline(
-            ctx: Context,
-            pipeline_name: str = DEFAULT_PIPELINE_NAME
-    ) -> Dict[str, Any]:
+    ctx: Context, pipeline_name: str = DEFAULT_PIPELINE_NAME
+) -> Dict[str, Any]:
     """Trigger execution of the specified AWS CodePipeline.
 
     This tool starts a new execution of the specified CodePipeline, typically used
@@ -60,8 +63,7 @@ async def tool_release_pipeline(
     """
     logger.info(f"Starting pipeline release for: {pipeline_name}")
 
-    # Validate pipeline name format
-    is_valid, validation_error = validate_pipeline_name(pipeline_name)
+    is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
@@ -70,8 +72,8 @@ async def tool_release_pipeline(
                 "Pipeline names must be 1-100 characters long",
                 "Can only contain letters, numbers, periods, underscores, and hyphens",
                 "Cannot contain spaces or other special characters",
-                f"Specific issue: {validation_error}"
-            ]
+                f"Specific issue: {validation_error}",
+            ],
         )
 
     try:
@@ -81,12 +83,12 @@ async def tool_release_pipeline(
         # First, validate that the pipeline exists
         logger.info(f"Validating pipeline existence: {pipeline_name}")
         try:
-            pipeline_response = await retry_with_exponential_backoff(
+            await retry_with_exponential_backoff(
                 codepipeline.get_pipeline, name=pipeline_name
             )
             logger.info(f"Pipeline found: {pipeline_name}")
         except ClientError as e:
-            if e.response.get('Error', {}).get('Code') == 'PipelineNotFoundException':
+            if e.response.get("Error", {}).get("Code") == "PipelineNotFoundException":
                 return format_error_response(
                     error=f"Pipeline '{pipeline_name}' not found",
                     message=f"The specified pipeline '{pipeline_name}' does not exist",
@@ -95,8 +97,8 @@ async def tool_release_pipeline(
                         f"Verify the pipeline name '{pipeline_name}' is correct",
                         f"Check that the pipeline exists in region: {AWS_REGION}",
                         "Ensure you have permissions to access the pipeline",
-                        "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines"
-                    ]
+                        "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines",
+                    ],
                 )
             else:
                 # Re-raise for general error handling
@@ -108,16 +110,19 @@ async def tool_release_pipeline(
             codepipeline.start_pipeline_execution, name=pipeline_name
         )
 
-        execution_id = execution_response['pipelineExecutionId']
-        logger.info(f"Pipeline execution started successfully. Execution ID: {execution_id}")
-
-        return format_success_response(
-            data={
-                "execution_id": execution_id,
-                "pipeline_name": pipeline_name
-            },
-            message=f"Pipeline '{pipeline_name}' execution started successfully"
+        execution_id = execution_response["pipelineExecutionId"]
+        logger.info(
+            f"Pipeline execution started successfully. Execution ID: {execution_id}"
         )
+
+        # Format success response
+        response = {
+            "success": True,
+            "execution_id": execution_id,
+            "pipeline_name": pipeline_name,
+            "message": f"Pipeline '{pipeline_name}' execution started successfully",
+        }
+        return response
 
     except Exception as e:
         logger.error(f"Error starting pipeline execution: {str(e)}")

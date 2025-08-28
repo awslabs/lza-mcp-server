@@ -15,10 +15,3 @@
 """AWS Landing Zone Accelerator (LZA) MCP Server."""
 
 __version__ = "0.1.0"
-
-from .server import runserver, register_all_components
-
-__version__ = "0.1.0"
-
-# Create an alias for register_all_components that matches what's imported in __main__.py
-register_all = register_all_components

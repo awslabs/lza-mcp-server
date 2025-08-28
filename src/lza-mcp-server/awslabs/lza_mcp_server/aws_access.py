@@ -52,13 +52,10 @@ def get_codepipeline_client() -> boto3.client:
     """
     session = get_aws_session(logger)
     config = Config(
-        retries={
-            'max_attempts': MAX_RETRY_ATTEMPTS,
-            'mode': 'adaptive'
-        },
-        max_pool_connections=50
+        retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
+        max_pool_connections=50,
     )
-    return session.client('codepipeline', config=config)
+    return session.client("codepipeline", config=config)
 
 
 def get_codebuild_client() -> boto3.client:
@@ -73,13 +70,10 @@ def get_codebuild_client() -> boto3.client:
     """
     session = get_aws_session(logger)
     config = Config(
-        retries={
-            'max_attempts': MAX_RETRY_ATTEMPTS,
-            'mode': 'adaptive'
-        },
-        max_pool_connections=50
+        retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
+        max_pool_connections=50,
     )
-    return session.client('codebuild', config=config)
+    return session.client("codebuild", config=config)
 
 
 def get_logs_client() -> boto3.client:
@@ -94,13 +88,10 @@ def get_logs_client() -> boto3.client:
     """
     session = get_aws_session(logger)
     config = Config(
-        retries={
-            'max_attempts': MAX_RETRY_ATTEMPTS,
-            'mode': 'adaptive'
-        },
-        max_pool_connections=50
+        retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
+        max_pool_connections=50,
     )
-    return session.client('logs', config=config)
+    return session.client("logs", config=config)
 
 
 async def retry_with_exponential_backoff(func, *args, **kwargs):
@@ -124,28 +115,34 @@ async def retry_with_exponential_backoff(func, *args, **kwargs):
         try:
             return func(*args, **kwargs)
         except ClientError as e:
-            error_code = e.response.get('Error', {}).get('Code', '')
+            error_code = e.response.get("Error", {}).get("Code", "")
 
-            if error_code in ['ThrottlingException', 'Throttling', 'RequestLimitExceeded', 'ServiceUnavailable']:
+            if error_code in [
+                "ThrottlingException",
+                "Throttling",
+                "RequestLimitExceeded",
+                "ServiceUnavailable",
+            ]:
                 last_exception = e
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
                     logger.warning(
-                        f"AWS API throttled, retrying in {delay} seconds (attempt {attempt + 1}/{MAX_RETRY_ATTEMPTS})")
+                        f"AWS API throttled, retrying in {delay} seconds (attempt {attempt + 1}/{MAX_RETRY_ATTEMPTS})"
+                    )
                     await asyncio.sleep(delay)
                     delay *= 2  # Exponential backoff
                     continue
             raise
-        except Exception as e:
+        except Exception:
             raise
 
     raise last_exception
 
 
 def format_error_response(
-        error: str,
-        message: str,
-        error_code: Optional[str] = None,
-        troubleshooting: Optional[list] = None
+    error: str,
+    message: str,
+    error_code: Optional[str] = None,
+    troubleshooting: Optional[list] = None,
 ) -> Dict[str, Any]:
     """Format an error response with consistent structure and troubleshooting guidance.
 
@@ -158,11 +155,7 @@ def format_error_response(
     Returns:
         Dict containing success=False, error details, and troubleshooting guidance
     """
-    response = {
-        "success": False,
-        "error": error,
-        "message": message
-    }
+    response = {"success": False, "error": error, "message": message}
 
     if error_code:
         response["error_code"] = error_code
@@ -175,7 +168,7 @@ def format_error_response(
             "Ensure AWS credentials are configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)",
             "Check if AWS_REGION is set correctly",
             "Verify IAM permissions for CodePipeline operations",
-            "Confirm the pipeline name exists in the specified region"
+            "Confirm the pipeline name exists in the specified region",
         ]
 
     return response
@@ -200,16 +193,16 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 "  - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables",
                 "  - Set AWS_PROFILE environment variable to use a named profile",
                 "  - Use IAM roles if running on EC2/ECS/Lambda",
-                "  - Configure credentials using 'aws configure' command"
-            ]
+                "  - Configure credentials using 'aws configure' command",
+            ],
         )
 
     elif isinstance(e, ClientError):
-        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-        error_message = e.response.get('Error', {}).get('Message', str(e))
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        error_message = e.response.get("Error", {}).get("Message", str(e))
 
         # Handle specific AWS error codes
-        if error_code == 'PipelineNotFoundException':
+        if error_code == "PipelineNotFoundException":
             return format_error_response(
                 error=error_message,
                 message=f"Pipeline not found during {operation}",
@@ -218,21 +211,21 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     "Verify the pipeline name is correct",
                     "Check that the pipeline exists in the specified AWS region",
                     "Ensure you have permissions to access the pipeline",
-                    f"Current region: {AWS_REGION}"
-                ]
+                    f"Current region: {AWS_REGION}",
+                ],
             )
 
-        elif error_code == 'AccessDenied' or error_code == 'UnauthorizedOperation':
+        elif error_code == "AccessDenied" or error_code == "UnauthorizedOperation":
             # Provide operation-specific permission guidance
             permission_guidance = get_iam_permission_guidance(operation, error_message)
             return format_error_response(
                 error=error_message,
                 message=f"Insufficient permissions for {operation}",
                 error_code=error_code,
-                troubleshooting=permission_guidance
+                troubleshooting=permission_guidance,
             )
 
-        elif error_code == 'ThrottlingException' or error_code == 'Throttling':
+        elif error_code == "ThrottlingException" or error_code == "Throttling":
             return format_error_response(
                 error=error_message,
                 message=f"AWS API rate limit exceeded during {operation}",
@@ -241,11 +234,11 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     "Wait a few seconds and retry the operation",
                     "AWS API calls are being throttled due to high request volume",
                     "Consider implementing exponential backoff for repeated operations",
-                    "If this persists, check AWS Service Health Dashboard for any issues"
-                ]
+                    "If this persists, check AWS Service Health Dashboard for any issues",
+                ],
             )
 
-        elif error_code == 'PipelineExecutionNotFoundException':
+        elif error_code == "PipelineExecutionNotFoundException":
             return format_error_response(
                 error=error_message,
                 message=f"Pipeline execution not found during {operation}",
@@ -254,11 +247,14 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     "Verify the execution ID is correct and exists",
                     "Check that the execution belongs to the specified pipeline",
                     "The execution may have been deleted or expired",
-                    "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions"
-                ]
+                    "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions",
+                ],
             )
 
-        elif error_code == 'InvalidParameterException' or error_code == 'ValidationException':
+        elif (
+            error_code == "InvalidParameterException"
+            or error_code == "ValidationException"
+        ):
             return format_error_response(
                 error=error_message,
                 message=f"Invalid parameters provided for {operation}",
@@ -267,11 +263,11 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     "Check that all required parameters are provided",
                     "Verify parameter formats match AWS requirements",
                     "Pipeline names must be 1-100 characters with only letters, numbers, periods, underscores, and hyphens",
-                    "Execution IDs must be valid UUIDs"
-                ]
+                    "Execution IDs must be valid UUIDs",
+                ],
             )
 
-        elif error_code == 'ConcurrentModificationException':
+        elif error_code == "ConcurrentModificationException":
             return format_error_response(
                 error=error_message,
                 message=f"Pipeline is being modified by another operation during {operation}",
@@ -279,11 +275,11 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 troubleshooting=[
                     "Wait a few seconds and retry the operation",
                     "Another user or process may be modifying the pipeline",
-                    "Check AWS CloudTrail logs to see what operations are in progress"
-                ]
+                    "Check AWS CloudTrail logs to see what operations are in progress",
+                ],
             )
 
-        elif error_code == 'PipelineExecutionNotStoppableException':
+        elif error_code == "PipelineExecutionNotStoppableException":
             return format_error_response(
                 error=error_message,
                 message=f"Pipeline execution cannot be stopped during {operation}",
@@ -291,11 +287,11 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 troubleshooting=[
                     "The pipeline execution may already be completed or stopping",
                     "Check the current execution status before attempting to stop",
-                    "Some pipeline stages cannot be interrupted once started"
-                ]
+                    "Some pipeline stages cannot be interrupted once started",
+                ],
             )
 
-        elif error_code == 'InvalidNextTokenException':
+        elif error_code == "InvalidNextTokenException":
             return format_error_response(
                 error=error_message,
                 message=f"Invalid pagination token provided during {operation}",
@@ -303,11 +299,11 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 troubleshooting=[
                     "Do not manually modify pagination tokens",
                     "Use tokens exactly as returned by previous API calls",
-                    "Tokens may expire - restart the operation if needed"
-                ]
+                    "Tokens may expire - restart the operation if needed",
+                ],
             )
 
-        elif error_code == 'RequestLimitExceeded':
+        elif error_code == "RequestLimitExceeded":
             return format_error_response(
                 error=error_message,
                 message=f"AWS request limit exceeded during {operation}",
@@ -316,8 +312,8 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     "You have exceeded the maximum number of requests per time period",
                     "Wait before making additional requests",
                     "Consider batching operations to reduce API call frequency",
-                    "Check AWS service quotas for your account"
-                ]
+                    "Check AWS service quotas for your account",
+                ],
             )
 
         else:
@@ -329,8 +325,8 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     f"AWS returned error code: {error_code}",
                     "Check AWS service status for any ongoing issues",
                     "Verify your AWS region and account permissions",
-                    "Review AWS CloudTrail logs for more details"
-                ]
+                    "Review AWS CloudTrail logs for more details",
+                ],
             )
 
     else:
@@ -341,8 +337,8 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 "Check network connectivity to AWS services",
                 "Verify AWS region configuration",
                 "Review application logs for more details",
-                "Contact support if the issue persists"
-            ]
+                "Contact support if the issue persists",
+            ],
         )
 
 
@@ -358,7 +354,7 @@ def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]
     """
     base_guidance = [
         "Ensure your AWS credentials have the required IAM permissions:",
-        "You can attach these permissions to your IAM user, role, or group."
+        "You can attach these permissions to your IAM user, role, or group.",
     ]
 
     # Operation-specific permissions
@@ -366,7 +362,7 @@ def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]
         permissions = [
             "  - codepipeline:GetPipeline (to validate pipeline exists)",
             "  - codepipeline:StartPipelineExecution (to start the execution)",
-            f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*"
+            f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*",
         ]
     elif "pipeline status" in operation or "getting status" in operation:
         permissions = [
@@ -374,7 +370,7 @@ def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]
             "  - codepipeline:GetPipelineExecution (to get execution details)",
             "  - codepipeline:GetPipelineState (to get current stage/action)",
             "  - codepipeline:ListPipelineExecutions (to find recent executions)",
-            f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*"
+            f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*",
         ]
     elif "error diagnosis" in operation or "diagnosing pipeline" in operation:
         permissions = [
@@ -385,7 +381,7 @@ def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]
             "  - logs:GetLogEvents (to retrieve CloudWatch logs)",
             f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*",
             f"  - Resource: arn:aws:codebuild:{AWS_REGION}:*:project/*",
-            f"  - Resource: arn:aws:logs:{AWS_REGION}:*:log-group:*"
+            f"  - Resource: arn:aws:logs:{AWS_REGION}:*:log-group:*",
         ]
     else:
         # General permissions for all pipeline operations
@@ -397,19 +393,27 @@ def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]
             "  - codepipeline:StartPipelineExecution",
             "  - codebuild:BatchGetBuilds",
             "  - logs:GetLogEvents",
-            f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*"
+            f"  - Resource: arn:aws:codepipeline:{AWS_REGION}:*:pipeline/*",
         ]
 
     # Add specific guidance based on error message content
     additional_guidance = []
     if "codepipeline:StartPipelineExecution" in error_message:
-        additional_guidance.append("The error specifically mentions StartPipelineExecution permission is missing")
+        additional_guidance.append(
+            "The error specifically mentions StartPipelineExecution permission is missing"
+        )
     elif "codepipeline:GetPipeline" in error_message:
-        additional_guidance.append("The error specifically mentions GetPipeline permission is missing")
+        additional_guidance.append(
+            "The error specifically mentions GetPipeline permission is missing"
+        )
     elif "codebuild:BatchGetBuilds" in error_message:
-        additional_guidance.append("The error specifically mentions CodeBuild access permission is missing")
+        additional_guidance.append(
+            "The error specifically mentions CodeBuild access permission is missing"
+        )
     elif "logs:GetLogEvents" in error_message:
-        additional_guidance.append("The error specifically mentions CloudWatch Logs access permission is missing")
+        additional_guidance.append(
+            "The error specifically mentions CloudWatch Logs access permission is missing"
+        )
 
     # Sample IAM policy
     policy_guidance = [
@@ -429,10 +433,10 @@ def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]
         '        "codebuild:BatchGetBuilds",',
         '        "logs:GetLogEvents"',
         "      ],",
-        f'      "Resource": "*"',
+        '      "Resource": "*"',
         "    }",
         "  ]",
-        "}"
+        "}",
     ]
 
     return base_guidance + permissions + additional_guidance + policy_guidance

@@ -18,20 +18,62 @@ from typing import Dict, Any, Optional
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
-from .manage_pipeline_tools import validate_pipeline_name, format_success_response, validate_execution_id, \
-    get_cached_pipeline_metadata, cache_pipeline_metadata, get_stage_description, get_action_description
-from ...aws_access import format_error_response, get_codepipeline_client, retry_with_exponential_backoff, \
-    handle_aws_error
+from .common import validate_pipeline_name_local, validate_execution_id_local
+
+from ...aws_access import (
+    format_error_response,
+    get_codepipeline_client,
+    retry_with_exponential_backoff,
+    handle_aws_error,
+)
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 
+# Simple cache implementation
+_pipeline_cache = {}
+_cache_timestamps = {}
+
+
+def get_cached_pipeline_metadata(pipeline_name: str):
+    """Get cached pipeline metadata if available."""
+    cache_key = f"pipeline_metadata_{pipeline_name}"
+    return _pipeline_cache.get(cache_key)
+
+
+def cache_pipeline_metadata(pipeline_name: str, metadata):
+    """Cache pipeline metadata."""
+    cache_key = f"pipeline_metadata_{pipeline_name}"
+    _pipeline_cache[cache_key] = metadata
+    from datetime import datetime
+
+    _cache_timestamps[cache_key] = datetime.now()
+
+
+def get_stage_description(stage_name: str) -> str:
+    """Get a description of what happens in a specific LZA pipeline stage."""
+    stage_descriptions = {
+        "Source": "Retrieves LZA source code from GitHub and configuration files from the aws-accelerator-config repository",
+        "Build": "Transpiles the LZA source code and performs input/type validation for configuration files",
+        "Deploy": "Deploys infrastructure across multiple sub-actions including networking, security, operations, and customizations",
+    }
+    return stage_descriptions.get(stage_name, f"Stage: {stage_name}")
+
+
+def get_action_description(action_name: str) -> str:
+    """Get a description of what happens in a specific LZA pipeline action."""
+    action_descriptions = {
+        "Network_Prepare": "Creates Transit Gateway and RAM shares",
+        "Network_VPCs": "Deploys VPCs, subnets, endpoints, and DNS resources",
+    }
+    return action_descriptions.get(action_name, f"Action: {action_name}")
+
 
 async def tool_get_pipeline_status(
-            ctx: Context,
-            pipeline_name: str = DEFAULT_PIPELINE_NAME,
-            execution_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ctx: Context,
+    pipeline_name: str = DEFAULT_PIPELINE_NAME,
+    execution_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """Retrieve current status and execution details for the specified CodePipeline.
 
     This tool provides comprehensive status information about a pipeline execution,
@@ -109,8 +151,7 @@ async def tool_get_pipeline_status(
     # Save whether a specific execution ID was provided (before it gets overwritten)
     original_execution_id_provided = execution_id is not None
 
-    # Validate pipeline name format
-    is_valid, validation_error = validate_pipeline_name(pipeline_name)
+    is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
@@ -119,13 +160,12 @@ async def tool_get_pipeline_status(
                 "Pipeline names must be 1-100 characters long",
                 "Can only contain letters, numbers, periods, underscores, and hyphens",
                 "Cannot contain spaces or other special characters",
-                f"Specific issue: {validation_error}"
-            ]
+                f"Specific issue: {validation_error}",
+            ],
         )
 
-    # Validate execution ID format if provided
     if execution_id is not None:
-        is_valid, validation_error = validate_execution_id(execution_id)
+        is_valid, validation_error = validate_execution_id_local(execution_id)
         if not is_valid:
             return format_error_response(
                 error=f"Invalid execution ID: {validation_error}",
@@ -133,8 +173,8 @@ async def tool_get_pipeline_status(
                 troubleshooting=[
                     "Execution IDs must be valid UUIDs (36 characters with hyphens)",
                     "Format: 12345678-1234-1234-1234-123456789012",
-                    f"Specific issue: {validation_error}"
-                ]
+                    f"Specific issue: {validation_error}",
+                ],
             )
 
     try:
@@ -147,7 +187,7 @@ async def tool_get_pipeline_status(
         # Check cache first
         cached_metadata = get_cached_pipeline_metadata(pipeline_name)
         if cached_metadata:
-            pipeline_stages = cached_metadata['stages']
+            pipeline_stages = cached_metadata["stages"]
             total_stages = len(pipeline_stages)
             logger.info(f"Using cached pipeline metadata with {total_stages} stages")
         else:
@@ -155,19 +195,22 @@ async def tool_get_pipeline_status(
                 pipeline_response = await retry_with_exponential_backoff(
                     codepipeline.get_pipeline, name=pipeline_name
                 )
-                pipeline_stages = pipeline_response['pipeline']['stages']
+                pipeline_stages = pipeline_response["pipeline"]["stages"]
                 total_stages = len(pipeline_stages)
 
                 # Cache the pipeline metadata
-                cache_pipeline_metadata(pipeline_name, {
-                    'stages': pipeline_stages,
-                    'total_stages': total_stages
-                })
+                cache_pipeline_metadata(
+                    pipeline_name,
+                    {"stages": pipeline_stages, "total_stages": total_stages},
+                )
 
-                stage_names = [stage['name'] for stage in pipeline_stages]
+                stage_names = [stage["name"] for stage in pipeline_stages]
                 logger.info(f"Pipeline found with {total_stages} stages: {stage_names}")
             except ClientError as e:
-                if e.response.get('Error', {}).get('Code') == 'PipelineNotFoundException':
+                if (
+                    e.response.get("Error", {}).get("Code")
+                    == "PipelineNotFoundException"
+                ):
                     return format_error_response(
                         error=f"Pipeline '{pipeline_name}' not found",
                         message=f"The specified pipeline '{pipeline_name}' does not exist",
@@ -176,8 +219,8 @@ async def tool_get_pipeline_status(
                             f"Verify the pipeline name '{pipeline_name}' is correct",
                             f"Check that the pipeline exists in region: {AWS_REGION}",
                             "Ensure you have permissions to access the pipeline",
-                            "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines"
-                        ]
+                            "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines",
+                        ],
                     )
                 else:
                     # Re-raise for general error handling
@@ -187,90 +230,107 @@ async def tool_get_pipeline_status(
         if execution_id:
             # When a specific execution ID is provided, still get recent executions to provide context
             logger.info(
-                f"🔍 Step 2: Getting recent pipeline executions (specific execution ID provided: {execution_id})")
+                f"🔍 Step 2: Getting recent pipeline executions (specific execution ID provided: {execution_id})"
+            )
             executions_response = await retry_with_exponential_backoff(
                 codepipeline.list_pipeline_executions,
                 pipelineName=pipeline_name,
-                maxResults=5  # Get more executions when looking for a specific one
+                maxResults=5,  # Get more executions when looking for a specific one
             )
 
             # Log all recent executions found
-            executions = executions_response['pipelineExecutionSummaries']
+            executions = executions_response["pipelineExecutionSummaries"]
             logger.info(f"🔍 Step 2: Found {len(executions)} recent executions:")
             for i, exec_summary in enumerate(executions):
-                exec_id = exec_summary['pipelineExecutionId']
-                exec_status = exec_summary.get('status', 'Unknown')
-                start_time = exec_summary.get('startTime', 'Unknown')
-                logger.info(f"🔍   {i + 1}. {exec_id} - Status: {exec_status} - Started: {start_time}")
+                exec_id = exec_summary["pipelineExecutionId"]
+                exec_status = exec_summary.get("status", "Unknown")
+                start_time = exec_summary.get("startTime", "Unknown")
+                logger.info(
+                    f"🔍   {i + 1}. {exec_id} - Status: {exec_status} - Started: {start_time}"
+                )
 
             # Try to find the specific execution in recent executions
             target_execution = None
             logger.info(f"🔍 Step 3: Looking for SPECIFIC execution ID: {execution_id}")
-            for i, exec_summary in enumerate(executions_response['pipelineExecutionSummaries']):
+            for i, exec_summary in enumerate(
+                executions_response["pipelineExecutionSummaries"]
+            ):
                 logger.info(
-                    f"🔍   Checking execution {i + 1}: {exec_summary['pipelineExecutionId']} (status: {exec_summary.get('status', 'Unknown')})")
-                if exec_summary['pipelineExecutionId'] == execution_id:
+                    f"🔍   Checking execution {i + 1}: {exec_summary['pipelineExecutionId']} (status: {exec_summary.get('status', 'Unknown')})"
+                )
+                if exec_summary["pipelineExecutionId"] == execution_id:
                     target_execution = exec_summary
                     logger.info(f"✅   FOUND requested execution: {execution_id}")
                     break
 
             if target_execution:
-                logger.info(f"🔍 Step 3: SELECTED execution for analysis: {execution_id}")
+                logger.info(
+                    f"🔍 Step 3: SELECTED execution for analysis: {execution_id}"
+                )
             else:
                 # Execution not found in recent list, but we'll still try to get it directly
-                logger.info(f"🔍 Step 3: Execution not found in recent list, will try direct access: {execution_id}")
+                logger.info(
+                    f"🔍 Step 3: Execution not found in recent list, will try direct access: {execution_id}"
+                )
         else:
             # Get recent executions when no specific execution ID is provided
-            logger.info(f"🔍 Step 2: Getting recent pipeline executions")
+            logger.info("🔍 Step 2: Getting recent pipeline executions")
             executions_response = await retry_with_exponential_backoff(
                 codepipeline.list_pipeline_executions,
                 pipelineName=pipeline_name,
-                maxResults=1  # Only need the most recent when no specific ID provided
+                maxResults=1,  # Only need the most recent when no specific ID provided
             )
 
             # Log all recent executions found
-            executions = executions_response['pipelineExecutionSummaries']
+            executions = executions_response["pipelineExecutionSummaries"]
             logger.info(f"🔍 Step 2: Found {len(executions)} recent executions:")
             for i, exec_summary in enumerate(executions):
-                exec_id = exec_summary['pipelineExecutionId']
-                exec_status = exec_summary.get('status', 'Unknown')
-                start_time = exec_summary.get('startTime', 'Unknown')
-                logger.info(f"🔍   {i + 1}. {exec_id} - Status: {exec_status} - Started: {start_time}")
-
-            if not executions_response['pipelineExecutionSummaries']:
-                return format_success_response(
-                    data={
-                        "pipeline_name": pipeline_name,
-                        "status": "NO_EXECUTIONS",
-                        "total_stages": total_stages,
-                        "stage_progress": {
-                            "current_stage_number": 0,
-                            "total_stages": total_stages,
-                            "current_stage_name": None,
-                            "current_action_name": None,
-                            "progress_text": f"No executions found for pipeline (pipeline has {total_stages} stages)"
-                        }
-                    },
-                    message=f"No executions found for pipeline '{pipeline_name}'"
+                exec_id = exec_summary["pipelineExecutionId"]
+                exec_status = exec_summary.get("status", "Unknown")
+                start_time = exec_summary.get("startTime", "Unknown")
+                logger.info(
+                    f"🔍   {i + 1}. {exec_id} - Status: {exec_status} - Started: {start_time}"
                 )
 
+            if not executions_response["pipelineExecutionSummaries"]:
+                response = {
+                    "success": True,
+                    "pipeline_name": pipeline_name,
+                    "status": "NO_EXECUTIONS",
+                    "total_stages": total_stages,
+                    "stage_progress": {
+                        "current_stage_number": 0,
+                        "total_stages": total_stages,
+                        "current_stage_name": None,
+                        "current_action_name": None,
+                        "progress_text": f"No executions found for pipeline (pipeline has {total_stages} stages)",
+                    },
+                    "message": f"No executions found for pipeline '{pipeline_name}'",
+                }
+                return response
+
             # Use the most recent execution
-            target_execution = executions_response['pipelineExecutionSummaries'][0]
-            execution_id = target_execution['pipelineExecutionId']
+            target_execution = executions_response["pipelineExecutionSummaries"][0]
+            execution_id = target_execution["pipelineExecutionId"]
             logger.info(f"🔍 Step 3: Using MOST RECENT execution: {execution_id}")
             logger.info(f"🔍 Step 3: SELECTED execution for analysis: {execution_id}")
 
         # Step 4: Get detailed execution information
-        logger.info(f"Step 4: Getting detailed execution information for: {execution_id}")
+        logger.info(
+            f"Step 4: Getting detailed execution information for: {execution_id}"
+        )
         try:
             execution_response = await retry_with_exponential_backoff(
                 codepipeline.get_pipeline_execution,
                 pipelineName=pipeline_name,
-                pipelineExecutionId=execution_id
+                pipelineExecutionId=execution_id,
             )
-            execution = execution_response['pipelineExecution']
+            execution = execution_response["pipelineExecution"]
         except ClientError as e:
-            if e.response.get('Error', {}).get('Code') == 'PipelineExecutionNotFoundException':
+            if (
+                e.response.get("Error", {}).get("Code")
+                == "PipelineExecutionNotFoundException"
+            ):
                 return format_error_response(
                     error=f"Execution '{execution_id}' not found",
                     message=f"The specified execution ID '{execution_id}' does not exist for pipeline '{pipeline_name}'",
@@ -278,20 +338,28 @@ async def tool_get_pipeline_status(
                     troubleshooting=[
                         "Verify the execution ID is correct",
                         "The execution may have been deleted or expired",
-                        "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions"
-                    ]
+                        "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions",
+                    ],
                 )
             else:
                 # Re-raise for general error handling
                 raise
 
         # Extract basic execution information
-        status = execution['status']
-        execution_mode = execution.get('executionMode', 'NORMAL')
-        start_time = execution['creationTime'].isoformat() if 'creationTime' in execution else None
-        end_time = execution.get('lastUpdateTime', {}).isoformat() if execution.get('lastUpdateTime') else None
+        status = execution["status"]
+        execution_mode = execution.get("executionMode", "NORMAL")
+        start_time = (
+            execution["creationTime"].isoformat()
+            if "creationTime" in execution
+            else None
+        )
+        end_time = (
+            execution.get("lastUpdateTime", {}).isoformat()
+            if execution.get("lastUpdateTime")
+            else None
+        )
 
-        logger.info(f"🔍 EXECUTION ANALYSIS:")
+        logger.info("🔍 EXECUTION ANALYSIS:")
         logger.info(f"🔍   Execution ID: {execution_id}")
         logger.info(f"🔍   Status: {status}")
         logger.info(f"🔍   Execution Mode: {execution_mode}")
@@ -301,17 +369,19 @@ async def tool_get_pipeline_status(
         # Step 5: Get current pipeline state (equivalent to: aws codepipeline get-pipeline-state --name PIPELINE)
         # Get pipeline state when a specific execution ID was originally provided or when execution is in progress
         stage_states = []
-        if original_execution_id_provided or status.upper() == 'IN_PROGRESS':
-            logger.info(f"🔍 Step 5: Getting current pipeline state")
+        if original_execution_id_provided or status.upper() == "IN_PROGRESS":
+            logger.info("🔍 Step 5: Getting current pipeline state")
             state_response = await retry_with_exponential_backoff(
                 codepipeline.get_pipeline_state, name=pipeline_name
             )
-            stage_states = state_response['stageStates']
+            stage_states = state_response["stageStates"]
         else:
-            logger.info(f"🔍 Step 5: Skipping pipeline state for most recent completed execution (status: {status})")
+            logger.info(
+                f"🔍 Step 5: Skipping pipeline state for most recent completed execution (status: {status})"
+            )
 
         # Step 6: Find currently in-progress stages (equivalent to CLI query for InProgress stages)
-        logger.info(f"🔍 Step 6: Finding in-progress stages")
+        logger.info("🔍 Step 6: Finding in-progress stages")
         current_stage = None
         current_action = None
         current_stage_number = 0
@@ -319,25 +389,37 @@ async def tool_get_pipeline_status(
 
         if stage_states:
             # Find all stages that are currently InProgress (equivalent to CLI query)
-            logger.info(f"🔍 Analyzing {len(stage_states)} stages for InProgress status:")
+            logger.info(
+                f"🔍 Analyzing {len(stage_states)} stages for InProgress status:"
+            )
             for i, stage_state in enumerate(stage_states):
-                stage_name = stage_state['stageName']
-                if 'latestExecution' in stage_state:
-                    latest_execution = stage_state['latestExecution']
-                    stage_status = latest_execution.get('status', 'Unknown')
-                    stage_exec_id = latest_execution.get('pipelineExecutionId', 'Unknown')
+                stage_name = stage_state["stageName"]
+                if "latestExecution" in stage_state:
+                    latest_execution = stage_state["latestExecution"]
+                    stage_status = latest_execution.get("status", "Unknown")
+                    stage_exec_id = latest_execution.get(
+                        "pipelineExecutionId", "Unknown"
+                    )
 
-                    logger.info(f"🔍   Stage {i + 1} ({stage_name}): status={stage_status}, exec_id={stage_exec_id}")
+                    logger.info(
+                        f"🔍   Stage {i + 1} ({stage_name}): status={stage_status}, exec_id={stage_exec_id}"
+                    )
 
-                    if stage_status.upper() == 'INPROGRESS':
-                        in_progress_stages.append({
-                            'stage_number': i + 1,
-                            'stage_name': stage_name,
-                            'execution_id': stage_exec_id
-                        })
-                        logger.info(f"✅ Found in-progress stage: {stage_name} (stage {i + 1})")
+                    if stage_status.upper() == "INPROGRESS":
+                        in_progress_stages.append(
+                            {
+                                "stage_number": i + 1,
+                                "stage_name": stage_name,
+                                "execution_id": stage_exec_id,
+                            }
+                        )
+                        logger.info(
+                            f"✅ Found in-progress stage: {stage_name} (stage {i + 1})"
+                        )
                 else:
-                    logger.info(f"🔍   Stage {i + 1} ({stage_name}): no latestExecution")
+                    logger.info(
+                        f"🔍   Stage {i + 1} ({stage_name}): no latestExecution"
+                    )
 
             logger.info(f"🔍 Found {len(in_progress_stages)} in-progress stages")
 
@@ -345,33 +427,42 @@ async def tool_get_pipeline_status(
             if in_progress_stages:
                 # Use the first in-progress stage (there should typically be only one)
                 current_stage_info = in_progress_stages[0]
-                current_stage = current_stage_info['stage_name']
-                current_stage_number = current_stage_info['stage_number']
+                current_stage = current_stage_info["stage_name"]
+                current_stage_number = current_stage_info["stage_number"]
 
-                logger.info(f"✅ Using in-progress stage: {current_stage} (stage {current_stage_number})")
+                logger.info(
+                    f"✅ Using in-progress stage: {current_stage} (stage {current_stage_number})"
+                )
 
                 # Find current action within this stage
                 stage_state = stage_states[current_stage_number - 1]
-                if 'actionStates' in stage_state:
-                    for action_state in stage_state['actionStates']:
-                        if 'latestExecution' in action_state:
-                            action_execution = action_state['latestExecution']
-                            if action_execution.get('status', '').upper() == 'INPROGRESS':
-                                current_action = action_state['actionName']
-                                logger.info(f"✅ Found in-progress action: {current_action}")
+                if "actionStates" in stage_state:
+                    for action_state in stage_state["actionStates"]:
+                        if "latestExecution" in action_state:
+                            action_execution = action_state["latestExecution"]
+                            if (
+                                action_execution.get("status", "").upper()
+                                == "INPROGRESS"
+                            ):
+                                current_action = action_state["actionName"]
+                                logger.info(
+                                    f"✅ Found in-progress action: {current_action}"
+                                )
                                 break
 
         # Determine current stage based on execution status if not found from stage states
         if not current_stage:
-            if status.upper() == 'IN_PROGRESS':
+            if status.upper() == "IN_PROGRESS":
                 # Pipeline execution is IN_PROGRESS but no stages show InProgress
-                logger.warning(f"⚠️ Pipeline execution is IN_PROGRESS but no stages show InProgress status")
+                logger.warning(
+                    "⚠️ Pipeline execution is IN_PROGRESS but no stages show InProgress status"
+                )
                 current_stage_number = 1  # Assume it's starting
-                current_stage = pipeline_stages[0]['name'] if pipeline_stages else None
-            elif status in ['SUCCEEDED', 'FAILED', 'STOPPED', 'STOPPING']:
+                current_stage = pipeline_stages[0]["name"] if pipeline_stages else None
+            elif status in ["SUCCEEDED", "FAILED", "STOPPED", "STOPPING"]:
                 # For completed executions, show the final stage
                 current_stage_number = total_stages
-                current_stage = pipeline_stages[-1]['name'] if pipeline_stages else None
+                current_stage = pipeline_stages[-1]["name"] if pipeline_stages else None
             else:
                 # For other statuses, we can't determine the stage
                 logger.info(f"🔍 Cannot determine stage for status: {status}")
@@ -384,9 +475,9 @@ async def tool_get_pipeline_status(
             if current_action:
                 progress_text += f" (action: {current_action})"
         else:
-            if len(in_progress_stages) == 0 and status.upper() == 'IN_PROGRESS':
-                progress_text = f"Pipeline execution is in progress but no stages are currently active"
-            elif status.upper() in ['SUCCEEDED', 'FAILED', 'STOPPED', 'STOPPING']:
+            if len(in_progress_stages) == 0 and status.upper() == "IN_PROGRESS":
+                progress_text = "Pipeline execution is in progress but no stages are currently active"
+            elif status.upper() in ["SUCCEEDED", "FAILED", "STOPPED", "STOPPING"]:
                 progress_text = f"Pipeline execution {status.lower()}"
             else:
                 progress_text = f"Pipeline has {total_stages} stages (status: {status})"
@@ -397,8 +488,12 @@ async def tool_get_pipeline_status(
             "current_stage_name": current_stage,
             "current_action_name": current_action,
             "progress_text": progress_text,
-            "current_stage_description": get_stage_description(current_stage) if current_stage else None,
-            "current_action_description": get_action_description(current_action) if current_action else None
+            "current_stage_description": get_stage_description(current_stage)
+            if current_stage
+            else None,
+            "current_action_description": get_action_description(current_action)
+            if current_action
+            else None,
         }
 
         # Create response data
@@ -406,7 +501,7 @@ async def tool_get_pipeline_status(
             "execution_id": execution_id,
             "pipeline_name": pipeline_name,
             "status": status,
-            "stage_progress": stage_progress
+            "stage_progress": stage_progress,
         }
 
         # Add timing information if available
@@ -422,33 +517,33 @@ async def tool_get_pipeline_status(
             response_data["current_action"] = current_action
 
         # Create appropriate message based on status and current stage
-        if status.upper() == 'IN_PROGRESS':
+        if status.upper() == "IN_PROGRESS":
             if current_stage:
                 message = f"Pipeline is on stage '{current_stage}' (stage {current_stage_number} of {total_stages})"
             elif len(in_progress_stages) > 0:
-                stage_names = [stage['stage_name'] for stage in in_progress_stages]
+                stage_names = [stage["stage_name"] for stage in in_progress_stages]
                 message = f"Pipeline has {len(in_progress_stages)} active stages: {', '.join(stage_names)}"
             else:
-                message = f"Pipeline execution is in progress but no stages are currently active"
+                message = "Pipeline execution is in progress but no stages are currently active"
         elif current_stage and original_execution_id_provided:
             # When a specific execution ID is provided, show stage info even for completed executions
             message = f"Pipeline is on stage '{current_stage}' (stage {current_stage_number} of {total_stages})"
-        elif status.upper() == 'FAILED':
-            message = f"Pipeline execution failed"
-        elif status.upper() == 'SUCCEEDED':
-            message = f"Pipeline execution completed successfully"
-        elif status.upper() in ['STOPPED', 'STOPPING']:
-            message = f"Pipeline execution was stopped"
+        elif status.upper() == "FAILED":
+            message = "Pipeline execution failed"
+        elif status.upper() == "SUCCEEDED":
+            message = "Pipeline execution completed successfully"
+        elif status.upper() in ["STOPPED", "STOPPING"]:
+            message = "Pipeline execution was stopped"
         else:
             message = f"Pipeline execution status: {status}"
 
         logger.info(
-            f"Pipeline status retrieved successfully. Status: {status}, Stage: {current_stage_number}/{total_stages}")
-
-        return format_success_response(
-            data=response_data,
-            message=message
+            f"Pipeline status retrieved successfully. Status: {status}, Stage: {current_stage_number}/{total_stages}"
         )
+
+        response = {"success": True, "message": message}
+        response.update(response_data)
+        return response
 
     except Exception as e:
         logger.error(f"Error getting pipeline status: {str(e)}")
