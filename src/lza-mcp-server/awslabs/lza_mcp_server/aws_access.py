@@ -23,7 +23,6 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 from .constants import DEFAULT_REGION, MAX_RETRY_ATTEMPTS, INITIAL_RETRY_DELAY
 
-# AWS Configuration
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 logger = logging.getLogger(__name__)
 
@@ -127,7 +126,6 @@ async def retry_with_exponential_backoff(func, *args, **kwargs):
         except ClientError as e:
             error_code = e.response.get('Error', {}).get('Code', '')
 
-            # Only retry on throttling and temporary errors
             if error_code in ['ThrottlingException', 'Throttling', 'RequestLimitExceeded', 'ServiceUnavailable']:
                 last_exception = e
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
@@ -136,13 +134,10 @@ async def retry_with_exponential_backoff(func, *args, **kwargs):
                     await asyncio.sleep(delay)
                     delay *= 2  # Exponential backoff
                     continue
-            # Don't retry on other errors (permissions, not found, etc.)
             raise
         except Exception as e:
-            # Don't retry on non-AWS errors
             raise
 
-    # If we get here, all retries were exhausted
     raise last_exception
 
 
@@ -184,6 +179,7 @@ def format_error_response(
         ]
 
     return response
+
 
 def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
     """Handle AWS API errors with appropriate error categorization and guidance.
