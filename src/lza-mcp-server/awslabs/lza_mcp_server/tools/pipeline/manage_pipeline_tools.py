@@ -19,7 +19,12 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from ...constants import CACHE_TTL_SECONDS, MAX_LOG_SIZE, DEFAULT_REGION, DEFAULT_PIPELINE_NAME
+from ...constants import (
+    CACHE_TTL_SECONDS,
+    MAX_LOG_SIZE,
+    DEFAULT_REGION,
+    DEFAULT_PIPELINE_NAME,
+)
 from .release_pipeline import tool_release_pipeline
 from .get_pipeline_status import tool_get_pipeline_status
 from .diagnose_pipeline_errors import tool_diagnose_pipeline_errors
@@ -35,10 +40,10 @@ _cache_timestamps = {}
 
 def is_cache_valid(cache_key: str) -> bool:
     """Check if a cache entry is still valid based on TTL.
-    
+
     Args:
         cache_key: The cache key to check
-        
+
     Returns:
         bool: True if cache entry is valid, False otherwise
     """
@@ -52,10 +57,10 @@ def is_cache_valid(cache_key: str) -> bool:
 
 def get_cached_pipeline_metadata(pipeline_name: str) -> Optional[Dict[str, Any]]:
     """Get cached pipeline metadata if available and valid.
-    
+
     Args:
         pipeline_name: Name of the pipeline
-        
+
     Returns:
         Dict containing cached pipeline metadata or None if not cached/expired
     """
@@ -70,7 +75,7 @@ def get_cached_pipeline_metadata(pipeline_name: str) -> Optional[Dict[str, Any]]
 
 def cache_pipeline_metadata(pipeline_name: str, metadata: Dict[str, Any]) -> None:
     """Cache pipeline metadata with timestamp.
-    
+
     Args:
         pipeline_name: Name of the pipeline
         metadata: Pipeline metadata to cache
@@ -90,11 +95,11 @@ def clear_pipeline_cache() -> None:
 
 def truncate_logs(logs_content: str, max_size: int = MAX_LOG_SIZE) -> str:
     """Truncate log content to prevent memory issues while preserving important information.
-    
+
     Args:
         logs_content: The full log content
         max_size: Maximum size in characters
-        
+
     Returns:
         str: Truncated log content with truncation notice if applicable
     """
@@ -113,28 +118,25 @@ def truncate_logs(logs_content: str, max_size: int = MAX_LOG_SIZE) -> str:
 
 def format_success_response(data: Dict[str, Any], message: str) -> Dict[str, Any]:
     """Format a successful response with consistent structure.
-    
+
     Args:
         data: The response data to include
         message: Success message to include
-        
+
     Returns:
         Dict containing success=True, message, and the provided data
     """
-    response = {
-        "success": True,
-        "message": message
-    }
+    response = {"success": True, "message": message}
     response.update(data)
     return response
 
 
 def validate_pipeline_name(pipeline_name: str) -> tuple[bool, str]:
     """Validate that a pipeline name meets AWS CodePipeline naming requirements.
-    
+
     Args:
         pipeline_name: The pipeline name to validate
-        
+
     Returns:
         tuple: (is_valid: bool, error_message: str)
     """
@@ -152,23 +154,32 @@ def validate_pipeline_name(pipeline_name: str) -> tuple[bool, str]:
         return False, "Pipeline name cannot be empty"
 
     if len(pipeline_name) > 100:
-        return False, f"Pipeline name too long ({len(pipeline_name)} characters). Maximum is 100 characters"
+        return (
+            False,
+            f"Pipeline name too long ({len(pipeline_name)} characters). Maximum is 100 characters",
+        )
 
     # Check for valid characters
     import re
-    if not re.match(r'^[a-zA-Z0-9._-]+$', pipeline_name):
-        invalid_chars = set(pipeline_name) - set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-')
-        return False, f"Pipeline name contains invalid characters: {', '.join(sorted(invalid_chars))}. Only letters, numbers, periods, underscores, and hyphens are allowed"
+
+    if not re.match(r"^[a-zA-Z0-9._-]+$", pipeline_name):
+        invalid_chars = set(pipeline_name) - set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+        )
+        return (
+            False,
+            f"Pipeline name contains invalid characters: {', '.join(sorted(invalid_chars))}. Only letters, numbers, periods, underscores, and hyphens are allowed",
+        )
 
     return True, ""
 
 
 def validate_execution_id(execution_id: str) -> tuple[bool, str]:
     """Validate that an execution ID meets AWS CodePipeline execution ID format.
-    
+
     Args:
         execution_id: The execution ID to validate
-        
+
     Returns:
         tuple: (is_valid: bool, error_message: str)
     """
@@ -180,20 +191,26 @@ def validate_execution_id(execution_id: str) -> tuple[bool, str]:
 
     # AWS execution IDs are UUIDs (36 characters with hyphens)
     import re
-    uuid_pattern = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+    uuid_pattern = (
+        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    )
 
     if not re.match(uuid_pattern, execution_id):
-        return False, f"Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012), got: {execution_id}"
+        return (
+            False,
+            f"Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012), got: {execution_id}",
+        )
 
     return True, ""
 
 
 def get_stage_description(stage_name: str) -> str:
     """Get a description of what happens in a specific LZA pipeline stage.
-    
+
     Args:
         stage_name: Name of the pipeline stage
-        
+
     Returns:
         str: Description of what the stage does
     """
@@ -208,7 +225,7 @@ def get_stage_description(stage_name: str) -> str:
         "Organization": "Deploys AWS Organization-wide resources like trusted services, policies, Cost and Usage Reports, and Budgets",
         "SecurityAudit": "Deploys security service dependencies for Macie, GuardDuty, Security Hub in the audit account",
         "Security_Audit": "Deploys security service dependencies for Macie, GuardDuty, Security Hub in the audit account",
-        "Deploy": "Deploys infrastructure across multiple sub-actions including networking, security, operations, and customizations"
+        "Deploy": "Deploys infrastructure across multiple sub-actions including networking, security, operations, and customizations",
     }
 
     return stage_descriptions.get(stage_name, f"Stage: {stage_name}")
@@ -216,10 +233,10 @@ def get_stage_description(stage_name: str) -> str:
 
 def get_action_description(action_name: str) -> str:
     """Get a description of what happens in a specific LZA pipeline action.
-    
+
     Args:
         action_name: Name of the pipeline action
-        
+
     Returns:
         str: Description of what the action does
     """
@@ -231,7 +248,7 @@ def get_action_description(action_name: str) -> str:
         "Security_Resources": "Deploys Config, CloudWatch metrics, and alarms",
         "Network_Associations": "Creates network associations and Gateway Load Balancer endpoints",
         "Customizations": "Deploys custom CloudFormation stacks/stacksets (optional)",
-        "Finalize": "Removes quarantine SCPs from new accounts"
+        "Finalize": "Removes quarantine SCPs from new accounts",
     }
 
     return action_descriptions.get(action_name, f"Action: {action_name}")
@@ -239,24 +256,24 @@ def get_action_description(action_name: str) -> str:
 
 def extract_create_failed_error(logs_content: str) -> str:
     """Extract the first CREATE_FAILED error from CodeBuild logs.
-    
+
     This focuses specifically on CloudFormation CREATE_FAILED errors which are
     the most actionable for LZA troubleshooting.
-    
+
     Args:
         logs_content: The full build log content
-        
+
     Returns:
         str: The first CREATE_FAILED line found, or None if none found
     """
     if not logs_content:
         return None
 
-    lines = logs_content.split('\n')
+    lines = logs_content.split("\n")
 
     # Look specifically for CREATE_FAILED lines
     for line in lines:
-        if 'CREATE_FAILED' in line:
+        if "CREATE_FAILED" in line:
             clean_line = line.strip()
             if clean_line:
                 return clean_line
@@ -279,11 +296,11 @@ def extract_error_line(logs_content: str) -> str:
     if not logs_content:
         return None
 
-    lines = logs_content.split('\n')
+    lines = logs_content.split("\n")
 
     # Look specifically for '| error |' lines
     for line in lines:
-        if '| error |' in line:
+        if "| error |" in line:
             clean_line = line.strip()
             if clean_line:
                 return clean_line
@@ -302,20 +319,51 @@ def register_pipeline_tools(mcp):
 
     @mcp.tool(name="releasePipeline")  # nosemgrep: useless-inner-function
     async def release_pipeline(
-            ctx: Context,
-            pipeline_name: str = DEFAULT_PIPELINE_NAME
-    ) -> Dict[str, Any]: tool_release_pipeline(ctx, pipeline_name)
+        ctx: Context, pipeline_name: str = DEFAULT_PIPELINE_NAME
+    ) -> Dict[str, Any]:
+        return await tool_release_pipeline(ctx, pipeline_name)
 
     @mcp.tool(name="getPipelineStatus")  # nosemgrep: useless-inner-function
     async def get_pipeline_status(
-            ctx: Context,
-            pipeline_name: str = DEFAULT_PIPELINE_NAME,
-            execution_id: Optional[str] = None
-    ) -> Dict[str, Any]: tool_get_pipeline_status(ctx, pipeline_name, execution_id)
+        ctx: Context,
+        pipeline_name: str = DEFAULT_PIPELINE_NAME,
+        execution_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return await tool_get_pipeline_status(ctx, pipeline_name, execution_id)
 
     @mcp.tool(name="diagnosePipelineErrors")  # nosemgrep: useless-inner-function
     async def diagnose_pipeline_errors(
-            ctx: Context,
-            pipeline_name: str = DEFAULT_PIPELINE_NAME,
-            execution_id: Optional[str] = None
-    ) -> Dict[str, Any]: tool_diagnose_pipeline_errors(ctx, pipeline_name, execution_id)
+        ctx: Context,
+        pipeline_name: str = DEFAULT_PIPELINE_NAME,
+        execution_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return await tool_diagnose_pipeline_errors(ctx, pipeline_name, execution_id)
+
+
+def validate_aws_region(region: str) -> tuple[bool, str]:
+    """Validate that an AWS region meets AWS region naming requirements.
+
+    Args:
+        region: The AWS region to validate
+
+    Returns:
+        tuple: (is_valid: bool, error_message: str)
+    """
+    if not region:
+        return False, "AWS region cannot be empty"
+
+    if not isinstance(region, str):
+        return False, "AWS region must be a string"
+
+    # AWS region format: us-east-1, eu-west-1, ap-southeast-2, etc.
+    import re
+
+    region_pattern = r"^[a-z]{2,3}-[a-z]+-[0-9]+$"
+
+    if not re.match(region_pattern, region):
+        return (
+            False,
+            f"Invalid AWS region format. Expected format like 'us-east-1', got: {region}",
+        )
+
+    return True, ""

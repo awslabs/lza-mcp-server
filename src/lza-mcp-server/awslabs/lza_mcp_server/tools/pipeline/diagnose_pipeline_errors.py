@@ -18,19 +18,30 @@ from typing import Dict, Any, Optional
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
-from .manage_pipeline_tools import validate_pipeline_name, format_success_response, validate_execution_id, \
-    extract_create_failed_error, truncate_logs
-from ...aws_access import format_error_response, get_codepipeline_client, retry_with_exponential_backoff, \
-    handle_aws_error, get_codebuild_client, get_logs_client
+from .common import (
+    truncate_logs,
+    validate_pipeline_name_local,
+    validate_execution_id_local,
+    extract_create_failed_error,
+)
+
+from ...aws_access import (
+    format_error_response,
+    get_codepipeline_client,
+    retry_with_exponential_backoff,
+    handle_aws_error,
+    get_codebuild_client,
+    get_logs_client,
+)
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 
 
 async def tool_diagnose_pipeline_errors(
-        ctx: Context,
-        pipeline_name: str = DEFAULT_PIPELINE_NAME,
-        execution_id: Optional[str] = None
+    ctx: Context,
+    pipeline_name: str = DEFAULT_PIPELINE_NAME,
+    execution_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Automatically detect and retrieve detailed error information for failed pipeline executions.
 
@@ -79,8 +90,7 @@ async def tool_diagnose_pipeline_errors(
     """
     logger.info(f"Diagnosing pipeline errors for: {pipeline_name}")
 
-    # Validate pipeline name format
-    is_valid, validation_error = validate_pipeline_name(pipeline_name)
+    is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
@@ -89,13 +99,12 @@ async def tool_diagnose_pipeline_errors(
                 "Pipeline names must be 1-100 characters long",
                 "Can only contain letters, numbers, periods, underscores, and hyphens",
                 "Cannot contain spaces or other special characters",
-                f"Specific issue: {validation_error}"
-            ]
+                f"Specific issue: {validation_error}",
+            ],
         )
 
-    # Validate execution ID format if provided
     if execution_id is not None:
-        is_valid, validation_error = validate_execution_id(execution_id)
+        is_valid, validation_error = validate_execution_id_local(execution_id)
         if not is_valid:
             return format_error_response(
                 error=f"Invalid execution ID: {validation_error}",
@@ -103,8 +112,8 @@ async def tool_diagnose_pipeline_errors(
                 troubleshooting=[
                     "Execution IDs must be valid UUIDs (36 characters with hyphens)",
                     "Format: 12345678-1234-1234-1234-123456789012",
-                    f"Specific issue: {validation_error}"
-                ]
+                    f"Specific issue: {validation_error}",
+                ],
             )
 
     try:
@@ -119,7 +128,7 @@ async def tool_diagnose_pipeline_errors(
             )
             logger.info(f"Pipeline found: {pipeline_name}")
         except ClientError as e:
-            if e.response.get('Error', {}).get('Code') == 'PipelineNotFoundException':
+            if e.response.get("Error", {}).get("Code") == "PipelineNotFoundException":
                 return format_error_response(
                     error=f"Pipeline '{pipeline_name}' not found",
                     message=f"The specified pipeline '{pipeline_name}' does not exist",
@@ -128,8 +137,8 @@ async def tool_diagnose_pipeline_errors(
                         f"Verify the pipeline name '{pipeline_name}' is correct",
                         f"Check that the pipeline exists in region: {AWS_REGION}",
                         "Ensure you have permissions to access the pipeline",
-                        "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines"
-                    ]
+                        "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines",
+                    ],
                 )
             else:
                 # Re-raise for general error handling
@@ -141,12 +150,14 @@ async def tool_diagnose_pipeline_errors(
             logger.info(f"Getting specific execution: {execution_id}")
             try:
                 execution_response = codepipeline.get_pipeline_execution(
-                    pipelineName=pipeline_name,
-                    pipelineExecutionId=execution_id
+                    pipelineName=pipeline_name, pipelineExecutionId=execution_id
                 )
-                execution = execution_response['pipelineExecution']
+                execution = execution_response["pipelineExecution"]
             except ClientError as e:
-                if e.response.get('Error', {}).get('Code') == 'PipelineExecutionNotFoundException':
+                if (
+                    e.response.get("Error", {}).get("Code")
+                    == "PipelineExecutionNotFoundException"
+                ):
                     return format_error_response(
                         error=f"Execution '{execution_id}' not found",
                         message=f"The specified execution ID '{execution_id}' does not exist for pipeline '{pipeline_name}'",
@@ -154,64 +165,68 @@ async def tool_diagnose_pipeline_errors(
                         troubleshooting=[
                             "Verify the execution ID is correct",
                             "Check that the execution exists for this pipeline",
-                            "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions"
-                        ]
+                            "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions",
+                        ],
                     )
                 else:
                     # Re-raise for general error handling
                     raise
         else:
             # Find most recent failed execution
-            logger.info(f"Finding most recent failed execution for pipeline: {pipeline_name}")
+            logger.info(
+                f"Finding most recent failed execution for pipeline: {pipeline_name}"
+            )
             executions_response = await retry_with_exponential_backoff(
                 codepipeline.list_pipeline_executions,
                 pipelineName=pipeline_name,
-                maxResults=10  # Check last 10 executions for failures
+                maxResults=10,  # Check last 10 executions for failures
             )
 
             failed_execution = None
-            for execution_summary in executions_response['pipelineExecutionSummaries']:
-                if execution_summary['status'].upper() == 'FAILED':
+            for execution_summary in executions_response["pipelineExecutionSummaries"]:
+                if execution_summary["status"].upper() == "FAILED":
                     failed_execution = execution_summary
                     break
 
             if not failed_execution:
-                return format_success_response(
-                    data={
-                        "pipeline_name": pipeline_name,
-                        "failed_actions": []
-                    },
-                    message=f"No failed executions found for pipeline '{pipeline_name}'"
-                )
+                response = {
+                    "success": True,
+                    "pipeline_name": pipeline_name,
+                    "failed_actions": [],
+                    "message": f"No failed executions found for pipeline '{pipeline_name}'",
+                }
+                return response
 
-            execution_id = failed_execution['pipelineExecutionId']
+            execution_id = failed_execution["pipelineExecutionId"]
 
             # Get detailed execution information
             execution_response = await retry_with_exponential_backoff(
                 codepipeline.get_pipeline_execution,
                 pipelineName=pipeline_name,
-                pipelineExecutionId=execution_id
+                pipelineExecutionId=execution_id,
             )
-            execution = execution_response['pipelineExecution']
+            execution = execution_response["pipelineExecution"]
 
         # Check if execution actually failed (case-insensitive comparison)
-        if execution['status'].upper() != 'FAILED':
-            return format_success_response(
-                data={
-                    "pipeline_name": pipeline_name,
-                    "execution_id": execution_id,
-                    "status": execution['status'],
-                    "failed_actions": []
-                },
-                message=f"Execution '{execution_id}' has status '{execution['status']}' - no failures to diagnose"
-            )
+        if execution["status"].upper() != "FAILED":
+            response = {
+                "success": True,
+                "pipeline_name": pipeline_name,
+                "execution_id": execution_id,
+                "status": execution["status"],
+                "failed_actions": [],
+                "message": f"Execution '{execution_id}' has status '{execution['status']}' - no failures to diagnose",
+            }
+            return response
 
         # Get pipeline state to find failed actions
-        logger.info(f"Getting pipeline state to identify failed actions: {execution_id}")
+        logger.info(
+            f"Getting pipeline state to identify failed actions: {execution_id}"
+        )
         state_response = await retry_with_exponential_backoff(
             codepipeline.get_pipeline_state, name=pipeline_name
         )
-        stage_states = state_response['stageStates']
+        stage_states = state_response["stageStates"]
 
         failed_actions = []
 
@@ -222,8 +237,12 @@ async def tool_diagnose_pipeline_errors(
         # Create response
         if failed_actions:
             # Count actions with detailed logs vs basic error info
-            actions_with_logs = sum(1 for action in failed_actions if action.get('codebuild_logs'))
-            actions_with_specific_errors = sum(1 for action in failed_actions if action.get('specific_error'))
+            actions_with_logs = sum(
+                1 for action in failed_actions if action.get("codebuild_logs")
+            )
+            actions_with_specific_errors = sum(
+                1 for action in failed_actions if action.get("specific_error")
+            )
 
             if actions_with_specific_errors > 0:
                 message = f"Found {len(failed_actions)} failed action(s) with CREATE_FAILED error details"
@@ -234,16 +253,18 @@ async def tool_diagnose_pipeline_errors(
         else:
             message = f"No failed actions found in execution '{execution_id}'"
 
-        logger.info(f"Pipeline error diagnosis completed. Found {len(failed_actions)} failed actions")
-
-        return format_success_response(
-            data={
-                "pipeline_name": pipeline_name,
-                "execution_id": execution_id,
-                "failed_actions": failed_actions
-            },
-            message=message
+        logger.info(
+            f"Pipeline error diagnosis completed. Found {len(failed_actions)} failed actions"
         )
+
+        response = {
+            "success": True,
+            "pipeline_name": pipeline_name,
+            "execution_id": execution_id,
+            "failed_actions": failed_actions,
+            "message": message,
+        }
+        return response
 
     except Exception as e:
         logger.error(f"Error diagnosing pipeline errors: {str(e)}")
@@ -251,60 +272,77 @@ async def tool_diagnose_pipeline_errors(
 
 
 async def find_failures_in_stages(execution_id, failed_actions, stage_state):
-    stage_name = stage_state['stageName']
+    stage_name = stage_state["stageName"]
     logger.info(f"Analyzing stage: {stage_name}")
-    if 'actionStates' in stage_state:
-        for action_state in stage_state['actionStates']:
-            action_name = action_state['actionName']
+    if "actionStates" in stage_state:
+        for action_state in stage_state["actionStates"]:
+            action_name = action_state["actionName"]
             # Get action type - handle both nested and flat structures
-            action_type_id = action_state.get('actionTypeId', {})
+            action_type_id = action_state.get("actionTypeId", {})
             if isinstance(action_type_id, dict):
-                action_type = action_type_id.get('provider', 'Unknown')
+                action_type = action_type_id.get("provider", "Unknown")
             else:
-                action_type = 'Unknown'
+                action_type = "Unknown"
 
             # Check if this action failed in our execution
-            if 'latestExecution' in action_state:
-                action_execution = action_state['latestExecution']
-                action_status = action_execution.get('status', 'Unknown')
-                logger.info(f"  Action: {action_name} ({action_type}) - Status: {action_status}")
+            if "latestExecution" in action_state:
+                action_execution = action_state["latestExecution"]
+                action_status = action_execution.get("status", "Unknown")
+                logger.info(
+                    f"  Action: {action_name} ({action_type}) - Status: {action_status}"
+                )
 
                 # Check if this action failed
                 # Note: We check the stage's latestExecution to see if it belongs to our pipeline execution
-                stage_execution = stage_state.get('latestExecution', {})
-                stage_execution_id = stage_execution.get('pipelineExecutionId')
+                stage_execution = stage_state.get("latestExecution", {})
+                stage_execution_id = stage_execution.get("pipelineExecutionId")
 
                 # Only process actions from the execution we're diagnosing
-                if (action_execution.get('status', '').upper() == 'FAILED' and
-                        stage_execution_id == execution_id):
+                if (
+                    action_execution.get("status", "").upper() == "FAILED"
+                    and stage_execution_id == execution_id
+                ):
                     # Get error details directly from pipeline state (much simpler and more reliable!)
-                    error_details = action_execution.get('errorDetails', {})
-                    error_code = error_details.get('code', 'Unknown')
-                    error_message = error_details.get('message', 'No error message available')
+                    error_details = action_execution.get("errorDetails", {})
+                    error_code = error_details.get("code", "Unknown")
+                    error_message = error_details.get(
+                        "message", "No error message available"
+                    )
 
                     # Create failure details with all available information
-                    failure_details = await build_failure_details_object(action_execution, action_name, action_type,
-                                                                         error_code, error_message, stage_name)
+                    failure_details = await build_failure_details_object(
+                        action_execution,
+                        action_name,
+                        action_type,
+                        error_code,
+                        error_message,
+                        stage_name,
+                    )
 
                     # Try to get CREATE_FAILED error from CodeBuild logs
-                    external_execution_id = action_execution.get('externalExecutionId')
+                    external_execution_id = action_execution.get("externalExecutionId")
                     if external_execution_id:
                         try:
-                            await pull_codebuild_details(action_name, external_execution_id, failure_details)
+                            await pull_codebuild_details(
+                                action_name, external_execution_id, failure_details
+                            )
 
                         except Exception as build_error:
                             logger.warning(
-                                f"Could not retrieve CodeBuild details for {external_execution_id}: {build_error}")
+                                f"Could not retrieve CodeBuild details for {external_execution_id}: {build_error}"
+                            )
 
                     logger.info(
-                        f"Found failed action: {stage_name}/{action_name} - {error_code}: {error_message}")
+                        f"Found failed action: {stage_name}/{action_name} - {error_code}: {error_message}"
+                    )
 
                     # Add to failed actions list
                     failed_actions.append(failure_details)
 
 
-async def build_failure_details_object(action_execution, action_name, action_type, error_code, error_message,
-                                       stage_name):
+async def build_failure_details_object(
+    action_execution, action_name, action_type, error_code, error_message, stage_name
+):
     failure_details = {
         "stage_name": stage_name,
         "action_name": action_name,
@@ -312,97 +350,102 @@ async def build_failure_details_object(action_execution, action_name, action_typ
         "error_code": error_code,
         "error_message": error_message,
         "error_summary": f"Failed {action_type} action ({error_code}): {error_message}",
-        "external_execution_id": action_execution.get('externalExecutionId'),
-        "external_execution_url": action_execution.get('externalExecutionUrl'),
-        "last_status_change": action_execution.get('lastStatusChange'),
+        "external_execution_id": action_execution.get("externalExecutionId"),
+        "external_execution_url": action_execution.get("externalExecutionUrl"),
+        "last_status_change": action_execution.get("lastStatusChange"),
         "codebuild_logs": None,
-        "specific_error": None
+        "specific_error": None,
     }
     return failure_details
 
 
 async def pull_codebuild_details(action_name, external_execution_id, failure_details):
     logger.info(
-        f"Retrieving CodeBuild logs for CREATE_FAILED error: {external_execution_id}")
+        f"Retrieving CodeBuild logs for CREATE_FAILED error: {external_execution_id}"
+    )
     # Get CodeBuild client
     codebuild = get_codebuild_client()
     # Get build details
     build_response = await retry_with_exponential_backoff(
         codebuild.batch_get_builds, ids=[external_execution_id]
     )
-    if build_response['builds']:
-        build = build_response['builds'][0]
+    if build_response["builds"]:
+        build = build_response["builds"][0]
 
         # Get CloudWatch logs if available
-        if 'logs' in build and 'groupName' in build['logs'] and 'streamName' in \
-                build['logs']:
-            log_group = build['logs']['groupName']
-            log_stream = build['logs']['streamName']
+        if (
+            "logs" in build
+            and "groupName" in build["logs"]
+            and "streamName" in build["logs"]
+        ):
+            log_group = build["logs"]["groupName"]
+            log_stream = build["logs"]["streamName"]
 
             try:
-                await get_cloudwatch_logs(action_name, external_execution_id,
-                                          failure_details, log_group, log_stream)
+                await get_cloudwatch_logs(
+                    action_name,
+                    external_execution_id,
+                    failure_details,
+                    log_group,
+                    log_stream,
+                )
 
             except Exception as log_error:
                 logger.warning(f"Could not retrieve CloudWatch logs: {log_error}")
         else:
             logger.info(
-                f"No CloudWatch logs available for build {external_execution_id}")
+                f"No CloudWatch logs available for build {external_execution_id}"
+            )
     else:
         logger.warning(f"No build details found for {external_execution_id}")
 
 
-async def get_cloudwatch_logs(action_name, external_execution_id, failure_details, log_group, log_stream):
+async def get_cloudwatch_logs(
+    action_name, external_execution_id, failure_details, log_group, log_stream
+):
     # Get CloudWatch Logs client
     logs_client = get_logs_client()
-    logger.info(
-        f"Retrieving CloudWatch logs from {log_group}/{log_stream}")
+    logger.info(f"Retrieving CloudWatch logs from {log_group}/{log_stream}")
     # Get log events - get more events to find CREATE_FAILED
     log_response = await retry_with_exponential_backoff(
         logs_client.get_log_events,
         logGroupName=log_group,
         logStreamName=log_stream,
         limit=2000,  # Get more logs to find CREATE_FAILED
-        startFromHead=True  # Start from beginning to get all events
+        startFromHead=True,  # Start from beginning to get all events
     )
     # Format log events and look for CREATE_FAILED
-    log_events = log_response['events']
+    log_events = log_response["events"]
     if log_events:
-        await format_log_events_for_create_failed(action_name,
-                                                  failure_details,
-                                                  log_events)
+        await format_log_events_for_create_failed(
+            action_name, failure_details, log_events
+        )
     else:
-        logger.warning(
-            f"No log events found for {external_execution_id}")
+        logger.warning(f"No log events found for {external_execution_id}")
 
 
 async def format_log_events_for_create_failed(action_name, failure_details, log_events):
     log_lines = []
     for event in log_events:
-        message = event['message']
+        message = event["message"]
         log_lines.append(message)
     logs_content = "\n".join(log_lines)
     # Look specifically for CREATE_FAILED error first
     create_failed_error = extract_create_failed_error(logs_content)
     if create_failed_error:
         failure_details["specific_error"] = create_failed_error
-        failure_details[
-            "error_summary"] = f"CREATE_FAILED: {create_failed_error}"
+        failure_details["error_summary"] = f"CREATE_FAILED: {create_failed_error}"
         logger.info(f"Found CREATE_FAILED error for {action_name}")
     else:
-        logger.info(
-            f"No CREATE_FAILED error found in logs for {action_name}")
+        logger.info(f"No CREATE_FAILED error found in logs for {action_name}")
         # If no CloudFormation CREATE_FAILED error found, search for general error pattern
         error_line = extract_error_line(logs_content)
         if error_line:
             failure_details["specific_error"] = error_line
-            failure_details[
-                "error_summary"] = f"Error: {error_line}"
-            logger.info(
-                f"Found general error pattern for {action_name}")
+            failure_details["error_summary"] = f"Error: {error_line}"
+            logger.info(f"Found general error pattern for {action_name}")
         else:
-            logger.info(
-                f"No specific error patterns found in logs for {action_name}")
+            logger.info(f"No specific error patterns found in logs for {action_name}")
     # Store truncated logs for reference
     failure_details["codebuild_logs"] = truncate_logs(logs_content)
 
@@ -422,11 +465,11 @@ def extract_error_line(logs_content: str) -> str:
     if not logs_content:
         return ""
 
-    lines = logs_content.split('\n')
+    lines = logs_content.split("\n")
 
     # Look specifically for '| error |' lines
     for line in lines:
-        if '| error |' in line:
+        if "| error |" in line:
             clean_line = line.strip()
             if clean_line:
                 return clean_line

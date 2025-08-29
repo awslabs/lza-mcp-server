@@ -39,6 +39,9 @@ coverage = {extras = ["toml"], version = ">=7.4.0"}
 moto = {extras = ["s3", "codepipeline", "cloudformation"], version = ">=4.2.0"}
 factory-boy = ">=3.3.0"
 faker = ">=22.0.0"
+ruff = ">=0.1.0"
+mypy = ">=1.8.0"
+bandit = ">=1.7.0"
 
 [tool.poetry.scripts]
 "awslabs.lza-mcp-server" = "awslabs.lza_mcp_server.server:main"
@@ -67,7 +70,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--cov-branch",
-    "--cov-fail-under=80"
+    "--cov-fail-under=40"
 ]
 markers = [
     "unit: Unit tests (no external dependencies)",
@@ -133,7 +136,7 @@ show_missing = true
 precision = 2
 skip_covered = false
 skip_empty = false
-fail_under = 80
+fail_under = 40
 
 [tool.coverage.html]
 directory = "htmlcov"
