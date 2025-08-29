@@ -15,5 +15,6 @@
 """LZA MCP Server Tools."""
 
 from .pipeline.manage_pipeline_tools import register_pipeline_tools
+from .schema.manage_schema_tools import register_schema_tools
 
-__all__ = ["register_pipeline_tools"]
+__all__ = ["register_pipeline_tools", "register_schema_tools"]
