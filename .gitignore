@@ -1,1 +1,4 @@
 .DS_Store
+lza-mcp-server/src/lza-mcp-server/htmlcov
+lza-mcp-server/src/lza-mcp-server/.coverage
+lza-mcp-server/src/lza-mcp-server/coverage.xml
