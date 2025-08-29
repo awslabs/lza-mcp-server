@@ -346,7 +346,7 @@ async def tool_get_pipeline_status(
                 raise
 
         # Extract basic execution information
-        status = execution["status"]
+        status = execution["status"].upper()  # Normalize to uppercase for consistency
         execution_mode = execution.get("executionMode", "NORMAL")
         start_time = (
             execution["creationTime"].isoformat()

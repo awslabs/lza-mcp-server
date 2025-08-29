@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  lza-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lza-mcp-server
+    environment:
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - FASTMCP_LOG_LEVEL=${FASTMCP_LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.aws:/home/lzauser/.aws:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

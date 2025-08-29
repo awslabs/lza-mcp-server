@@ -69,3 +69,4 @@ target/
 
 .DS_Store
 coverage.xml
+bandit-report.json
