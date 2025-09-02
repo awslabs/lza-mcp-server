@@ -317,13 +317,19 @@ def register_pipeline_tools(mcp):
         mcp: The FastMCP server instance to register tools with
     """
 
-    @mcp.tool(name="releasePipeline")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="releasePipeline",
+        description="Start the LZA pipeline execution to deploy configuration changes",
+    )  # nosemgrep: useless-inner-function
     async def release_pipeline(
         ctx: Context, pipeline_name: str = DEFAULT_PIPELINE_NAME
     ) -> Dict[str, Any]:
         return await tool_release_pipeline(ctx, pipeline_name)
 
-    @mcp.tool(name="getPipelineStatus")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="getPipelineStatus",
+        description="Get current pipeline status and execution progress with detailed stage information",
+    )  # nosemgrep: useless-inner-function
     async def get_pipeline_status(
         ctx: Context,
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
@@ -331,7 +337,10 @@ def register_pipeline_tools(mcp):
     ) -> Dict[str, Any]:
         return await tool_get_pipeline_status(ctx, pipeline_name, execution_id)
 
-    @mcp.tool(name="diagnosePipelineErrors")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="diagnosePipelineErrors",
+        description="Retrieve detailed error logs and diagnostics for failed pipeline executions",
+    )  # nosemgrep: useless-inner-function
     async def diagnose_pipeline_errors(
         ctx: Context,
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
