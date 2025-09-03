@@ -35,7 +35,7 @@ class TestAWSClients:
 
     def test_get_aws_session(self):
         """Test AWS session creation."""
-        session = get_aws_session(Mock())
+        session = get_aws_session()
         assert session is not None
         assert hasattr(session, "client")
 

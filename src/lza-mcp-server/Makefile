@@ -47,7 +47,7 @@ release: clean-cache format lint type-check security-check test-coverage
 	@echo "  ✓ Code linted with ruff"
 	@echo "  ✓ Type checking passed"
 	@echo "  ✓ Security analysis passed"
-	@echo "  ✓ All tests passed with coverage ≥46%"
+	@echo "  ✓ All tests passed with coverage ≥50%"
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
 
@@ -143,7 +143,7 @@ test-coverage:
 		--cov-report=term-missing \
 		--cov-report=xml \
 		--cov-branch \
-		--cov-fail-under=46 \
+		--cov-fail-under=50 \
 		-n auto \
 		--dist=worksteal \
 		--tb=short

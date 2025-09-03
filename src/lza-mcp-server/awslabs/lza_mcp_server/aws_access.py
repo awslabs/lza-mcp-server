@@ -27,7 +27,14 @@ AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 logger = logging.getLogger(__name__)
 
 
-def get_aws_session(logger) -> boto3.Session:
+def get_aws_account_id():
+    """Get the AWS account ID for the current session."""
+    session = get_aws_session()
+    sts_client = session.client("sts")
+    return sts_client.get_caller_identity()["Account"]
+
+
+def get_aws_session() -> boto3.Session:
     """Create an AWS session using boto3's default credential provider chain.
 
     Returns:
@@ -50,7 +57,7 @@ def get_codepipeline_client() -> boto3.client:
         NoCredentialsError: If AWS credentials are not properly configured
         ClientError: If there are issues creating the client
     """
-    session = get_aws_session(logger)
+    session = get_aws_session()
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
@@ -68,7 +75,7 @@ def get_codebuild_client() -> boto3.client:
         NoCredentialsError: If AWS credentials are not properly configured
         ClientError: If there are issues creating the client
     """
-    session = get_aws_session(logger)
+    session = get_aws_session()
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
@@ -86,7 +93,7 @@ def get_logs_client() -> boto3.client:
         NoCredentialsError: If AWS credentials are not properly configured
         ClientError: If there are issues creating the client
     """
-    session = get_aws_session(logger)
+    session = get_aws_session()
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
