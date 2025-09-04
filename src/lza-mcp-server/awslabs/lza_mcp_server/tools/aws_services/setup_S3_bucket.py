@@ -5,7 +5,7 @@ from typing import Dict, Any
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 
-from awslabs.lza_mcp_server.aws_access import get_aws_account_id, get_aws_session
+from awslabs.lza_mcp_server.aws_access import get_aws_account_id, get_s3_client
 from awslabs.lza_mcp_server.constants import DEFAULT_REGION, BUCKET_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,7 @@ def get_validation_bucket():
         bucket_name = f"{BUCKET_PREFIX}-{account_id}-{region}"
         logger.info(f"Using default validation bucket name: {bucket_name}")
 
-    session = get_aws_session()
-    s3_client = session.client("s3")
+    s3_client = get_s3_client()
 
     try:
         s3_client.head_bucket(Bucket=bucket_name)

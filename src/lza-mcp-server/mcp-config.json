@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "awslabs.lza-mcp-server": {
+    "lza-mcp-server": {
       "command": "docker",
       "args": [
         "run",
