@@ -1,7 +1,8 @@
 DEFAULT_REGION = "us-east-1"
 DEFAULT_PIPELINE_NAME = "AWSAccelerator-Pipeline"
 BUCKET_PREFIX = "awslabs-lza-mcp-server"
-
+ACCOUNT_CONFIG_FILENAME = "accounts-config.yaml"
+ORG_CONFIG_FILENAME = "organization-config.yaml"
 
 MAX_LOG_SIZE = 50000  # Maximum log size in characters to prevent memory issues
 CACHE_TTL_SECONDS = 300  # 5 minutes cache TTL for pipeline metadata

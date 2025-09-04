@@ -157,22 +157,20 @@ class TestGetValidationBucket:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_aws_session"
-            ) as mock_get_session,
+                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_s3_client"
+            ) as mock_get_s3_client,
             patch(
                 "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_aws_account_id",
                 return_value="123456789012",
             ),
             patch.dict(os.environ, {"AWS_REGION": "us-east-1"}),
         ):
-            mock_session = Mock()
-            mock_session.client.return_value = mock_s3_client
-            mock_get_session.return_value = mock_session
+            mock_get_s3_client.return_value = mock_s3_client
 
             result = get_validation_bucket()
 
             assert result == bucket_name
-            mock_session.client.assert_called_once_with("s3")
+            mock_get_s3_client.assert_called_once()
 
 
 class TestRegisterAwsTools:
@@ -263,16 +261,14 @@ class TestAsyncAwsOperations:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_aws_session"
-            ) as mock_get_session,
+                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_s3_client"
+            ) as mock_get_s3_client,
             patch(
                 "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_aws_account_id",
                 return_value="123456789012",
             ),
         ):
-            mock_session = Mock()
-            mock_session.client.return_value = mock_s3_client
-            mock_get_session.return_value = mock_session
+            mock_get_s3_client.return_value = mock_s3_client
 
             mock_context = MockContext()
             result = await tool_setup_s3_bucket(mock_context)

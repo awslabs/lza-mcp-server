@@ -47,6 +47,48 @@ def get_aws_session() -> boto3.Session:
     return boto3.Session(region_name=AWS_REGION)
 
 
+def get_s3_client() -> boto3.client:
+    """Create an S3 client using the configured AWS session with retry configuration.
+
+    Returns:
+        boto3.client: S3 client configured with the current session and retry logic
+
+    Raises:
+        NoCredentialsError: If AWS credentials are not properly configured
+        ClientError: If there are issues creating the client
+    """
+    session = get_aws_session()
+    config = Config(
+        retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
+        max_pool_connections=50,
+    )
+    return session.client("s3", config=config)
+
+
+def download_from_s3(bucket: str, key: str, local_path: str) -> bool:
+    """
+    Download a file from S3 to a local path.
+
+    Args:
+        bucket: The S3 bucket name
+        key: The S3 object key
+        local_path: The local file path to save to
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    session = get_aws_session()
+    s3_client = session.client("s3")
+
+    try:
+        s3_client.download_file(bucket, key, local_path)
+        logger.info(f"Successfully downloaded {bucket}/{key} to {local_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to download {bucket}/{key}: {str(e)}")
+        return False
+
+
 def get_codepipeline_client() -> boto3.client:
     """Create a CodePipeline client using the configured AWS session with retry configuration.
 
