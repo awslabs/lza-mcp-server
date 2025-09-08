@@ -14,11 +14,13 @@
 
 """Validation-related MCP tools for the LZA MCP Server."""
 
-import os
 import logging
 from typing import Dict, Any
 from mcp.server.fastmcp import Context
 
+from awslabs.lza_mcp_server.tools.validation.cleanup_validation_zip import (
+    tool_cleanup_validation_zip,
+)
 from awslabs.lza_mcp_server.tools.validation.validate_configuration_share import (
     tool_validate_configuration_from_share,
 )
@@ -32,7 +34,10 @@ logger = logging.getLogger(__name__)
 def register_validation_tools(mcp):
     """Register validation-related MCP tools."""
 
-    @mcp.tool(name="validateConfigurationFromS3")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="validateConfigurationFromS3",
+        description="Validate LZA configurations stored in S3 bucket for syntax and compliance",
+    )  # nosemgrep: useless-inner-function
     async def validate_configuration_from_s3(
         ctx: Context,
         s3_path: str,
@@ -40,78 +45,21 @@ def register_validation_tools(mcp):
         return await tool_validate_configuration_from_s3(ctx, s3_path)
 
     @mcp.tool(
-        name="validateConfigurationFromShare"
+        name="validateConfigurationFromShare",
+        description="Validate LZA configurations from local file shares or directories",
     )  # nosemgrep: useless-inner-function
     async def validate_configuration_from_share(
         ctx: Context, local_share_path: str = "~/Documents/lza-config"
     ) -> Dict[str, Any]:
         return await tool_validate_configuration_from_share(ctx, local_share_path)
 
-    @mcp.tool(name="cleanupValidationZip")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="cleanupValidationZip",
+        description="Clean up temporary validation files and zip archives after validation",
+    )  # nosemgrep: useless-inner-function
     async def cleanup_validation_zip(
         ctx: Context, share_path: str = "~/Documents/lza-config"
     ) -> Dict[str, Any]:
-        """
-        Clean up the validation ZIP file from the share location.
-
-        This tool allows manual cleanup of the config.zip file after successful
-        upload to S3. Use this only after you've uploaded the configuration.
-
-        Args:
-            share_path (str, optional): Path to the share location (default: ~/Documents/lza-config)
-
-        Returns:
-            Dictionary containing cleanup result
-
-        Example:
-            ```python
-            # Clean up after successful upload
-            result = await cleanup_validation_zip(ctx)
-
-            # Clean up from custom share location
-            result = await cleanup_validation_zip(ctx, share_path="~/my-lza-config")
-            ```
-        """
-        try:
-            await ctx.info("🧹 Cleaning up validation ZIP file...")
-
-            # Expand the share path
-            expanded_path = os.path.expanduser(share_path)
-            zip_file_path = os.path.join(expanded_path, "config.zip")
-
-            if not os.path.exists(zip_file_path):
-                await ctx.info(f"✅ ZIP file already cleaned up: {zip_file_path}")
-                return {
-                    "success": True,
-                    "message": "ZIP file already cleaned up",
-                    "zip_path": zip_file_path,
-                    "existed": False,
-                }
-
-            # Remove the ZIP file
-            os.remove(zip_file_path)
-            await ctx.info(f"✅ Successfully cleaned up ZIP file: {zip_file_path}")
-
-            return {
-                "success": True,
-                "message": "ZIP file cleaned up successfully",
-                "zip_path": zip_file_path,
-                "existed": True,
-            }
-
-        except Exception as e:
-            error_message = f"Failed to clean up ZIP file: {str(e)}"
-            await ctx.error(error_message)
-
-            return {
-                "success": False,
-                "error": error_message,
-                "zip_path": zip_file_path if "zip_file_path" in locals() else None,
-                "troubleshooting": [
-                    "Check that the share path is correct",
-                    "Verify file system permissions",
-                    "Ensure the ZIP file is not locked by another process",
-                ],
-            }
+        return await tool_cleanup_validation_zip(ctx, share_path)
 
     logger.info("Validation tools registered successfully")

@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 def register_schema_tools(mcp):
     """Register schema-related MCP tools."""
 
-    @mcp.tool(name="searchJsonSchema")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="searchJsonSchema",
+        description="Search through LZA JSON schemas to find specific properties and configurations",
+    )  # nosemgrep: useless-inner-function
     async def search_json_schema(
         ctx: Context,
         search_terms: List[str],
@@ -52,7 +55,10 @@ def register_schema_tools(mcp):
             format_level,
         )
 
-    @mcp.tool(name="getFullSchema")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="getFullSchema",
+        description="Retrieve complete LZA configuration JSON schemas with optional property filtering",
+    )  # nosemgrep: useless-inner-function
     async def get_full_schema(
         ctx: Context,
         schema_path: str,

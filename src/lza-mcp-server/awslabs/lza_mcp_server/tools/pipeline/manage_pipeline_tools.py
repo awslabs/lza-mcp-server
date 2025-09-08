@@ -19,6 +19,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from .release_pipeline_after_upload import tool_release_pipeline_after_upload
 from ...constants import (
     CACHE_TTL_SECONDS,
     MAX_LOG_SIZE,
@@ -131,78 +132,7 @@ def format_success_response(data: Dict[str, Any], message: str) -> Dict[str, Any
     return response
 
 
-def validate_pipeline_name(pipeline_name: str) -> tuple[bool, str]:
-    """Validate that a pipeline name meets AWS CodePipeline naming requirements.
-
-    Args:
-        pipeline_name: The pipeline name to validate
-
-    Returns:
-        tuple: (is_valid: bool, error_message: str)
-    """
-    if not pipeline_name:
-        return False, "Pipeline name cannot be empty"
-
-    if not isinstance(pipeline_name, str):
-        return False, "Pipeline name must be a string"
-
-    # AWS CodePipeline naming rules:
-    # - Must be 1-100 characters
-    # - Can contain letters, numbers, periods, underscores, and hyphens
-    # - Cannot contain spaces or other special characters
-    if len(pipeline_name) < 1:
-        return False, "Pipeline name cannot be empty"
-
-    if len(pipeline_name) > 100:
-        return (
-            False,
-            f"Pipeline name too long ({len(pipeline_name)} characters). Maximum is 100 characters",
-        )
-
-    # Check for valid characters
-    import re
-
-    if not re.match(r"^[a-zA-Z0-9._-]+$", pipeline_name):
-        invalid_chars = set(pipeline_name) - set(
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
-        )
-        return (
-            False,
-            f"Pipeline name contains invalid characters: {', '.join(sorted(invalid_chars))}. Only letters, numbers, periods, underscores, and hyphens are allowed",
-        )
-
-    return True, ""
-
-
-def validate_execution_id(execution_id: str) -> tuple[bool, str]:
-    """Validate that an execution ID meets AWS CodePipeline execution ID format.
-
-    Args:
-        execution_id: The execution ID to validate
-
-    Returns:
-        tuple: (is_valid: bool, error_message: str)
-    """
-    if not execution_id:
-        return False, "Execution ID cannot be empty"
-
-    if not isinstance(execution_id, str):
-        return False, "Execution ID must be a string"
-
-    # AWS execution IDs are UUIDs (36 characters with hyphens)
-    import re
-
-    uuid_pattern = (
-        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-    )
-
-    if not re.match(uuid_pattern, execution_id):
-        return (
-            False,
-            f"Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012), got: {execution_id}",
-        )
-
-    return True, ""
+# Import validation functions from separate module to avoid circular imports
 
 
 def get_stage_description(stage_name: str) -> str:
@@ -348,31 +278,13 @@ def register_pipeline_tools(mcp):
     ) -> Dict[str, Any]:
         return await tool_diagnose_pipeline_errors(ctx, pipeline_name, execution_id)
 
+    @mcp.tool(
+        name="releasePipelineAfterUpload",
+        description="Trigger LZA pipeline execution after configuration upload is complete",
+    )
+    async def release_pipeline_after_upload(
+        ctx: Context, pipeline_name: str = DEFAULT_PIPELINE_NAME
+    ) -> Dict[str, Any]:
+        return await tool_release_pipeline_after_upload(ctx, pipeline_name)
 
-def validate_aws_region(region: str) -> tuple[bool, str]:
-    """Validate that an AWS region meets AWS region naming requirements.
-
-    Args:
-        region: The AWS region to validate
-
-    Returns:
-        tuple: (is_valid: bool, error_message: str)
-    """
-    if not region:
-        return False, "AWS region cannot be empty"
-
-    if not isinstance(region, str):
-        return False, "AWS region must be a string"
-
-    # AWS region format: us-east-1, eu-west-1, ap-southeast-2, etc.
-    import re
-
-    region_pattern = r"^[a-z]{2,3}-[a-z]+-[0-9]+$"
-
-    if not re.match(region_pattern, region):
-        return (
-            False,
-            f"Invalid AWS region format. Expected format like 'us-east-1', got: {region}",
-        )
-
-    return True, ""
+    logger.info("Pipeline tools registered successfully")

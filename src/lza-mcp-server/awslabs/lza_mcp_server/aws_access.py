@@ -15,13 +15,19 @@
 import asyncio
 import logging
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
+from mcp.server.fastmcp import Context
 
 from .constants import DEFAULT_REGION, MAX_RETRY_ATTEMPTS, INITIAL_RETRY_DELAY
+from .error_categories import ErrorCategory
+from .utils.error_handling import (
+    format_error_response,
+    create_structured_error_response,
+)
 
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 logger = logging.getLogger(__name__)
@@ -45,6 +51,99 @@ def get_aws_session() -> boto3.Session:
     """
     logger.info(f"Creating AWS session with region: {AWS_REGION}")
     return boto3.Session(region_name=AWS_REGION)
+
+
+async def verify_aws_connectivity(ctx: Context) -> Dict[str, Any]:
+    """
+    Verify AWS connectivity using structured error handling.
+
+    This function reuses the exact same logic as the existing checkAwsConnectivity tool
+    but with enhanced structured error reporting and categorization.
+
+    Args:
+        ctx: MCP context for logging and user interaction
+
+    Returns:
+        Dictionary containing connectivity status and AWS account information
+
+    Raises:
+        S3UploadError: If AWS connectivity check fails with structured error information
+    """
+    try:
+        # Use existing AWS session management (same as checkAwsConnectivity)
+        session = get_aws_session()
+        sts_client = session.client("sts")
+
+        # Get caller identity to verify credentials (identical to existing tool)
+        identity = sts_client.get_caller_identity()
+
+        account_id = identity["Account"]
+        user_arn = identity["Arn"]
+        user_id = identity["UserId"]
+        region = AWS_REGION
+
+        await ctx.info(
+            f"AWS connectivity verified - Account: {account_id}, Region: {region}"
+        )
+
+        return {
+            "connected": True,
+            "account_id": account_id,
+            "user_arn": user_arn,
+            "user_id": user_id,
+            "region": region,
+            "message": f"Successfully connected to AWS account {account_id} in region {region}",
+        }
+
+    except (NoCredentialsError, ClientError, BotoCoreError) as e:
+        # Use structured error categorization
+        error_info = categorize_aws_error(e)
+        error_message = f"AWS connectivity failed: {str(e)}"
+        await ctx.error(error_message)
+
+        # Create structured error response
+        error_response = create_structured_error_response(
+            error=error_message,
+            category=error_info["category"],
+            error_code=error_info["error_code"],
+            troubleshooting=error_info["troubleshooting"],
+            context={
+                "operation": "aws_connectivity_verification",
+                "error_type": type(e).__name__,
+            },
+        )
+
+        # Add connectivity-specific fields for backward compatibility
+        error_response["connected"] = False
+
+        return error_response
+
+    except Exception as e:
+        error_message = f"Unexpected AWS connectivity error: {str(e)}"
+        await ctx.error(error_message)
+
+        # Handle unexpected errors with structured response
+        error_response = create_structured_error_response(
+            error=error_message,
+            category=ErrorCategory.CONNECTIVITY,
+            error_code="UNEXPECTED_CONNECTIVITY_ERROR",
+            troubleshooting=[
+                "Ensure AWS credentials are configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)",
+                "Check if AWS_REGION is set correctly",
+                "Verify AWS profile is configured if using AWS_PROFILE",
+                "For Docker: ensure credentials are passed as environment variables",
+                "Check system resources and network connectivity",
+            ],
+            context={
+                "operation": "aws_connectivity_verification",
+                "error_type": type(e).__name__,
+            },
+        )
+
+        # Add connectivity-specific fields for backward compatibility
+        error_response["connected"] = False
+
+        return error_response
 
 
 def get_s3_client() -> boto3.client:
@@ -185,42 +284,6 @@ async def retry_with_exponential_backoff(func, *args, **kwargs):
             raise
 
     raise last_exception
-
-
-def format_error_response(
-    error: str,
-    message: str,
-    error_code: Optional[str] = None,
-    troubleshooting: Optional[list] = None,
-) -> Dict[str, Any]:
-    """Format an error response with consistent structure and troubleshooting guidance.
-
-    Args:
-        error: The specific error that occurred
-        message: User-friendly error message
-        error_code: AWS error code if applicable
-        troubleshooting: List of troubleshooting steps
-
-    Returns:
-        Dict containing success=False, error details, and troubleshooting guidance
-    """
-    response = {"success": False, "error": error, "message": message}
-
-    if error_code:
-        response["error_code"] = error_code
-
-    if troubleshooting:
-        response["troubleshooting"] = troubleshooting
-    else:
-        # Default troubleshooting steps
-        response["troubleshooting"] = [
-            "Ensure AWS credentials are configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)",
-            "Check if AWS_REGION is set correctly",
-            "Verify IAM permissions for CodePipeline operations",
-            "Confirm the pipeline name exists in the specified region",
-        ]
-
-    return response
 
 
 def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
@@ -389,6 +452,136 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 "Contact support if the issue persists",
             ],
         )
+
+
+def categorize_aws_error(error: Exception) -> Dict[str, Any]:
+    """
+    Categorize AWS errors and provide specific troubleshooting guidance.
+
+    Args:
+        error: AWS exception to categorize
+
+    Returns:
+        Dictionary with error category and troubleshooting steps
+    """
+    if isinstance(error, NoCredentialsError):
+        return {
+            "category": ErrorCategory.CONNECTIVITY,
+            "error_code": "NO_CREDENTIALS",
+            "troubleshooting": [
+                "Configure AWS credentials using one of these methods:",
+                "  - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables",
+                "  - Configure AWS profile with 'aws configure'",
+                "  - Use IAM roles if running on EC2",
+                "  - For Docker: pass credentials as environment variables",
+            ],
+        }
+
+    elif isinstance(error, ClientError):
+        error_code = error.response.get("Error", {}).get("Code", "Unknown")
+
+        if error_code == "AccessDenied":
+            return {
+                "category": ErrorCategory.CONNECTIVITY,
+                "error_code": error_code,
+                "troubleshooting": [
+                    "AWS credentials lack necessary permissions",
+                    "Ensure the user/role has the following permissions:",
+                    "  - sts:GetCallerIdentity (for connectivity verification)",
+                    "  - s3:ListBucket (for bucket verification)",
+                    "  - s3:PutObject (for configuration upload)",
+                    "  - s3:GetBucketLocation (for bucket region verification)",
+                    "Check IAM policies and resource-based policies",
+                ],
+            }
+
+        elif error_code == "NoSuchBucket":
+            return {
+                "category": ErrorCategory.S3,
+                "error_code": error_code,
+                "troubleshooting": [
+                    "The specified S3 bucket does not exist",
+                    "Verify the bucket name is correct",
+                    "Check that the bucket exists in your AWS account",
+                    "Ensure the bucket is in the same region as your AWS session",
+                    "Create the bucket if it doesn't exist",
+                ],
+            }
+
+        elif error_code == "InvalidBucketName":
+            return {
+                "category": ErrorCategory.S3,
+                "error_code": error_code,
+                "troubleshooting": [
+                    "The bucket name does not meet AWS S3 naming requirements",
+                    "Bucket names must be 3-63 characters long",
+                    "Must contain only lowercase letters, numbers, periods, and hyphens",
+                    "Cannot start or end with periods or hyphens",
+                    "Cannot contain consecutive periods",
+                ],
+            }
+
+        elif error_code in ["Throttling", "RequestLimitExceeded", "SlowDown"]:
+            return {
+                "category": ErrorCategory.S3,
+                "error_code": error_code,
+                "troubleshooting": [
+                    "AWS API rate limit exceeded",
+                    "Wait a few moments and retry the operation",
+                    "Consider implementing exponential backoff",
+                    "Check if other processes are making concurrent requests",
+                ],
+            }
+
+        elif error_code == "InvalidUserID.NotFound":
+            return {
+                "category": ErrorCategory.CONNECTIVITY,
+                "error_code": error_code,
+                "troubleshooting": [
+                    "AWS credentials may be invalid or expired",
+                    "Try refreshing your AWS credentials",
+                    "Verify the access key ID is correct",
+                    "Check if the IAM user still exists",
+                ],
+            }
+
+        else:
+            return {
+                "category": ErrorCategory.S3,
+                "error_code": error_code,
+                "troubleshooting": [
+                    f"AWS API error: {error_code}",
+                    "Check AWS service status for any ongoing issues",
+                    "Verify your AWS credentials and permissions",
+                    "Check network connectivity to AWS services",
+                ],
+            }
+
+    elif isinstance(error, BotoCoreError):
+        return {
+            "category": ErrorCategory.CONNECTIVITY,
+            "error_code": "BOTOCORE_ERROR",
+            "troubleshooting": [
+                "AWS configuration error detected",
+                "Check AWS region configuration (AWS_REGION or AWS_DEFAULT_REGION)",
+                "Verify AWS configuration files are properly formatted",
+                "Check network connectivity and DNS resolution",
+                "Ensure boto3 and botocore are up to date",
+            ],
+        }
+
+    else:
+        return {
+            "category": ErrorCategory.INTEGRATION,
+            "error_code": "UNEXPECTED_ERROR",
+            "troubleshooting": [
+                "An unexpected error occurred",
+                "Check system resources and disk space",
+                "Verify network connectivity",
+                "Check application logs for more details",
+                "Contact support if the issue persists",
+            ],
+        }
 
 
 def get_iam_permission_guidance(operation: str, error_message: str) -> list[str]:

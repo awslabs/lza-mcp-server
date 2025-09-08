@@ -21,7 +21,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 # Import the actual modules to ensure coverage
 from awslabs.lza_mcp_server.tools.aws_services.manage_aws_service_tools import (
-    register_aws_service_tools,
+    register_aws_tools,
 )
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
@@ -180,10 +180,12 @@ class TestRegisterAwsTools:
         """Test successful registration of AWS tools."""
         mock_mcp = Mock()
 
-        register_aws_service_tools(mock_mcp)
+        register_aws_tools(mock_mcp)
 
         # Verify that tool registration was called
-        assert mock_mcp.tool.call_count == 2  # checkAwsConnectivity and setupS3Bucket
+        assert (
+            mock_mcp.tool.call_count == 3
+        )  # checkAwsConnectivity, setupS3Bucket, and uploadConfigurationToS3WithCustomBucket
 
         # Verify the tools were registered with correct names
         tool_calls = mock_mcp.tool.call_args_list
