@@ -57,7 +57,7 @@ async def _offer_s3_upload_after_validation(
             "  • uploadConfigurationToS3 - Automatically detects validation ZIP and uploads"
         )
         await ctx.info(
-            "  • uploadConfigurationToS3WithCustomBucket - Use a specific bucket name"
+            "  • uploadConfigurationToS3(bucket_name='custom-bucket') - Use a specific bucket name"
         )
         await ctx.info("")
         await ctx.info("After upload, you can release the pipeline with:")
@@ -76,7 +76,7 @@ async def _offer_s3_upload_after_validation(
             "validation_result": validation_result,
             "next_steps": [
                 "Use uploadConfigurationToS3 (automatically detects validation ZIP)",
-                "Or use uploadConfigurationToS3WithCustomBucket for custom bucket",
+                "Or use uploadConfigurationToS3(bucket_name='custom-bucket') for custom bucket",
                 "Then use releasePipelineAfterUpload to deploy",
             ],
             "message": "S3 upload tools are available for deployment",

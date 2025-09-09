@@ -15,7 +15,7 @@
 """AWS-related MCP tools for the LZA MCP Server."""
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from mcp.server.fastmcp import Context
 
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
@@ -24,9 +24,8 @@ from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
 from awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket import (
     tool_setup_s3_bucket,
 )
-from awslabs.lza_mcp_server.tools.aws_services.upload_config_s3_with_bucket import (
-    tool_upload_configuration_to_s3_with_custom_bucket,
-)
+# Removed deprecated tool_upload_configuration_to_s3_with_custom_bucket
+# Use upload_configuration_to_s3 with bucket_name parameter instead
 
 logger = logging.getLogger(__name__)
 
@@ -48,18 +47,7 @@ def register_aws_tools(mcp):
     async def setup_s3_bucket(ctx: Context, bucket_name: str = "") -> Dict[str, Any]:
         return await tool_setup_s3_bucket(ctx, bucket_name)
 
-    @mcp.tool(
-        name="uploadConfigurationToS3WithCustomBucket",
-        description="Upload LZA configuration files to a specified custom S3 bucket",
-    )
-    async def upload_configuration_to_s3_with_custom_bucket(
-        ctx: Context,
-        custom_bucket_name: str,
-        config_path: Optional[str] = None,
-        offer_pipeline_release: bool = True,
-    ) -> Dict[str, Any]:
-        return await tool_upload_configuration_to_s3_with_custom_bucket(
-            ctx, config_path, custom_bucket_name, offer_pipeline_release
-        )
+    # DEPRECATED: uploadConfigurationToS3WithCustomBucket has been removed
+    # Use uploadConfigurationToS3 with bucket_name parameter instead
 
     logger.info("AWS tools registered successfully")

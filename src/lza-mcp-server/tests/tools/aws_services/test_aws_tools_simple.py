@@ -184,8 +184,8 @@ class TestRegisterAwsTools:
 
         # Verify that tool registration was called
         assert (
-            mock_mcp.tool.call_count == 3
-        )  # checkAwsConnectivity, setupS3Bucket, and uploadConfigurationToS3WithCustomBucket
+            mock_mcp.tool.call_count == 2
+        )  # checkAwsConnectivity and setupS3Bucket (uploadConfigurationToS3WithCustomBucket removed)
 
         # Verify the tools were registered with correct names
         tool_calls = mock_mcp.tool.call_args_list

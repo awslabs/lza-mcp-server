@@ -434,7 +434,6 @@ class S3UploadAgent(BaseAgent):
                 description="Upload validated LZA configurations to S3 buckets",
                 tools=[
                     "uploadConfigurationToS3",
-                    "uploadConfigurationToS3WithCustomBucket",
                 ],
                 expertise_domain="configuration_deployment",
             ),
@@ -543,7 +542,6 @@ class S3UploadAgent(BaseAgent):
             # Add upload guidance and deployment assistance
             if tool_name in [
                 "uploadConfigurationToS3",
-                "uploadConfigurationToS3WithCustomBucket",
             ]:
                 result = await _enhance_upload_result(result)
             elif tool_name == "releasePipelineAfterUpload":
