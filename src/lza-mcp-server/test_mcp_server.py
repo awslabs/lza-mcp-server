@@ -47,7 +47,7 @@ def test_mcp_server():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd="/Users/vmayberr/xdev/mte/lza-mcp-server/src/lza-mcp-server",
+            cwd="~/lza-mcp-server/src/lza-mcp-server",
         )
 
         # Send initialization message
