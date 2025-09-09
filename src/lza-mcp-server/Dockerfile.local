@@ -19,6 +19,9 @@ ENV PYTHONPATH="/app"
 ENV FASTMCP_LOG_LEVEL="INFO"
 ENV AWS_DEFAULT_REGION="us-east-1"
 
+# Create .aws directory for mounted credentials
+RUN mkdir -p /home/lzauser/.aws && chown -R lzauser:lzauser /home/lzauser/.aws
+
 # Change ownership to non-root user
 RUN chown -R lzauser:lzauser /app
 

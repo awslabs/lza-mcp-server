@@ -23,6 +23,8 @@ from botocore.exceptions import ClientError
 from awslabs.lza_mcp_server.aws_access import (
     get_aws_session,
     get_aws_account_id,
+)
+from awslabs.lza_mcp_server.utils.error_handling import (
     create_structured_error_response,
 )
 from awslabs.lza_mcp_server.constants import (

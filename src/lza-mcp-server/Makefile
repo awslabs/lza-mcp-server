@@ -54,7 +54,7 @@ release: clean-cache py-compile format lint type-check security-check test-cover
 	@echo "  ✓ Code linted with ruff"
 	@echo "  ✓ Type checking passed"
 	@echo "  ✓ Security analysis passed"
-	@echo "  ✓ All tests passed with coverage ≥30%"
+	@echo "  ✓ All tests passed with coverage ≥40%"
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
 
@@ -150,7 +150,7 @@ test-coverage:
 		--cov-report=term-missing \
 		--cov-report=xml \
 		--cov-branch \
-		--cov-fail-under=30 \
+		--cov-fail-under=40 \
 		-n auto \
 		--dist=worksteal \
 		--tb=short

@@ -20,13 +20,11 @@ from typing import Dict, Any
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
-from mcp.server.fastmcp import Context
 
 from .constants import DEFAULT_REGION, MAX_RETRY_ATTEMPTS, INITIAL_RETRY_DELAY
 from .error_categories import ErrorCategory
 from .utils.error_handling import (
     format_error_response,
-    create_structured_error_response,
 )
 
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -51,99 +49,6 @@ def get_aws_session() -> boto3.Session:
     """
     logger.info(f"Creating AWS session with region: {AWS_REGION}")
     return boto3.Session(region_name=AWS_REGION)
-
-
-async def verify_aws_connectivity(ctx: Context) -> Dict[str, Any]:
-    """
-    Verify AWS connectivity using structured error handling.
-
-    This function reuses the exact same logic as the existing checkAwsConnectivity tool
-    but with enhanced structured error reporting and categorization.
-
-    Args:
-        ctx: MCP context for logging and user interaction
-
-    Returns:
-        Dictionary containing connectivity status and AWS account information
-
-    Raises:
-        S3UploadError: If AWS connectivity check fails with structured error information
-    """
-    try:
-        # Use existing AWS session management (same as checkAwsConnectivity)
-        session = get_aws_session()
-        sts_client = session.client("sts")
-
-        # Get caller identity to verify credentials (identical to existing tool)
-        identity = sts_client.get_caller_identity()
-
-        account_id = identity["Account"]
-        user_arn = identity["Arn"]
-        user_id = identity["UserId"]
-        region = AWS_REGION
-
-        await ctx.info(
-            f"AWS connectivity verified - Account: {account_id}, Region: {region}"
-        )
-
-        return {
-            "connected": True,
-            "account_id": account_id,
-            "user_arn": user_arn,
-            "user_id": user_id,
-            "region": region,
-            "message": f"Successfully connected to AWS account {account_id} in region {region}",
-        }
-
-    except (NoCredentialsError, ClientError, BotoCoreError) as e:
-        # Use structured error categorization
-        error_info = categorize_aws_error(e)
-        error_message = f"AWS connectivity failed: {str(e)}"
-        await ctx.error(error_message)
-
-        # Create structured error response
-        error_response = create_structured_error_response(
-            error=error_message,
-            category=error_info["category"],
-            error_code=error_info["error_code"],
-            troubleshooting=error_info["troubleshooting"],
-            context={
-                "operation": "aws_connectivity_verification",
-                "error_type": type(e).__name__,
-            },
-        )
-
-        # Add connectivity-specific fields for backward compatibility
-        error_response["connected"] = False
-
-        return error_response
-
-    except Exception as e:
-        error_message = f"Unexpected AWS connectivity error: {str(e)}"
-        await ctx.error(error_message)
-
-        # Handle unexpected errors with structured response
-        error_response = create_structured_error_response(
-            error=error_message,
-            category=ErrorCategory.CONNECTIVITY,
-            error_code="UNEXPECTED_CONNECTIVITY_ERROR",
-            troubleshooting=[
-                "Ensure AWS credentials are configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)",
-                "Check if AWS_REGION is set correctly",
-                "Verify AWS profile is configured if using AWS_PROFILE",
-                "For Docker: ensure credentials are passed as environment variables",
-                "Check system resources and network connectivity",
-            ],
-            context={
-                "operation": "aws_connectivity_verification",
-                "error_type": type(e).__name__,
-            },
-        )
-
-        # Add connectivity-specific fields for backward compatibility
-        error_response["connected"] = False
-
-        return error_response
 
 
 def get_s3_client() -> boto3.client:

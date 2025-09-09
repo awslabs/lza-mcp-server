@@ -34,12 +34,14 @@ from awslabs.lza_mcp_server.orchestration.core.pipeline_release_manager import (
 from awslabs.lza_mcp_server.orchestration.core.s3_manager import S3Manager
 from awslabs.lza_mcp_server.orchestration.core.s3_upload_error import S3UploadError
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
+from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
+    tool_check_aws_connectivity,
+)
 from awslabs.lza_mcp_server.tools.aws_services.common import (
     categorize_configuration_error,
 )
-from awslabs.lza_mcp_server.aws_access import (
+from awslabs.lza_mcp_server.utils.error_handling import (
     create_structured_error_response,
-    verify_aws_connectivity,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +80,7 @@ class S3UploadUtils:
             return self._aws_context
 
         # Use existing AWS connectivity verification
-        connectivity_result = await verify_aws_connectivity(ctx)
+        connectivity_result = await tool_check_aws_connectivity(ctx)
 
         if not connectivity_result["connected"]:
             raise Exception(

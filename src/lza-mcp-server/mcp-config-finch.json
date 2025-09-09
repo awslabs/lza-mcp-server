@@ -1,22 +1,15 @@
 {
   "mcpServers": {
     "lza-mcp-server": {
-      "command": "/Users/vmayberr/xdev/mte/lza-mcp-server/scripts/extract-aws-credentials.sh",
+      "command": "finch",
       "args": [
-        "finch",
         "run",
         "--rm",
         "--interactive",
-        "-e",
-        "FASTMCP_LOG_LEVEL=INFO",
-        "-e",
-        "AWS_ACCESS_KEY_ID",
-        "-e",
-        "AWS_SECRET_ACCESS_KEY",
-        "-e",
-        "AWS_SESSION_TOKEN",
-        "-e",
-        "AWS_REGION",
+        "-v", "/Users/vmayberr/.aws:/home/lzauser/.aws:ro",
+        "-e", "AWS_PROFILE=default",
+        "-e", "AWS_REGION=us-east-1",
+        "-e", "FASTMCP_LOG_LEVEL=INFO",
         "lza-mcp-server:local"
       ],
       "env": {},

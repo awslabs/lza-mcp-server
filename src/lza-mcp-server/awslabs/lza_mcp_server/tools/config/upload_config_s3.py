@@ -26,7 +26,7 @@ from awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils import S3UploadUt
 from awslabs.lza_mcp_server.tools.config.common import (
     ErrorCategory,
 )
-from awslabs.lza_mcp_server.aws_access import create_structured_error_response
+from awslabs.lza_mcp_server.utils.error_handling import create_structured_error_response
 
 logger = logging.getLogger(__name__)
 
