@@ -17,25 +17,37 @@
 import logging
 from typing import Dict, Any
 from mcp.server.fastmcp import Context
+
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
 )
 from awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket import (
     tool_setup_s3_bucket,
 )
+# Removed deprecated tool_upload_configuration_to_s3_with_custom_bucket
+# Use upload_configuration_to_s3 with bucket_name parameter instead
 
 logger = logging.getLogger(__name__)
 
 
-def register_aws_service_tools(mcp):
+def register_aws_tools(mcp):
     """Register AWS-related MCP tools."""
 
-    @mcp.tool(name="checkAwsConnectivity")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="checkAwsConnectivity",
+        description="Verify AWS credentials and connectivity to ensure proper access to AWS services",
+    )
     async def check_aws_connectivity(ctx: Context) -> Dict[str, Any]:
         return await tool_check_aws_connectivity(ctx)
 
-    @mcp.tool(name="setupS3Bucket")  # nosemgrep: useless-inner-function
+    @mcp.tool(
+        name="setupS3Bucket",
+        description="Create and configure S3 buckets for LZA configuration storage with proper permissions",
+    )
     async def setup_s3_bucket(ctx: Context, bucket_name: str = "") -> Dict[str, Any]:
         return await tool_setup_s3_bucket(ctx, bucket_name)
+
+    # DEPRECATED: uploadConfigurationToS3WithCustomBucket has been removed
+    # Use uploadConfigurationToS3 with bucket_name parameter instead
 
     logger.info("AWS tools registered successfully")

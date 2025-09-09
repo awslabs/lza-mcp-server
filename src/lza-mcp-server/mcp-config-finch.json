@@ -1,34 +1,21 @@
 {
   "mcpServers": {
+    "lza-mcp-server": {
       "command": "finch",
       "args": [
         "run",
         "--rm",
         "--interactive",
-        "-v",
-        "$HOME/.aws:/root/.aws:ro",
-        "-e",
-        "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}",
-        "-e",
-        "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}",
-        "-e",
-        "AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}",
-        "-e",
-        "AWS_REGION=${AWS_REGION:-us-east-1}",
-        "-e",
-        "AWS_PROFILE=${AWS_PROFILE:-}",
-        "-e",
-        "FASTMCP_LOG_LEVEL=INFO",
-        "lza-mcp-server:latest"
+        "-v", "/Users/vmayberr/.aws:/home/lzauser/.aws:ro",
+        "-e", "AWS_PROFILE=default",
+        "-e", "AWS_REGION=us-east-1",
+        "-e", "FASTMCP_LOG_LEVEL=INFO",
+        "lza-mcp-server:local"
       ],
       "env": {},
       "disabled": false,
       "autoApprove": [
-        "searchJsonSchema",
-        "getFullSchema",
-        "releasePipeline",
-        "getPipelineStatus",
-        "diagnosePipelineErrors"
       ]
+    }
   }
 }

@@ -12,32 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:3.11-slim
-
-# Create non-root user
-RUN groupadd -r lzauser && useradd -r -g lzauser -d /app -s /bin/bash lzauser
+FROM public.ecr.aws/lambda/python:3.13
 
 # Set working directory
-WORKDIR /app
+WORKDIR ${LAMBDA_TASK_ROOT}
 
 # Copy project files
-COPY . /app/
-COPY lza-minimum-configuration/ /app/lza-minimum-configuration/
+COPY . ${LAMBDA_TASK_ROOT}/
+COPY lza-minimum-configuration/ ${LAMBDA_TASK_ROOT}/lza-minimum-configuration/
 
 # Install dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e .
 
 # Set environment variables
-ENV PYTHONPATH="/app"
+ENV PYTHONPATH="${LAMBDA_TASK_ROOT}"
 ENV FASTMCP_LOG_LEVEL="INFO"
 ENV AWS_DEFAULT_REGION="us-east-1"
-
-# Change ownership to non-root user
-RUN chown -R lzauser:lzauser /app
-
-# Switch to non-root user
-USER lzauser
 
 # Expose port for MCP server
 EXPOSE 8000

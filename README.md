@@ -6,7 +6,7 @@ An AWS Labs Model Context Protocol (MCP) server for AWS Landing Zone Accelerator
 
 - **Pipeline Management**: Start, monitor, and diagnose LZA pipeline executions
 - **Cross-Account Support**: Works with LZA deployments in different AWS accounts
-- **Container Support**: Containerized deployment using Docker or Finch for local and cloud environments
+- **Container Support**: Containerized deployment using Finch for local development and AWS Lambda deployment
 - **Amazon Q Integration**: Compatible with Amazon Q Developer for AI-assisted operations
 
 ## Quick Start
@@ -35,9 +35,19 @@ python -m server
 
 ### Container Deployment
 
-#### Using Docker Compose
+#### For AWS Lambda Deployment
 ```bash
-docker-compose up --build
+# Build Lambda-compatible image
+finch build -t lza-mcp-server:lambda .
+```
+
+#### For Local Development
+```bash
+# Build local development image
+finch build -f Dockerfile.local -t lza-mcp-server:local .
+
+# Run locally
+finch run -p 8000:8000 -v ~/.aws:/home/lzauser/.aws:ro lza-mcp-server:local
 ```
 
 #### Using Finch Compose
@@ -45,20 +55,6 @@ docker-compose up --build
 # Start Finch VM if not running
 finch vm start
 finch compose up --build
-```
-
-#### Using Docker directly
-```bash
-docker build -t lza-mcp-server .
-docker run -p 8000:8000 -v ~/.aws:/home/lzauser/.aws:ro lza-mcp-server
-```
-
-#### Using Finch directly
-```bash
-# Start Finch VM if not running
-finch vm start
-finch build -t lza-mcp-server .
-finch run -p 8000:8000 -v ~/.aws:/home/lzauser/.aws:ro lza-mcp-server
 ```
 
 ### Amazon Q Integration
@@ -82,10 +78,11 @@ cp mcp-config.json ~/.aws/amazonq/mcp.json
 
 ## Troubleshooting
 
-### Finch Issues
-- **VM not started**: Run `finch vm start` before using Finch commands
+### Container Issues
+- **Finch VM not started**: Run `finch vm start` before using Finch commands
 - **Build context errors**: Ensure you're running commands from the correct directory with all required files
 - **AWS credentials warnings**: Set environment variables or use AWS credential files
+- **Local vs Lambda builds**: Use `Dockerfile.local` for local development, default `Dockerfile` for Lambda deployment
 
 ## Documentation
 

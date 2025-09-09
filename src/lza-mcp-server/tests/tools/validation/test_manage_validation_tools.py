@@ -59,7 +59,7 @@ class TestRegisterValidationTools:
         cleanup_tool = None
 
         # Capture the cleanup tool function
-        def capture_tool(name):
+        def capture_tool(name, description=None):
             def decorator(func):
                 nonlocal cleanup_tool
                 if name == "cleanupValidationZip":
@@ -95,7 +95,7 @@ class TestRegisterValidationTools:
         cleanup_tool = None
 
         # Capture the cleanup tool function
-        def capture_tool(name):
+        def capture_tool(name, description=None):
             def decorator(func):
                 nonlocal cleanup_tool
                 if name == "cleanupValidationZip":
@@ -127,7 +127,7 @@ class TestRegisterValidationTools:
         cleanup_tool = None
 
         # Capture the cleanup tool function
-        def capture_tool(name):
+        def capture_tool(name, description=None):
             def decorator(func):
                 nonlocal cleanup_tool
                 if name == "cleanupValidationZip":

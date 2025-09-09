@@ -35,16 +35,35 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 
 ## Available Tools
 
+### AWS Services
+- **checkAwsConnectivity**: Verify AWS credentials and connectivity
+- **setupS3Bucket**: Create and configure S3 buckets for LZA
+
+### Configuration Management
+- **getMinimumConfiguration**: Generate minimal LZA configuration templates
+- **uploadConfigurationToS3**: Upload configuration files to S3 bucket
+
+### Validation
+- **validateConfigurationFromS3**: Validate LZA configurations stored in S3
+- **validateConfigurationFromShare**: Validate configurations from file shares
+- **cleanupValidationZip**: Clean up temporary validation files
+
 ### Pipeline Management
-- **releasePipeline**: Trigger execution of the LZA Configuration Pipeline (AWSAccelerator-Pipeline)
-- **getPipelineStatus**: Monitor pipeline execution status with stage progression details
-- **diagnosePipelineErrors**: Automatically retrieve CodeBuild logs for failed pipeline executions
+- **releasePipeline**: Trigger execution of the LZA Configuration Pipeline
+- **getPipelineStatus**: Monitor pipeline execution status with stage progression
+- **diagnosePipelineErrors**: Retrieve CodeBuild logs for failed executions
 
-## Pipeline Management Workflow
+### Schema Management
+- **getConfigurationSchema**: Retrieve LZA configuration JSON schemas
 
-1. Trigger pipeline deployment with `releasePipeline`
-2. Monitor progress with `getPipelineStatus`
-3. If failures occur, diagnose issues with `diagnosePipelineErrors`
+## Typical Workflow
+
+1. Check AWS connectivity with `checkAwsConnectivity`
+2. Generate configuration with `getMinimumConfiguration`
+3. Validate configuration with `validateConfigurationFromS3`
+4. Upload to S3 with `uploadConfigurationToS3`
+5. Deploy with `releasePipeline`
+6. Monitor with `getPipelineStatus`
 
 For detailed usage instructions, see the individual tool documentation.
 """,
@@ -54,10 +73,18 @@ For detailed usage instructions, see the individual tool documentation.
 
 def register_all_components():
     """Register all MCP tools and resources."""
+    from .tools.aws_services import register_aws_tools
+    from .tools.config import register_config_tools
+    from .tools.validation import register_validation_tools
     from .tools.pipeline import register_pipeline_tools
+    from .tools.schema import register_schema_tools
 
-    # Register pipeline tools
+    # Register all tool categories
+    register_aws_tools(mcp)
+    register_config_tools(mcp)
+    register_validation_tools(mcp)
     register_pipeline_tools(mcp)
+    register_schema_tools(mcp)
 
     logger.info("All MCP components registered successfully")
 
