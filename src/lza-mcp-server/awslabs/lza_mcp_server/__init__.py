@@ -14,4 +14,7 @@
 
 """AWS Landing Zone Accelerator (LZA) MCP Server."""
 
+from . import tools
+
 __version__ = "0.1.0"
+__all__ = ["tools"]

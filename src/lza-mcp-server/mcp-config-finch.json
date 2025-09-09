@@ -6,7 +6,7 @@
         "run",
         "--rm",
         "--interactive",
-        "-v", "/Users/vmayberr/.aws:/home/lzauser/.aws:ro",
+        "-v", "/Users/<YOUR_USERNAME>/.aws:/home/lzauser/.aws:ro",
         "-e", "AWS_PROFILE=default",
         "-e", "AWS_REGION=us-east-1",
         "-e", "FASTMCP_LOG_LEVEL=INFO",

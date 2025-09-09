@@ -1,3 +1,5 @@
+from typing import Optional
+
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,185 +15,211 @@
 # limitations under the License.
 
 import os
-import sys
-import logging
-from typing import Dict, Any, List, Optional
+import json
+from typing import Dict, Any
 from mcp.server.fastmcp import Context
 
-logger = logging.getLogger(__name__)
+
+def _load_combined_schemas(combined_schema_path: str) -> Dict[str, Any]:
+    """Load and return the combined schemas from file."""
+    with open(combined_schema_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
-async def tool_search_json_schema(
-    ctx: Context,
-    search_terms: List[str],
-    search_type: str = "general",
-    max_results: int = 10,
-    include_metadata: bool = True,
-    include_schema: bool = False,
-    filters: Optional[Dict] = None,
-    schema_path: Optional[str] = None,
-    format_level: str = "standard",
+def _navigate_to_property(
+    schema_content: Dict[str, Any], property_path: str
 ) -> Dict[str, Any]:
-    """Search JSON schemas using different search strategies.
+    """Navigate to a specific property within the schema."""
+    current_node = schema_content
+    path_parts = property_path.split(".")
+    navigation_history = []
 
-    This tool provides powerful search capabilities across all LZA JSON schemas to help
-    users discover configuration options and understand the structure of LZA configurations.
+    for i, part in enumerate(path_parts):
+        base_part = part.split("[")[0] if "[" in part else part
+        navigation_history.append(base_part)
 
-    The tool supports multiple search strategies:
+        if base_part in current_node:
+            current_node = current_node[base_part]
+            if "[" in part and isinstance(current_node, list) and current_node:
+                if i == len(path_parts) - 1 or (
+                    i < len(path_parts) - 1 and "[" in path_parts[i + 1]
+                ):
+                    pass
+                else:
+                    current_node = current_node[0]
+        elif current_node.get("properties") and base_part in current_node["properties"]:
+            current_node = current_node["properties"][base_part]
+        elif (
+            current_node.get("items")
+            and isinstance(current_node["items"], dict)
+            and base_part in current_node["items"]
+        ):
+            current_node = current_node["items"][base_part]
+        else:
+            available_props = []
+            if isinstance(current_node, dict):
+                available_props = list(current_node.keys())
+                if "properties" in current_node and isinstance(
+                    current_node["properties"], dict
+                ):
+                    available_props += list(current_node["properties"].keys())
 
-    1. **General Search**: Searches across all metadata fields including titles, descriptions,
-       and property names. Most comprehensive search type for general exploration.
+            raise ValueError(
+                f"Property path element '{base_part}' not found at '{'.'.join(navigation_history)}'. Available: {available_props[:10]}"
+            )
 
-    2. **Property Search**: Specifically finds schemas that contain properties matching the
-       search terms. Useful when looking for schemas with specific data fields.
+    return current_node
 
-    3. **Pattern Search**: Finds schemas that use specific validation patterns (like regular
-       expressions). Great for finding schemas with specific data format validations.
 
-    4. **Relationship Search**: Discovers schemas based on their relationships with other
-       schemas. Helps map dependencies between different schema components.
+def _build_property_result(
+    schema_path: str,
+    property_path: str,
+    property_node: Any,
+    target_schema: Dict[str, Any],
+    include_metadata: bool,
+) -> Dict[str, Any]:
+    """Build the result dictionary for a specific property."""
+    result = {
+        "success": True,
+        "schema_path": schema_path,
+        "property_path": property_path,
+        "property": property_node,
+    }
 
-    5. **Complexity Search**: Finds schemas based on complexity metrics like nesting depth
-       or property count. Useful for identifying the most complex or simplest schemas.
+    if include_metadata and "_metadata" in target_schema:
+        result["schema_metadata"] = target_schema["_metadata"]
 
-    Results can be formatted at different detail levels (minimal, standard, detailed) and
-    can optionally include full schema content for detailed analysis.
+    return result
+
+
+def _build_full_schema_result(
+    schema_path: str, target_schema: Dict[str, Any], include_metadata: bool
+) -> Dict[str, Any]:
+    """Build the result dictionary for a full schema."""
+    result = {
+        "success": True,
+        "schema_path": schema_path,
+    }
+
+    if include_metadata and "_metadata" in target_schema:
+        result["metadata"] = target_schema["_metadata"]
+
+    schema_copy = {k: v for k, v in target_schema.items() if k != "_metadata"}
+    result["schema"] = schema_copy
+
+    return result
+
+
+async def tool_get_full_schema(
+    ctx: Context,
+    schema_path: str,
+    property_path: Optional[str] = None,
+    include_metadata: bool = True,
+) -> Dict[str, Any]:
+    """Retrieve the full details of a JSON schema or a specific property within it.
+
+    This tool retrieves complete schema information for detailed analysis. It's typically
+    used after finding schemas with searchJsonSchema when you need to examine the full
+    structure or a specific property within a schema.
+
+    The tool can return:
+    - Complete schema definitions with all properties and constraints
+    - Specific property details when a property path is provided
+    - Schema metadata including statistics and relationships
+
+    Property paths can be extracted from searchJsonSchema results' match_locations field.
+    For example, if a match location shows "property:centralNetworkServices.ipams:substring",
+    you can use "centralNetworkServices.ipams" as the property_path to get just that
+    section of the schema.
+
+    This enables efficient exploration of large schemas by focusing on relevant sections.
 
     Args:
-        search_terms (List[str]): List of search terms to look for in the schemas
-        search_type (str, optional): Type of search (general, property, pattern, relationship, complexity). Default: general
-        max_results (int, optional): Maximum number of results to return. Default: 10
-        include_metadata (bool, optional): Whether to include metadata in results. Default: True
-        include_schema (bool, optional): Whether to include the full schema in results. Default: False
-        filters (Dict, optional): Additional filters for complexity search (min/max depth, properties, required fields)
-        schema_path (str, optional): Optional path to schema file or directory (uses default if not provided)
-        format_level (str, optional): Detail level for results (minimal, standard, detailed). Default: standard
+        schema_path (str): The path to the schema (returned by searchJsonSchema as 'schema_ref')
+        property_path (str, optional): Optional path to a specific property within the schema (extracted from searchJsonSchema match_locations)
+        include_metadata (bool, optional): Whether to include metadata in the result. Default: True
 
     Returns:
-        Dictionary containing search results with matching schemas, relevance scores, and match locations
+        Complete schema or specific property details with optional metadata
     """
     try:
-        await ctx.info(
-            f"Searching JSON schemas for terms: {search_terms}, type: {search_type}"
-        )
+        await ctx.info(f"Retrieving schema: {schema_path}")
+        if property_path:
+            await ctx.info(f"Looking for specific property path: {property_path}")
 
-        # Import schema_search module
+        combined_schema_path = os.path.join("/app/json-output", "combined.json")
+
+        if not os.path.exists(combined_schema_path):
+            error_message = f"Combined schema file not found at: {combined_schema_path}"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Combined schema file not found. The file is generated by the docker-json-schema.sh script during container startup.",
+            }
+
         try:
-            from schema_search import search_json_schemas
-
-            await ctx.info("Successfully imported schema_search module")
-        except ImportError:
-            json_schema_dir = os.path.join(
-                os.path.dirname(__file__), "../../../json-schema/src"
+            combined_schemas = _load_combined_schemas(combined_schema_path)
+            await ctx.info(
+                f"Loaded combined schema file with {len(combined_schemas)} schemas"
             )
-            sys.path.append(os.path.abspath(json_schema_dir))
-            try:
-                from schema_search import search_json_schemas
+        except Exception as e:
+            error_message = f"Failed to load combined schema file: {str(e)}"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Error loading combined schema file.",
+            }
 
-                await ctx.info(f"Imported schema_search from {json_schema_dir}")
-            except ImportError as e:
-                error_message = f"Failed to import schema_search module: {e}"
+        if schema_path not in combined_schemas:
+            error_message = f"Schema not found: {schema_path}"
+            await ctx.error(error_message)
+            available_schemas = list(combined_schemas.keys())[:5]
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "The requested schema could not be found in the combined schema file.",
+                "available_schemas_sample": available_schemas,
+            }
+
+        target_schema = combined_schemas[schema_path]
+
+        if property_path:
+            try:
+                schema_content = {
+                    k: v for k, v in target_schema.items() if k != "_metadata"
+                }
+                property_node = _navigate_to_property(schema_content, property_path)
+                return _build_property_result(
+                    schema_path,
+                    property_path,
+                    property_node,
+                    target_schema,
+                    include_metadata,
+                )
+            except ValueError as e:
+                await ctx.error(str(e))
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "message": f"Could not navigate to '{property_path}'.",
+                }
+            except Exception as e:
+                error_message = f"Error navigating to property path: {str(e)}"
                 await ctx.error(error_message)
                 return {
                     "success": False,
                     "error": error_message,
-                    "message": "Module import failed. Please check if schema_search.py is available.",
+                    "message": f"The property path '{property_path}' could not be processed.",
                 }
 
-        # Determine schema path
-        if schema_path is None:
-            schema_path = os.path.join("/app/json-output", "combined.json")
-            await ctx.info(f"Using default schema path: {schema_path}")
-        else:
-            await ctx.info(f"Using user-provided schema path: {schema_path}")
-
-        # Check if the schema file exists
-        if not os.path.exists(schema_path):
-            error_message = f"Schema file not found: {schema_path}"
-            await ctx.error(error_message)
-            return {
-                "success": False,
-                "error": error_message,
-                "message": "Schema file not found. Please provide a valid path or ensure 'combined.json' is available.",
-                "troubleshooting": "The schema search function requires a combined.json file that contains all schemas with metadata.",
-            }
-
-        # Prepare filters for complexity search
-        if filters is None:
-            filters = {}
-
-        # Perform the search
-        try:
-            include_schema_actual = include_schema and format_level == "detailed"
-
-            search_result = search_json_schemas(
-                schema_path=schema_path,
-                search_terms=search_terms,
-                search_type=search_type,
-                max_results=max_results,
-                include_metadata=include_metadata,
-                include_schema=include_schema_actual,
-                filters=filters,
-            )
-
-            await ctx.info(
-                f"Search completed. Found {search_result.get('total_matches', 0)} matches."
-            )
-
-            # Format the results based on format_level
-            formatted_results = []
-            for i, result in enumerate(search_result.get("results", [])):
-                formatted_result = {
-                    "rank": i + 1,
-                    "path": result.get("path", "unknown"),
-                    "score": result.get("relevance_score", 0),
-                    "match_locations": result.get("match_locations", []),
-                    "schema_ref": result.get("path", "unknown"),
-                }
-
-                # Add metadata fields when available and requested
-                if include_metadata and "_metadata" in result:
-                    metadata = result.get("_metadata", {})
-                    formatted_result["title"] = metadata.get("title", "Untitled Schema")
-                    formatted_result["description"] = metadata.get(
-                        "description", "No description"
-                    )
-
-                    if format_level == "detailed" and "statistics" in metadata:
-                        formatted_result["statistics"] = metadata.get("statistics", {})
-
-                # Include schema only for detailed format and when explicitly requested
-                if include_schema_actual and "schema" in result:
-                    formatted_result["schema"] = result.get("schema")
-
-                formatted_results.append(formatted_result)
-
-            return {
-                "success": True,
-                "message": f"Found {search_result.get('total_matches', 0)} matches for '{', '.join(search_terms)}' (showing {len(formatted_results)})",
-                "search_info": {
-                    "terms": search_terms,
-                    "type": search_type,
-                    "total_matches": search_result.get("total_matches", 0),
-                    "returned_matches": len(formatted_results),
-                },
-                "results": formatted_results,
-            }
-
-        except Exception as e:
-            error_message = f"Search failed: {str(e)}"
-            await ctx.error(error_message)
-            return {
-                "success": False,
-                "error": error_message,
-                "message": "Search operation failed. Please check the search parameters and try again.",
-            }
+        return _build_full_schema_result(schema_path, target_schema, include_metadata)
 
     except Exception as e:
-        error_message = f"Error searching JSON schemas: {str(e)}"
-        await ctx.error(error_message)
+        await ctx.error(f"Unexpected error: {str(e)}")
         return {
             "success": False,
-            "error": error_message,
-            "message": "An unexpected error occurred while performing the search.",
+            "error": str(e),
+            "message": "An unexpected error occurred while processing the schema request.",
         }

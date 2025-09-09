@@ -1,0 +1,27 @@
+# Ignore temp files and caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+bandit-report.json
+
+# Ignore development files
+.git
+.gitignore
+*.md
+DEVELOPMENT.md
+README.md
+
+# Ignore test files
+tests/
+
+# Ignore json-schema source and temp files
+json-schema/temp/
+json-schema/src/
+
+# Keep json-output (this is what we need for the Docker image)
+!json-output/

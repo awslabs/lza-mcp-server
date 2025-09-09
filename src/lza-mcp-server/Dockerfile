@@ -20,6 +20,7 @@ WORKDIR ${LAMBDA_TASK_ROOT}
 # Copy project files
 COPY . ${LAMBDA_TASK_ROOT}/
 COPY lza-minimum-configuration/ ${LAMBDA_TASK_ROOT}/lza-minimum-configuration/
+COPY json-output/ ${LAMBDA_TASK_ROOT}/json-output/
 
 # Install dependencies
 RUN pip install --no-cache-dir --upgrade pip && \

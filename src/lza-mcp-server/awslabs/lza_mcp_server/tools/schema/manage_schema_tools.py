@@ -19,8 +19,8 @@ from typing import Dict, Any, List, Optional
 
 from mcp.server.fastmcp import Context
 
-from .get_full_schema import tool_search_json_schema
-from .search_json_schema import tool_get_full_schema
+from .get_full_schema import tool_get_full_schema
+from .search_json_schema import tool_search_json_schema
 
 logger = logging.getLogger(__name__)
 
