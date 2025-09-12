@@ -261,8 +261,7 @@ class TestSchemaTools:
         search_func = registered_tools["searchJsonSchema"]
 
         with (
-            patch("os.path.exists", return_value=True),
-            patch("builtins.__import__", side_effect=ImportError("Module not found")),
+            patch("os.path.exists", return_value=False),
         ):
             result = await search_func(mock_mcp_context, search_terms=["accounts"])
 
@@ -754,7 +753,10 @@ class TestSchemaTools:
 
         assert result["success"] is False
         assert "error" in result
-        assert "Module import failed" in result["message"]
+        assert (
+            "An unexpected error occurred while performing the search."
+            in result["message"]
+        )
 
         # Test unexpected error in get schema function
         with patch("os.path.exists", side_effect=Exception("Unexpected error")):

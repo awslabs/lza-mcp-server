@@ -61,7 +61,12 @@ finch run -p 8000:8000 -v ~/.aws:/home/lzauser/.aws:ro lza-mcp-server:local
 ```bash
 # Start Finch VM if not running
 finch vm start
+
+# Build and run using docker-compose (uses Dockerfile.local)
 finch compose up --build
+
+# Or build manually with local dockerfile
+finch build -f Dockerfile.local -t lza-mcp-server:local .
 ```
 
 ### Amazon Q Integration

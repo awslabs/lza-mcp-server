@@ -217,14 +217,6 @@ def resolve_references_with_metadata(combined_json):
     return enhanced_json
 
 
-def resolve_references(combined_json):
-    """
-    Legacy function for backward compatibility.
-    Now calls resolve_references_with_metadata.
-    """
-    return resolve_references_with_metadata(combined_json)
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Resolve $ref references in JSON files"
@@ -256,7 +248,7 @@ def main():
             combined_json[relative_path] = data
 
     # Resolve references
-    resolved_json = resolve_references(combined_json)
+    resolved_json = resolve_references_with_metadata(combined_json)
 
     # Output each resolved file separately
     for file_path, data in resolved_json.items():
