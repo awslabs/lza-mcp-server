@@ -25,3 +25,6 @@ json-schema/src/
 
 # Keep json-output (this is what we need for the Docker image)
 !json-output/
+
+# Keep lza-minimum-configuration (required for MCP tools)
+!lza-minimum-configuration/

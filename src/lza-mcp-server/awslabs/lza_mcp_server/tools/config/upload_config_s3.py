@@ -18,6 +18,9 @@ import logging
 import os
 from typing import Dict, Any, Optional
 
+# AWS SDK
+import boto3
+
 # MCP framework components
 from mcp.server.fastmcp import Context
 
@@ -33,6 +36,24 @@ logger = logging.getLogger(__name__)
 # S3 Configuration constants
 S3_OBJECT_KEY = "zipped/aws-accelerator-config.zip"
 BUCKET_NAME_PATTERN = "aws-accelerator-config-{account_id}-{region}"
+
+
+def detect_lza_bucket() -> Optional[str]:
+    """Detect LZA bucket name from AWS environment.
+
+    This is a placeholder function for test compatibility.
+    In real implementation, this would detect the actual LZA bucket.
+    """
+    try:
+        # This is a simplified implementation for test compatibility
+        # In practice, this would use AWS APIs to detect the actual bucket
+        session = boto3.Session()
+        sts = session.client("sts")
+        account_id = sts.get_caller_identity()["Account"]
+        region = session.region_name or "us-east-1"
+        return f"aws-accelerator-config-{account_id}-{region}"
+    except Exception:
+        return None
 
 
 async def _handle_share_to_s3_upload(

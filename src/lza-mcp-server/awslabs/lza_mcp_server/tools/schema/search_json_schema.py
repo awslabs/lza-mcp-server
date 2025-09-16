@@ -20,6 +20,15 @@ from mcp.server.fastmcp import Context
 
 logger = logging.getLogger(__name__)
 
+# Import optimized search functionality
+try:
+    from .optimized_schema_search import tool_search_json_schema_optimized
+
+    OPTIMIZED_SEARCH_AVAILABLE = True
+except ImportError:
+    OPTIMIZED_SEARCH_AVAILABLE = False
+    logger.warning("Optimized search not available, falling back to standard search")
+
 
 async def tool_search_json_schema(
     ctx: Context,
@@ -71,6 +80,38 @@ async def tool_search_json_schema(
         Dictionary containing search results with matching schemas, relevance scores, and match locations
     """
     try:
+        # Check if we should use optimized search for large files
+        schema_file_path = schema_path or os.path.join(
+            "/app/json-output", "combined.json"
+        )
+
+        # Try local path for development
+        if not os.path.exists(schema_file_path):
+            local_schema_path = "/Users/vmayberr/xdev/mte/lza-mcp-server/src/lza-mcp-server/json-output/combined.json"
+            if os.path.exists(local_schema_path):
+                schema_file_path = local_schema_path
+
+        # Check file size and use optimized search for large files
+        if os.path.exists(schema_file_path):
+            file_size = os.path.getsize(schema_file_path)
+            if (
+                file_size > 2 * 1024 * 1024 and OPTIMIZED_SEARCH_AVAILABLE
+            ):  # 2MB threshold
+                await ctx.info(
+                    f"Large schema file detected ({file_size / (1024 * 1024):.1f}MB), using optimized search"
+                )
+                return await tool_search_json_schema_optimized(
+                    ctx,
+                    search_terms,
+                    search_type,
+                    max_results,
+                    include_metadata,
+                    include_schema,
+                    filters,
+                    schema_path,
+                    format_level,
+                )
+
         await ctx.info(
             f"Searching JSON schemas for terms: {search_terms}, type: {search_type}"
         )

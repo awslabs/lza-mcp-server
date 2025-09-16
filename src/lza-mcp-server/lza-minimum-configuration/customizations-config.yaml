@@ -1,0 +1,4 @@
+# Customizations Configuration
+# This file defines custom applications, scripts, and configurations for the LZA deployment
+
+customizations: []
