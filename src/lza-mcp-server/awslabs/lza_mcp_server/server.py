@@ -75,7 +75,7 @@ def register_all_components():
     """Register all MCP tools and resources."""
     from .tools.aws_services import register_aws_tools
     from .tools.config import register_config_tools
-    from .tools.validation import register_validation_tools
+    from .tools import register_validation_tools
     from .tools.pipeline import register_pipeline_tools
     from .tools.schema import register_schema_tools
 

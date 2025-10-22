@@ -21,7 +21,6 @@ tests/
 
 # Ignore json-schema source and temp files
 json-schema/temp/
-json-schema/src/
 
 # Keep json-output (this is what we need for the Docker image)
 !json-output/

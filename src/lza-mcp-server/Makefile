@@ -6,7 +6,7 @@
 # - Incremental testing for changed code
 # - Performance monitoring and optimization
 
-.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache clean-schema release lint format security-check type-check py-compile download-schema
+.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache release lint format security-check type-check py-compile build-local run-local
 
 # Default target
 help:
@@ -18,12 +18,15 @@ help:
 	@echo "  test-unit          Run unit tests with parallel execution"
 	@echo ""
 	@echo "Pre-Commit Verification:"
-	@echo "  release            Complete pre-commit verification (schema, lint, test, coverage, security)"
-	@echo "  download-schema    Download and process LZA schema from GitHub"
+	@echo "  release            Complete pre-commit verification (lint, test, coverage, security)"
 	@echo "  lint               Run code linting with ruff"
 	@echo "  format             Format code with ruff"
 	@echo "  type-check         Run type checking with mypy"
 	@echo "  security-check     Run security analysis with bandit"
+	@echo ""
+	@echo "Docker Commands:"
+	@echo "  build-local        Build local development Docker image"
+	@echo "  run-local          Run local Docker container with validation support"
 	@echo ""
 	@echo "Comprehensive Testing:"
 	@echo "  test               Run all tests with standard configuration"
@@ -33,7 +36,6 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  clean-cache        Clear all test caches and temporary files"
-	@echo "  clean-schema       Clear downloaded schema files"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make test-fast     # Quick feedback during development"
@@ -46,20 +48,12 @@ py-compile:
 	@python3 -m py_compile awslabs/**/*.py
 	@echo "✅ Python syntax validation complete"
 
-# Download and process LZA schema from GitHub
-download-schema:
-	@echo "📥 Downloading LZA schema from GitHub..."
-	@mkdir -p json-output
-	@cd ../../ && scripts/docker-json-schema.sh
-	@echo "✅ LZA schema download and processing complete"
-
 # Complete pre-commit verification pipeline
-release: clean-cache py-compile download-schema format lint type-check security-check test-coverage
+release: clean-cache py-compile format lint type-check security-check test-coverage
 	@echo "✅ Release verification complete - ready for code review!"
 	@echo ""
 	@echo "📋 Verification Summary:"
 	@echo "  ✓ Python syntax validated"
-	@echo "  ✓ LZA schema downloaded and processed"
 	@echo "  ✓ Code formatted with ruff"
 	@echo "  ✓ Code linted with ruff"
 	@echo "  ✓ Type checking passed"
@@ -67,6 +61,34 @@ release: clean-cache py-compile download-schema format lint type-check security-
 	@echo "  ✓ All tests passed with coverage ≥38%"
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
+
+# Build local development Docker image
+build-local:
+	@echo "🐳 Building local development Docker image..."
+	@echo "  This will clone LZA repo and generate schemas during build"
+	@docker build -f Dockerfile.local -t lza-mcp-server:local .
+	@echo "✅ Docker image built successfully"
+
+# Run local Docker container with validation support
+run-local:
+	@echo "🚀 Starting local Docker container..."
+	@echo "  Mounting AWS credentials and validation share directory"
+	@docker run -d \
+		--name lza-mcp-server \
+		-p 8000:8000 \
+		-v ~/.aws:/home/lzauser/.aws:ro \
+		-v ~/Documents/lza-config:/app/lza-config \
+		lza-mcp-server:local
+	@echo "✅ Container started successfully"
+	@echo ""
+	@echo "📋 Container Info:"
+	@echo "  Name: lza-mcp-server"
+	@echo "  Port: 8000"
+	@echo "  AWS Creds: ~/.aws (read-only)"
+	@echo "  Validation Share: ~/Documents/lza-config"
+	@echo ""
+	@echo "🔍 View logs: docker logs -f lza-mcp-server"
+	@echo "🛑 Stop: docker stop lza-mcp-server && docker rm lza-mcp-server"
 
 # Code formatting
 format:
@@ -167,15 +189,8 @@ test-coverage:
 
 
 
-# Clean schema files
-clean-schema:
-	@echo "🗑️  Cleaning schema files..."
-	@rm -rf json-output/
-	@rm -rf json-schema/temp/
-	@echo "✅ Schema cleanup complete"
-
 # Clean all caches and temporary files
-clean-cache: clean-schema
+clean-cache:
 	@echo "🗑️  Cleaning test caches..."
 	@rm -rf .pytest_cache/
 	@rm -rf htmlcov/
