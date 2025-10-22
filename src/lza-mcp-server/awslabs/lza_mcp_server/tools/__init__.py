@@ -16,7 +16,7 @@
 
 from .aws_services.manage_aws_service_tools import register_aws_tools
 from .config.manage_config_tools import register_config_tools
-from .validation.manage_validation_tools import register_validation_tools
+from .validation import register_validation_tools
 from .pipeline.manage_pipeline_tools import register_pipeline_tools
 from .schema.manage_schema_tools import register_schema_tools
 
