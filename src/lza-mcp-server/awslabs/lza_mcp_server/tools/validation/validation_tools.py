@@ -317,7 +317,7 @@ async def _offer_s3_upload_after_validation(ctx: Context, config_path: str, vali
         await ctx.info("  • uploadConfigurationToS3WithCustomBucket - Use a specific bucket name")
         await ctx.info("")
         await ctx.info("After upload, you can release the pipeline with:")
-        await ctx.info("  • releasePipelineAfterUpload - Starts the LZA deployment pipeline")
+        await ctx.info("  • releasePipeline - Starts the LZA deployment pipeline")
         await ctx.info("")
         await ctx.info("💡 Tip: uploadConfigurationToS3 will automatically find and use your validation ZIP.")
         
@@ -329,7 +329,7 @@ async def _offer_s3_upload_after_validation(ctx: Context, config_path: str, vali
             "next_steps": [
                 "Use uploadConfigurationToS3 (automatically detects validation ZIP)",
                 "Or use uploadConfigurationToS3WithCustomBucket for custom bucket",
-                "Then use releasePipelineAfterUpload to deploy"
+                "Then use releasePipeline to deploy"
             ],
             "message": "S3 upload tools are available for deployment"
         }

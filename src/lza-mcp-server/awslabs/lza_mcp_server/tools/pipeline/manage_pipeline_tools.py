@@ -19,7 +19,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from .release_pipeline_after_upload import tool_release_pipeline_after_upload
+
 from ...constants import (
     CACHE_TTL_SECONDS,
     MAX_LOG_SIZE,
@@ -277,14 +277,5 @@ def register_pipeline_tools(mcp):
         execution_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         return await tool_diagnose_pipeline_errors(ctx, pipeline_name, execution_id)
-
-    @mcp.tool(
-        name="releasePipelineAfterUpload",
-        description="Trigger LZA pipeline execution after configuration upload is complete",
-    )
-    async def release_pipeline_after_upload(
-        ctx: Context, pipeline_name: str = DEFAULT_PIPELINE_NAME
-    ) -> Dict[str, Any]:
-        return await tool_release_pipeline_after_upload(ctx, pipeline_name)
 
     logger.info("Pipeline tools registered successfully")

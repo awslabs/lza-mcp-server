@@ -157,15 +157,15 @@ Help me diagnose any errors in my failed LZA pipeline execution.
 
 **Expected Result:** Detailed error logs and diagnostic information for troubleshooting.
 
-#### Test 11: Release Pipeline After Upload
-**Tool:** `releasePipelineAfterUpload`
+#### Test 11: Release Pipeline
+**Tool:** `releasePipeline`
 
 **Sample Prompt:**
 ```
-Trigger the LZA pipeline execution now that my configuration upload is complete.
+Start the LZA pipeline execution to deploy my configuration changes.
 ```
 
-**Expected Result:** Pipeline execution initiated following successful configuration upload.
+**Expected Result:** Pipeline execution initiated successfully with execution ID returned.
 
 ### Schema Management Tools
 

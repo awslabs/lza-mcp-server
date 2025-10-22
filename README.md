@@ -130,8 +130,7 @@ make build-local
 - **cleanupValidationZip**: Clean up temporary validation files after upload
 
 ### Pipeline Management
-- **releasePipeline**: Start the LZA pipeline execution (standalone)
-- **releasePipelineAfterUpload**: Trigger pipeline execution after configuration upload (workflow integration)
+- **releasePipeline**: Start the LZA pipeline execution
 - **getPipelineStatus**: Get current pipeline status and progress
 - **diagnosePipelineErrors**: Retrieve logs for failed pipeline executions
 
@@ -185,33 +184,18 @@ cleanupValidationZip()
 
 ## Pipeline Deployment
 
-After validating and uploading your configuration, deploy changes using the pipeline tools.
-
-### Standalone Pipeline Execution
-
-Use `releasePipeline` to manually trigger the pipeline at any time:
-
-```bash
-# Start pipeline execution
-releasePipeline(pipeline_name="AWSAccelerator-Pipeline")
-
-# Check status
-getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
-```
-
-### Workflow-Integrated Pipeline Execution
-
-Use `releasePipelineAfterUpload` as part of the upload workflow:
+After validating and uploading your configuration, deploy changes using the pipeline tool:
 
 ```bash
 # 1. Upload configuration
 uploadConfigurationToS3(config_path="/path/to/config", bucket_name="my-bucket")
 
-# 2. Trigger pipeline with confirmation workflow
-releasePipelineAfterUpload(pipeline_name="AWSAccelerator-Pipeline")
-```
+# 2. Start pipeline execution
+releasePipeline(pipeline_name="AWSAccelerator-Pipeline")
 
-The workflow-integrated version provides additional confirmation steps and error handling designed for the complete upload-to-deployment workflow.
+# 3. Check status
+getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
+```
 
 ## Troubleshooting
 
