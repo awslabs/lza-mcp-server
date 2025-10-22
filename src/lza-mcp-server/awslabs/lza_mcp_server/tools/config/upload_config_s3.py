@@ -137,7 +137,7 @@ async def _handle_share_to_s3_upload(
         # Offer pipeline release
         if offer_pipeline_release:
             await ctx.info(
-                "🚀 Use 'releasePipelineAfterUpload' to deploy the configuration"
+                "🚀 Use 'releasePipeline' to deploy the configuration"
             )
 
         return {
@@ -245,7 +245,7 @@ async def _handle_s3_to_s3_copy(
         # Offer pipeline release
         if offer_pipeline_release:
             await ctx.info(
-                "🚀 Use 'releasePipelineAfterUpload' to deploy the configuration"
+                "🚀 Use 'releasePipeline' to deploy the configuration"
             )
 
         return {

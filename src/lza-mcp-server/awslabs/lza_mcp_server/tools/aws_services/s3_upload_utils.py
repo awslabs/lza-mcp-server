@@ -28,9 +28,7 @@ from awslabs.lza_mcp_server.orchestration.core.configuration_manager import (
     cleanup_configuration_zip,
     select_configuration,
 )
-from awslabs.lza_mcp_server.orchestration.core.pipeline_release_manager import (
-    PipelineReleaseManager,
-)
+
 from awslabs.lza_mcp_server.orchestration.core.s3_manager import S3Manager
 from awslabs.lza_mcp_server.orchestration.core.s3_upload_error import S3UploadError
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
@@ -56,7 +54,6 @@ class S3UploadUtils:
         self.logger = logger
         self.s3_manager = S3Manager()
         self.config_manager = ConfigurationManager()
-        self.pipeline_manager = PipelineReleaseManager()
         self._aws_connectivity_verified = False
         self._aws_context = None
 
@@ -359,13 +356,10 @@ class S3UploadUtils:
 
                 # Step 8: Offer pipeline release if requested
                 if offer_pipeline_release:
-                    pipeline_offer_result = (
-                        await self.pipeline_manager.offer_pipeline_release(ctx)
-                    )
-                    final_result["pipeline_release_offered"] = pipeline_offer_result[
-                        "offered"
-                    ]
-                    final_result["pipeline_offer_details"] = pipeline_offer_result
+                    await ctx.info("")
+                    await ctx.info("✅ Configuration uploaded successfully!")
+                    await ctx.info("🚀 Use 'releasePipeline' to deploy the configuration")
+                    final_result["pipeline_release_offered"] = True
 
                 return final_result
 
