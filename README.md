@@ -118,7 +118,6 @@ make build-local
 
 ### AWS Services
 - **checkAwsConnectivity**: Verify AWS credentials and connectivity
-- **setupS3Bucket**: Create and configure S3 buckets for LZA configuration storage
 
 ### Configuration Management
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates
@@ -150,14 +149,15 @@ Validates configurations stored in S3 buckets (recommended for production):
 # 1. Check AWS connectivity
 checkAwsConnectivity()
 
-# 2. Create/verify S3 bucket
-setupS3Bucket()
+# 2. Create S3 bucket (if needed) using AWS CLI
+aws s3 mb s3://your-bucket-name --region your-region
 
-# 3. Upload configuration ZIP to S3
-aws s3 cp config.zip s3://your-bucket/config.zip
+# 3. Create and upload configuration ZIP to S3
+cd /path/to/config && zip -r config.zip .
+aws s3 cp config.zip s3://your-bucket-name/config.zip
 
 # 4. Validate from S3
-validateConfigurationFromS3(s3_path="s3://your-bucket/config.zip")
+validateConfigurationFromS3(s3_path="s3://your-bucket-name/config.zip")
 ```
 
 ### Local Shared Volume Validation

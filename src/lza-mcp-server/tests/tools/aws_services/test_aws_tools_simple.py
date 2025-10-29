@@ -26,10 +26,6 @@ from awslabs.lza_mcp_server.tools.aws_services.manage_aws_service_tools import (
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
 )
-from awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket import (
-    tool_setup_s3_bucket,
-    get_validation_bucket,
-)
 from awslabs.lza_mcp_server.aws_access import get_aws_session, get_aws_account_id
 from awslabs.lza_mcp_server.constants import DEFAULT_REGION, BUCKET_PREFIX
 
@@ -147,32 +143,6 @@ class TestGetAwsAccountId:
                 get_aws_account_id()
 
 
-class TestGetValidationBucket:
-    """Test cases for get_validation_bucket function."""
-
-    def test_get_validation_bucket_existing_bucket(self):
-        """Test getting validation bucket when bucket already exists."""
-        bucket_name = "awslabs-lza-mcp-server-123456789012-us-east-1"
-        mock_s3_client = MockS3Client(existing_buckets=[bucket_name])
-
-        with (
-            patch(
-                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_s3_client"
-            ) as mock_get_s3_client,
-            patch(
-                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_aws_account_id",
-                return_value="123456789012",
-            ),
-            patch.dict(os.environ, {"AWS_REGION": "us-east-1"}),
-        ):
-            mock_get_s3_client.return_value = mock_s3_client
-
-            result = get_validation_bucket()
-
-            assert result == bucket_name
-            mock_get_s3_client.assert_called_once()
-
-
 class TestRegisterAwsTools:
     """Test cases for register_aws_service_tools function."""
 
@@ -184,15 +154,14 @@ class TestRegisterAwsTools:
 
         # Verify that tool registration was called
         assert (
-            mock_mcp.tool.call_count == 2
-        )  # checkAwsConnectivity and setupS3Bucket (uploadConfigurationToS3WithCustomBucket removed)
+            mock_mcp.tool.call_count == 1
+        )
 
         # Verify the tools were registered with correct names
         tool_calls = mock_mcp.tool.call_args_list
         tool_names = [call[1]["name"] for call in tool_calls]
 
         assert "checkAwsConnectivity" in tool_names
-        assert "setupS3Bucket" in tool_names
 
 
 class TestEnvironmentVariableHandling:
@@ -254,27 +223,3 @@ class TestAsyncAwsOperations:
             assert result["connected"] is False
             assert "error" in result
             assert "troubleshooting" in result
-
-    @pytest.mark.asyncio
-    async def test_setup_s3_bucket_tool_success(self):
-        """Test successful S3 bucket setup tool."""
-        bucket_name = "awslabs-lza-mcp-server-123456789012-us-east-1"
-        mock_s3_client = MockS3Client(existing_buckets=[bucket_name])
-
-        with (
-            patch(
-                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_s3_client"
-            ) as mock_get_s3_client,
-            patch(
-                "awslabs.lza_mcp_server.tools.aws_services.setup_S3_bucket.get_aws_account_id",
-                return_value="123456789012",
-            ),
-        ):
-            mock_get_s3_client.return_value = mock_s3_client
-
-            mock_context = MockContext()
-            result = await tool_setup_s3_bucket(mock_context)
-
-            assert result["success"] is True
-            assert "bucket_name" in result
-            assert "upload_instructions" in result

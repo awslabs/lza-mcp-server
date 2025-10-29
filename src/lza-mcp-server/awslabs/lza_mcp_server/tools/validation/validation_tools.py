@@ -435,7 +435,7 @@ def register_validation_tools(mcp):
         
         This tool is part of the S3 validation workflow:
         1. checkAwsConnectivity() - Verify AWS credentials
-        2. setupS3Bucket() - Create/verify S3 bucket
+        2. Ensure S3 bucket exists (ask user for bucket name or help them create one)
         3. User uploads configuration ZIP to S3
         4. validateConfigurationFromS3() - This tool validates the configuration
         
@@ -469,8 +469,11 @@ The Docker container CANNOT access files on the local filesystem.
 
 Please follow the complete workflow:
 1. Call checkAwsConnectivity() to verify AWS credentials
-2. Call setupS3Bucket() to create/verify an S3 bucket
-3. Help the user upload their configuration to S3
+2. Ask the user if they have an existing S3 bucket or help them create one using AWS CLI:
+   aws s3 mb s3://your-bucket-name --region your-region
+3. Help the user upload their configuration to S3:
+   cd /path/to/config && zip -r config.zip .
+   aws s3 cp config.zip s3://your-bucket-name/config.zip
 4. Use validateConfigurationFromS3() with the S3 path
 """
             }
