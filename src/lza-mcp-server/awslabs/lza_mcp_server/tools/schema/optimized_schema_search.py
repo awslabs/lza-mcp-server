@@ -94,12 +94,24 @@ class OptimizedSchemaSearcher:
         results = []
         total_processed = 0
 
-        schema_keys = self._get_schema_keys()
+        # Load the entire file once (we need to for JSON parsing)
+        try:
+            with open(self.schema_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load schema file: {e}")
+            return {
+                "total_matches": 0,
+                "results": [],
+                "processed_schemas": 0,
+            }
+
+        schema_keys = list(data.keys())
 
         # Process in chunks
         for i in range(0, len(schema_keys), chunk_size):
             chunk_keys = schema_keys[i : i + chunk_size]
-            chunk_results = self._search_chunk(chunk_keys, search_terms)
+            chunk_results = self._search_chunk(data, chunk_keys, search_terms)
             results.extend(chunk_results)
             total_processed += len(chunk_keys)
 
@@ -115,22 +127,18 @@ class OptimizedSchemaSearcher:
         }
 
     def _search_chunk(
-        self, schema_keys: List[str], search_terms: List[str]
+        self, data: Dict[str, Any], schema_keys: List[str], search_terms: List[str]
     ) -> List[Dict[str, Any]]:
         """Search a chunk of schemas."""
         results = []
 
         try:
-            with open(self.schema_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                data = json.loads(content)
-
-                for key in schema_keys:
-                    if key in data:
-                        schema = data[key]
-                        matches = self._check_schema_matches(key, schema, search_terms)
-                        if matches:
-                            results.append(matches)
+            for key in schema_keys:
+                if key in data:
+                    schema = data[key]
+                    matches = self._check_schema_matches(key, schema, search_terms)
+                    if matches:
+                        results.append(matches)
 
         except Exception as e:
             logger.error(f"Failed to search chunk: {e}")
@@ -172,31 +180,79 @@ class OptimizedSchemaSearcher:
                     match_locations.append(f"description:{term}")
                     relevance_score += 0.4
 
-        # Check properties (limited to avoid memory issues)
-        if "properties" in schema:
-            properties = schema["properties"]
-            prop_count = 0
-            for prop_name, prop_def in properties.items():
-                if prop_count > 20:  # Limit property checking
-                    break
+        # Check properties recursively
+        relevance_score = self._search_properties(schema, search_terms_lower, match_locations, relevance_score)
 
+        if match_locations:
+            return {
+                "path": schema_key,
+                "relevance_score": min(relevance_score, 1.0),
+                "match_locations": match_locations[:10],  # Limit match locations
+                "_metadata": schema.get("_metadata", {}),
+            }
+
+        return None
+
+    def _search_properties(
+        self,
+        obj: Any,
+        search_terms_lower: List[str],
+        match_locations: List[str],
+        relevance_score: float,
+        depth: int = 0,
+        max_depth: int = 5,
+    ) -> float:
+        """Recursively search through properties and nested objects."""
+        if depth > max_depth or not isinstance(obj, dict):
+            return relevance_score
+
+        # Check properties
+        if "properties" in obj:
+            properties = obj["properties"]
+            for prop_name, prop_def in properties.items():
                 prop_name_lower = prop_name.lower()
                 for term in search_terms_lower:
                     if term in prop_name_lower:
                         match_locations.append(f"property:{prop_name}")
                         relevance_score += 0.5
 
-                prop_count += 1
+                # Check property description
+                if isinstance(prop_def, dict):
+                    prop_desc = prop_def.get("description", "").lower()
+                    for term in search_terms_lower:
+                        if term in prop_desc:
+                            match_locations.append(f"property_desc:{prop_name}")
+                            relevance_score += 0.3
 
-        if match_locations:
-            return {
-                "path": schema_key,
-                "relevance_score": min(relevance_score, 1.0),
-                "match_locations": match_locations[:5],  # Limit match locations
-                "_metadata": schema.get("_metadata", {}),
-            }
+                    # Recursively search nested properties
+                    relevance_score = self._search_properties(
+                        prop_def, search_terms_lower, match_locations, relevance_score, depth + 1
+                    )
 
-        return None
+        # Check items (for arrays)
+        if "items" in obj and isinstance(obj["items"], dict):
+            relevance_score = self._search_properties(
+                obj["items"], search_terms_lower, match_locations, relevance_score, depth + 1
+            )
+
+        # Check enum values
+        if "enum" in obj:
+            for enum_val in obj["enum"]:
+                enum_str = str(enum_val).lower()
+                for term in search_terms_lower:
+                    if term in enum_str:
+                        match_locations.append(f"enum:{enum_val}")
+                        relevance_score += 0.4
+
+        # Check anyOf, oneOf, allOf
+        for key in ["anyOf", "oneOf", "allOf"]:
+            if key in obj and isinstance(obj[key], list):
+                for item in obj[key]:
+                    relevance_score = self._search_properties(
+                        item, search_terms_lower, match_locations, relevance_score, depth + 1
+                    )
+
+        return relevance_score
 
 
 async def tool_search_json_schema_optimized(
