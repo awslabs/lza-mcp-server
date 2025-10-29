@@ -37,7 +37,6 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 
 ### AWS Services
 - **checkAwsConnectivity**: Verify AWS credentials and connectivity
-- **setupS3Bucket**: Create and configure S3 buckets for LZA
 
 ### Configuration Management
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates

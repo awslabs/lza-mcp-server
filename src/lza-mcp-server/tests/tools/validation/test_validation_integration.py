@@ -256,8 +256,8 @@ organizationalUnits:
         assert "CRITICAL WORKFLOW ERROR" in result["workflow_correction"]
         assert "checkAwsConnectivity" in result["workflow_correction"]
 
-        # Verify helpful instructions are provided
-        assert "setupS3Bucket" in result["workflow_correction"]
+        # Verify helpful instructions are provided (setupS3Bucket removed, should mention S3 bucket)
+        assert "S3 bucket" in result["workflow_correction"] or "bucket" in result["workflow_correction"]
 
     def test_validation_performance_with_large_config(self):
         """Test validation performance with larger configuration."""

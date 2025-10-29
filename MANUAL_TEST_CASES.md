@@ -61,15 +61,15 @@ Check my AWS connectivity and verify my credentials are working properly.
 
 **Expected Result:** Confirmation of AWS access with account details and region information.
 
-#### Test 2: Setup S3 Bucket
-**Tool:** `setupS3Bucket`
+#### Test 2: Create S3 Bucket (Manual)
+**Note:** The `setupS3Bucket` tool has been removed. Users should create buckets manually using AWS CLI or console.
 
-**Sample Prompt:**
-```
-Create an S3 bucket for my LZA configuration storage. Use the name "my-lza-config-bucket-test-123".
+**Sample Command:**
+```bash
+aws s3 mb s3://my-lza-config-bucket-test-123 --region us-east-1
 ```
 
-**Expected Result:** S3 bucket created with proper permissions and configuration for LZA use.
+**Expected Result:** S3 bucket created successfully.
 
 ### Configuration Management Tools
 
@@ -89,6 +89,11 @@ Generate a minimal LZA configuration template for me to get started.
 **Sample Prompt:**
 ```
 Upload my LZA configuration files to S3. Use the bucket "my-lza-config-bucket-test-123" and offer to release the pipeline after upload.
+```
+
+**Note:** Ensure the bucket exists before uploading. Create it manually if needed:
+```bash
+aws s3 mb s3://my-lza-config-bucket-test-123 --region us-east-1
 ```
 
 **Expected Result:** Configuration files uploaded to S3 with option to trigger pipeline execution.
