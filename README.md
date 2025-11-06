@@ -87,6 +87,110 @@ cp mcp-config.json ~/.aws/amazonq/mcp.json
 
 ## AWS Permissions
 
+The MCP server requires specific IAM permissions to interact with AWS services for LZA pipeline management, configuration operations, and schema access. Below is the recommended IAM policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OrgStatement",
+      "Effect": "Allow",
+      "NotAction": [
+        "organizations:DescribeAccount",
+        "organizations:DescribeOrganization",
+        "organizations:DescribeOrganizationalUnit",
+        "organizations:ListAccounts",
+        "organizations:ListAccountsForParent",
+        "organizations:ListChildren",
+        "organizations:ListOrganizationalUnitsForParent",
+        "organizations:ListParents",
+        "organizations:ListRoots"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PipelineAccess",
+      "Effect": "Allow",
+      "Action": [
+        "codepipeline:GetPipelineExecution",
+        "codepipeline:GetPipelineState",
+        "codepipeline:ListActionExecutions",
+        "codepipeline:ListPipelineExecutions"
+      ],
+      "Resource": "arn:aws:codepipeline:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${ACCELERATOR_PREFIX}-Pipeline"
+    },
+    {
+      "Sid": "IAMStatement",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListPolicies",
+        "iam:ListRolePolicies"
+      ],
+      "Resource": [
+        "arn:${PARTITION}:iam::*:role/cdk-accel*",
+        "arn:${PARTITION}:iam::*:role/${MANAGEMENT_ACCOUNT_ACCESS_ROLE}",
+        "arn:aws:iam::*:role/${ACCELERATOR_PREFIX}-*"
+      ]
+    },
+    {
+      "Sid": "KmsStatement",
+      "Effect": "Allow",
+      "Action": [
+        "kms:DescribeKey",
+        "kms:ListAliases"
+      ],
+      "Resource": "arn:aws:kms:*:*:key/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "kms:ResourceAliases": [
+            "alias/accelerator*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "S3Statement",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketEncryption",
+        "s3:GetBucketVersioning",
+        "s3:GetObject",
+        "s3:ListBuckets",
+        "s3:ListObject",
+        "s3:PutBucketVersioning",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:${PARTITION}:s3:::aws-accelerator*",
+        "arn:${PARTITION}:s3:::aws-accelerator*/*"
+      ]
+    }
+  ]
+}
+```
+
+### Policy Variables
+
+Replace the following placeholders with your specific values:
+
+- `${HOME-REGION}`: Your AWS home region (e.g., `us-east-1`)
+- `${MANAGEMENT_ACCOUNT}`: Your AWS management account ID
+- `${ACCELERATOR_PREFIX}`: Your LZA accelerator prefix (default: `AWSAccelerator`)
+- `${PARTITION}`: AWS partition (typically `aws`, or `aws-us-gov` for GovCloud)
+- `${MANAGEMENT_ACCOUNT_ACCESS_ROLE}`: Role name for cross-account access (default: `OrganizationAccountAccessRole`)
+
+### Permission Breakdown
+
+- **Organizations**: Read-only access to AWS Organizations for account and OU information
+- **CodePipeline**: Access to monitor and manage LZA pipeline executions
+- **IAM**: Read access to roles and policies used by LZA
+- **KMS**: Access to KMS keys with the accelerator alias for encryption operations
+- **S3**: Read/write access to LZA configuration buckets for configuration management
+
 ## Schema Management
 
 The server includes automated LZA schema management that generates schemas during Docker image build.
