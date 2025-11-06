@@ -53,10 +53,11 @@ class TestMCPToolRegistration:
 
         registered_tools = mock_fastmcp_server.get_registered_tools()
 
-        # Verify both tools are registered
-        assert len(registered_tools) == 2
+        # Verify all tools are registered
+        assert len(registered_tools) == 3
         assert "getMinimumConfiguration" in registered_tools
         assert "uploadConfigurationToS3" in registered_tools
+        assert "getConfigurationFromS3" in registered_tools
 
         # Verify tool metadata
         get_min_config = registered_tools["getMinimumConfiguration"]
@@ -66,6 +67,10 @@ class TestMCPToolRegistration:
         upload_config = registered_tools["uploadConfigurationToS3"]
         assert callable(upload_config["function"])
         assert "Upload LZA configuration" in upload_config["description"]
+        
+        get_config = registered_tools["getConfigurationFromS3"]
+        assert callable(get_config["function"])
+        assert "Retrieve current LZA configuration" in get_config["description"]
 
     @pytest.mark.asyncio
     async def test_mcp_context_integration(self, mock_fastmcp_server, mock_mcp_context):

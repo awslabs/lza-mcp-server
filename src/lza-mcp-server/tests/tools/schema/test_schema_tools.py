@@ -169,7 +169,7 @@ class TestSchemaTools:
         # Get the search function
         search_func = registered_tools["searchJsonSchema"]
 
-        # Test the import error case instead of successful case
+        # Test the file not found case
         with patch("os.path.exists", return_value=False):
             result = await search_func(
                 mock_mcp_context,
@@ -183,7 +183,7 @@ class TestSchemaTools:
         # Verify the error result structure
         assert result["success"] is False
         assert "error" in result
-        assert "Failed to import schema_search module" in result["error"]
+        assert "Schema file not found" in result["error"]
 
     @pytest.mark.asyncio
     async def test_search_json_schema_with_schema_inclusion(
@@ -240,7 +240,7 @@ class TestSchemaTools:
 
         assert result["success"] is False
         assert "error" in result
-        assert "Failed to import schema_search module" in result["error"]
+        assert "Schema file not found" in result["error"]
 
     @pytest.mark.asyncio
     async def test_search_json_schema_import_error(self, mock_mcp_context):
@@ -260,10 +260,13 @@ class TestSchemaTools:
 
         search_func = registered_tools["searchJsonSchema"]
 
-        with (
-            patch("os.path.exists", return_value=False),
-        ):
-            result = await search_func(mock_mcp_context, search_terms=["accounts"])
+        # Mock the import to fail for schema_search module
+        # We need to patch where it's imported in the search_json_schema module
+        import_error = ImportError("No module named 'schema_search'")
+        
+        with patch("awslabs.lza_mcp_server.tools.schema.search_json_schema.sys.path", []):
+            with patch("builtins.__import__", side_effect=import_error):
+                result = await search_func(mock_mcp_context, search_terms=["accounts"])
 
         assert result["success"] is False
         assert "error" in result
@@ -293,7 +296,7 @@ class TestSchemaTools:
 
         assert result["success"] is False
         assert "error" in result
-        assert "Failed to import schema_search module" in result["error"]
+        assert "Schema file not found" in result["error"]
 
     @pytest.mark.asyncio
     async def test_search_json_schema_different_search_types(self, mock_mcp_context):

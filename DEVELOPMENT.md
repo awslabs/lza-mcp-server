@@ -209,10 +209,11 @@ The schema processing adds approximately 30-60 seconds to the Docker build time 
 #### Adding New Tools
 
 1. **Choose the appropriate module**:
-   - AWS operations → `aws_tools.py`
-   - Configuration generation → `config_tools.py`
-   - Validation workflows → `validation_tools.py`
-   - Schema operations → `schema_tools.py`
+   - AWS operations → `tools/aws_services/`
+   - Configuration generation and retrieval → `tools/config/`
+   - Validation workflows → `tools/validation/`
+   - Schema operations → `tools/schema/`
+   - Pipeline management → `tools/pipeline/`
 
 2. **Implement the tool**:
    ```python
@@ -334,8 +335,9 @@ Test these key workflows to validate functionality:
 
 1. **AWS Connectivity**: `Check my AWS connectivity`
 2. **Configuration Generation**: `Generate a minimum viable LZA configuration`
-3. **Validation Workflow**: `Validate my LZA configuration from s3://bucket/config.zip`
-4. **Schema Discovery**: `Search for VPC-related configuration options`
+3. **Configuration Retrieval**: `Retrieve my current LZA configuration from S3`
+4. **Validation Workflow**: `Validate my LZA configuration from s3://bucket/config.zip`
+5. **Schema Discovery**: `Search for VPC-related configuration options`
 
 For detailed testing procedures, coverage analysis, and troubleshooting, see [TESTING.md](TESTING.md).
 
@@ -379,11 +381,34 @@ For detailed testing procedures, coverage analysis, and troubleshooting, see [TE
 
 ### Module Organization
 
-- **AWS Tools**: Operations that interact with AWS services
-- **Config Tools**: Configuration generation and management
-- **Validation Tools**: Configuration validation workflows
-- **Schema Tools**: Schema discovery and analysis
+- **AWS Tools** (`tools/aws_services/`): Operations that interact with AWS services
+  - `check_aws_connectivity.py`: AWS credential verification
+  - `s3_upload_utils.py`: S3 upload operations
+  - `common.py`: Shared AWS utilities
+
+- **Config Tools** (`tools/config/`): Configuration generation, retrieval, and management
+  - `get_minimum_configuration.py`: Generate minimal LZA configurations
+  - `upload_config_s3.py`: Upload configurations to S3
+  - `get_config_s3.py`: **NEW** - Retrieve and extract configurations from S3
+  - `manage_config_tools.py`: Tool registration and coordination
+  - `common.py`: Shared configuration utilities
+
+- **Validation Tools** (`tools/validation/`): Configuration validation workflows
+  - `validation_tools.py`: Validation and cleanup operations (includes unified `cleanupConfiguration`)
+
+- **Schema Tools** (`tools/schema/`): Schema discovery and analysis
+  - `search_json_schema.py`: Search LZA configuration schemas
+  - `get_full_schema.py`: Retrieve complete schema details
+  - `manage_schema_tools.py`: Tool registration
+
+- **Pipeline Tools** (`tools/pipeline/`): Pipeline management and monitoring
+  - `release_pipeline.py`: Start pipeline executions
+  - `get_pipeline_status.py`: Monitor pipeline progress
+  - `diagnose_pipeline_errors.py`: Retrieve error logs
+
 - **Utils**: Shared functionality used across modules
+  - `error_handling.py`: Structured error responses
+  - `utils.py`: Common utilities
 
 ### Dependencies
 

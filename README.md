@@ -122,11 +122,12 @@ make build-local
 ### Configuration Management
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates
 - **uploadConfigurationToS3**: Upload configuration files to S3 bucket
+- **getConfigurationFromS3**: Retrieve and extract current LZA configuration from S3
 
 ### Configuration Validation
 - **validateConfigurationFromS3**: Validate LZA configurations stored in S3 buckets
 - **validateConfigurationFromShare**: Validate configurations using Docker shared volumes
-- **cleanupValidationZip**: Clean up temporary validation files after upload
+- **cleanupConfiguration**: Clean up temporary validation files and retrieved configurations (planned)
 
 ### Pipeline Management
 - **releasePipeline**: Start the LZA pipeline execution
@@ -136,6 +137,47 @@ make build-local
 ### Schema Search
 - **searchJsonSchema**: Search LZA configuration schemas by terms, properties, patterns, or complexity
 - **getFullSchema**: Retrieve complete schema details or specific properties
+
+## Configuration Retrieval
+
+The server provides tools to retrieve and inspect deployed LZA configurations from S3.
+
+### Retrieving Current Configuration
+
+Retrieve the currently deployed LZA configuration from S3 for inspection or comparison:
+
+### Retrieval Workflow
+
+The `getConfigurationFromS3` tool:
+- Downloads the configuration ZIP from `zipped/aws-accelerator-config.zip` in the S3 bucket
+- Extracts all files to `/app/lza-config/retrieved-config` (Docker container path)
+- Returns both `container_path` and `host_path` for file access
+- **LLM uses `host_path`** to inspect and read configuration files on the local system
+- Returns comprehensive metadata including file counts, directory structure, and file listings
+- Automatically cleans up previous retrieved configurations to keep the file system clean
+- Users map their local directory (e.g., `~/Documents/lza-config`) to `/app/lza-config` in the container
+
+**Volume Mount Configuration**:
+The host path is determined by:
+1. Environment variable `LZA_CONFIG_HOST_PATH` (if set in MCP server configuration)
+2. Default: `~/Documents/lza-config`
+
+To configure a custom host path, add the environment variable to your MCP server configuration:
+```json
+{
+  "mcpServers": {
+    "awslabs.lza-mcp-server": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-v", "/your/custom/path:/app/lza-config:rw",
+        "-e", "LZA_CONFIG_HOST_PATH=/your/custom/path",
+        ...
+      ]
+    }
+  }
+}
+```
 
 ## Configuration Validation
 
@@ -171,8 +213,8 @@ cd /path/to/config && zip -r ~/Documents/lza-config/config.zip .
 # 2. Run validation with shared volume
 validateConfigurationFromShare(local_share_path="~/Documents/lza-config")
 
-# 3. Clean up after successful upload
-cleanupValidationZip()
+# 3. Clean up after successful upload (manual cleanup if needed)
+# Note: Automatic cleanup occurs on next retrieval
 ```
 
 ### Validation Requirements
@@ -181,6 +223,24 @@ cleanupValidationZip()
 - Include all subdirectories and supporting files (IAM policies, SCP policies, etc.)
 - Use `zip -r config.zip .` from within the configuration directory
 - Ensure all referenced files are included in the ZIP
+
+## Configuration Cleanup
+
+### Automatic Cleanup
+
+The `getConfigurationFromS3` tool automatically cleans up the previous retrieved configuration before creating a new one. This ensures the file system stays clean without requiring manual intervention.
+
+### Manual Cleanup
+
+If you need to clean up a retrieved configuration directory immediately (before the next retrieval), you can manually remove it:
+
+```bash
+# From inside the Docker container
+rm -rf /app/lza-config/retrieved-config
+
+# Or from your local system (if you have the volume mounted)
+rm -rf ~/Documents/lza-config/retrieved-config
+```
 
 ## Pipeline Deployment
 
@@ -212,6 +272,13 @@ getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
 - **Local vs Lambda builds**: Use `Dockerfile.local` for local development, default `Dockerfile` for Lambda deployment
 - **Missing schema in container**: Schemas are generated during build - rebuild image if missing
 - **Build fails during LZA clone**: Check network connectivity and GitHub access
+
+### Configuration Retrieval Issues
+- **Bucket not found**: Verify LZA has been deployed and the configuration bucket exists
+- **Object not found**: Ensure configuration has been uploaded to `zipped/aws-accelerator-config.zip`
+- **Invalid bucket name**: Bucket names must be 3-63 characters, lowercase, following AWS S3 naming rules
+- **Permission denied**: Verify IAM permissions include `s3:GetObject` for the configuration bucket
+- **Invalid ZIP file**: The downloaded file may be corrupted - check the S3 object integrity
 
 ### Validation Issues
 - **ZIP file errors**: Ensure ZIP contains complete directory structure with `zip -r config.zip .`
