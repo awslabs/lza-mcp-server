@@ -117,27 +117,63 @@ async def tool_search_json_schema(
         )
 
         # Import schema_search module
+        # Try multiple import strategies to handle different deployment scenarios
+        search_json_schemas = None
+        
+        # Strategy 1: Try direct import (works if schema_search is in PYTHONPATH)
         try:
             from schema_search import search_json_schemas
 
-            await ctx.info("Successfully imported schema_search module")
+            await ctx.info("Successfully imported schema_search module (direct import)")
         except ImportError:
-            json_schema_dir = os.path.join(
-                os.path.dirname(__file__), "../../../json-schema/src"
-            )
-            sys.path.append(os.path.abspath(json_schema_dir))
+            pass
+        
+        # Strategy 2: Try relative to this file's location
+        if search_json_schemas is None:
             try:
+                json_schema_dir = os.path.join(
+                    os.path.dirname(__file__), "../../../json-schema/src"
+                )
+                json_schema_dir_abs = os.path.abspath(json_schema_dir)
+                if json_schema_dir_abs not in sys.path:
+                    sys.path.insert(0, json_schema_dir_abs)
                 from schema_search import search_json_schemas
 
-                await ctx.info(f"Imported schema_search from {json_schema_dir}")
-            except ImportError as e:
-                error_message = f"Failed to import schema_search module: {e}"
-                await ctx.error(error_message)
-                return {
-                    "success": False,
-                    "error": error_message,
-                    "message": "Module import failed. Please check if schema_search.py is available.",
-                }
+                await ctx.info(f"Imported schema_search from {json_schema_dir_abs}")
+            except ImportError:
+                pass
+        
+        # Strategy 3: Try relative to package root
+        if search_json_schemas is None:
+            try:
+                # Get package root (awslabs/lza_mcp_server)
+                package_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                json_schema_dir = os.path.join(package_root, "../../json-schema/src")
+                json_schema_dir_abs = os.path.abspath(json_schema_dir)
+                if json_schema_dir_abs not in sys.path:
+                    sys.path.insert(0, json_schema_dir_abs)
+                from schema_search import search_json_schemas
+
+                await ctx.info(f"Imported schema_search from package root: {json_schema_dir_abs}")
+            except ImportError:
+                pass
+        
+        # If all strategies failed, return error
+        if search_json_schemas is None:
+            error_message = "Failed to import schema_search module after trying multiple strategies"
+            await ctx.error(error_message)
+            await ctx.error(f"Current sys.path: {sys.path}")
+            await ctx.error(f"Current __file__: {__file__}")
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Module import failed. Please check if schema_search.py is available in json-schema/src directory.",
+                "troubleshooting": [
+                    "Verify that json-schema/src/schema_search.py exists",
+                    "Check that the MCP server has access to the json-schema directory",
+                    "Ensure the package structure is intact after installation",
+                ],
+            }
 
         # Determine schema path
         if schema_path is None:

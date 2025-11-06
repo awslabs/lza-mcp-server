@@ -18,6 +18,7 @@ import os
 import tempfile
 import zipfile
 import logging
+import shutil
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import Context
 from ...aws_access import download_from_s3, get_aws_session
@@ -181,6 +182,51 @@ async def _validate_from_docker_path(ctx: Context, docker_zip_path: str = None) 
             "message": "Validation failed"
         }
 
+def _validate_cleanup_inputs(
+    cleanup_type: str,
+    path: Optional[str]
+) -> Dict[str, Any]:
+    """
+    Validate cleanup inputs.
+    
+    Args:
+        cleanup_type: Type of cleanup to validate ("validation_zip" or "retrieved_config")
+        path: Path to validate (optional for validation_zip, required for retrieved_config)
+        
+    Returns:
+        Dictionary with validation result and LLM-friendly error message if invalid
+        
+    Examples:
+        >>> _validate_cleanup_inputs("validation_zip", None)
+        {"valid": True}
+        
+        >>> _validate_cleanup_inputs("retrieved_config", "/tmp/lza-config-abc123")
+        {"valid": True}
+        
+        >>> _validate_cleanup_inputs("invalid_type", None)
+        {"valid": False, "error": "Invalid cleanup type 'invalid_type'. Please use 'validation_zip' to clean up validation files or 'retrieved_config' to clean up retrieved configuration directories."}
+        
+        >>> _validate_cleanup_inputs("retrieved_config", None)
+        {"valid": False, "error": "The 'path' parameter is required when cleanup_type is 'retrieved_config'. Please provide the temporary directory path returned from getConfigurationFromS3."}
+    """
+    # Validate cleanup_type
+    valid_cleanup_types = ["validation_zip", "retrieved_config"]
+    if cleanup_type not in valid_cleanup_types:
+        return {
+            "valid": False,
+            "error": f"Invalid cleanup type '{cleanup_type}'. Please use 'validation_zip' to clean up validation files or 'retrieved_config' to clean up retrieved configuration directories."
+        }
+    
+    # Validate path requirements based on cleanup_type
+    if cleanup_type == "retrieved_config" and not path:
+        return {
+            "valid": False,
+            "error": "The 'path' parameter is required when cleanup_type is 'retrieved_config'. Please provide the temporary directory path returned from getConfigurationFromS3."
+        }
+    
+    # All validations passed
+    return {"valid": True}
+
 async def _cleanup_zip_with_bash(ctx: Context, local_share_path: str) -> Dict[str, Any]:
     """Clean up ZIP file using bash commands."""
     try:
@@ -199,6 +245,144 @@ async def _cleanup_zip_with_bash(ctx: Context, local_share_path: str) -> Dict[st
         error_msg = f"Cleanup error: {str(e)}"
         await ctx.error(error_msg)
         return {"success": False, "error": error_msg}
+
+async def cleanup_configuration(
+    ctx: Context,
+    cleanup_type: str,
+    path: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Unified cleanup for LZA configuration files and directories.
+    
+    Handles multiple cleanup scenarios:
+    1. validation_zip: Removes config.zip from share location
+    2. retrieved_config: Removes extracted configuration directory
+    
+    Args:
+        ctx: MCP context for logging
+        cleanup_type: Type of cleanup ("validation_zip" or "retrieved_config")
+        path: Optional path override. For validation_zip, defaults to ~/Documents/lza-config.
+              For retrieved_config, must specify the temp directory path.
+        
+    Returns:
+        Dictionary with cleanup status
+        
+    Examples:
+        # Clean up validation ZIP
+        cleanup_configuration(ctx, cleanup_type="validation_zip")
+        
+        # Clean up validation ZIP from custom location
+        cleanup_configuration(ctx, cleanup_type="validation_zip", path="~/custom/path")
+        
+        # Clean up retrieved configuration
+        cleanup_configuration(ctx, cleanup_type="retrieved_config", path="/tmp/lza-config-abc123")
+    """
+    # Validate inputs
+    validation_result = _validate_cleanup_inputs(cleanup_type, path)
+    if not validation_result["valid"]:
+        await ctx.error(validation_result["error"])
+        return {
+            "success": False,
+            "error": validation_result["error"],
+            "cleanup_type": cleanup_type
+        }
+    
+    try:
+        if cleanup_type == "validation_zip":
+            # Handle validation ZIP cleanup
+            share_path = path if path else "~/Documents/lza-config"
+            expanded_path = os.path.expanduser(share_path)
+            zip_file_path = os.path.join(expanded_path, "config.zip")
+            
+            if os.path.exists(zip_file_path):
+                os.remove(zip_file_path)
+                await ctx.info(f"✅ Cleaned up validation ZIP: {zip_file_path}")
+                logger.info(f"Cleaned up validation ZIP file: {zip_file_path}")
+                return {
+                    "success": True,
+                    "cleanup_type": cleanup_type,
+                    "path": zip_file_path,
+                    "existed": True,
+                    "message": "Validation ZIP file cleaned up successfully"
+                }
+            else:
+                await ctx.info(f"✅ Validation ZIP already cleaned up: {zip_file_path}")
+                return {
+                    "success": True,
+                    "cleanup_type": cleanup_type,
+                    "path": zip_file_path,
+                    "existed": False,
+                    "message": "Validation ZIP file already cleaned up"
+                }
+        
+        elif cleanup_type == "retrieved_config":
+            # Handle retrieved config directory cleanup
+            import shutil
+            
+            # Import S3ConfigRetrieval to access tracking dicts
+            from ..config.get_config_s3 import S3ConfigRetrieval
+            
+            if not os.path.exists(path):
+                await ctx.info(f"✅ Configuration directory already cleaned up: {path}")
+                return {
+                    "success": True,
+                    "cleanup_type": cleanup_type,
+                    "path": path,
+                    "existed": False,
+                    "message": "Configuration directory already cleaned up"
+                }
+            
+            # Remove the entire directory tree
+            shutil.rmtree(path)
+            await ctx.info(f"✅ Cleaned up configuration directory: {path}")
+            logger.info(f"Cleaned up retrieved configuration directory: {path}")
+            
+            # Update tracking dicts if this is a tracked directory
+            # Note: We need to access the singleton instance's tracking dicts
+            # This is handled by creating a temporary instance to access class-level tracking
+            retrieval_instance = S3ConfigRetrieval()
+            if path in retrieval_instance._temp_directories:
+                del retrieval_instance._temp_directories[path]
+            if retrieval_instance._last_temp_directory == path:
+                retrieval_instance._last_temp_directory = None
+            
+            # Verify directory no longer exists
+            if os.path.exists(path):
+                error_msg = f"Failed to remove directory: {path} still exists"
+                await ctx.error(error_msg)
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "cleanup_type": cleanup_type,
+                    "path": path,
+                    "error": error_msg,
+                    "message": "Failed to verify directory removal"
+                }
+            
+            return {
+                "success": True,
+                "cleanup_type": cleanup_type,
+                "path": path,
+                "existed": True,
+                "message": "Configuration directory cleaned up successfully"
+            }
+        
+    except Exception as e:
+        error_msg = f"Cleanup failed: {str(e)}"
+        await ctx.error(error_msg)
+        logger.error(f"Cleanup error for type '{cleanup_type}': {str(e)}")
+        return {
+            "success": False,
+            "cleanup_type": cleanup_type,
+            "path": path,
+            "error": error_msg,
+            "troubleshooting": [
+                "Check that the path is correct",
+                "Verify file system permissions",
+                "Ensure the file/directory is not locked by another process",
+                "Check available disk space"
+            ]
+        }
 
 async def _offer_s3_upload_after_validation(ctx: Context, config_path: str, validation_result: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -800,72 +984,39 @@ The ZIP file should be accessible at: {docker_zip_path}
 
 
 
-    @mcp.tool(name="cleanupValidationZip") # nosemgrep: useless-inner-function
-    async def cleanup_validation_zip(
+    @mcp.tool(name="cleanupConfiguration") # nosemgrep: useless-inner-function
+    async def cleanup_configuration_tool(
         ctx: Context,
-        share_path: str = "~/Documents/lza-config"
+        cleanup_type: str,
+        path: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Clean up the validation ZIP file from the share location.
+        Clean up LZA configuration files and directories.
         
-        This tool allows manual cleanup of the config.zip file after successful
-        upload to S3. Use this only after you've uploaded the configuration.
+        This tool handles multiple cleanup scenarios:
+        1. "validation_zip": Removes config.zip from validation share location
+        2. "retrieved_config": Removes extracted configuration directory from S3 retrieval
         
         Args:
-            share_path (str, optional): Path to the share location (default: ~/Documents/lza-config)
+            cleanup_type: Type of cleanup to perform ("validation_zip" or "retrieved_config")
+            path: Optional path override. For validation_zip, defaults to ~/Documents/lza-config.
+                  For retrieved_config, must specify the temp directory path.
             
         Returns:
-            Dictionary containing cleanup result
+            Dictionary with cleanup status
             
-        Example:
-            ```python
-            # Clean up after successful upload
-            result = await cleanup_validation_zip(ctx)
+        Examples:
+            # Clean up validation ZIP
+            cleanup_configuration(ctx, cleanup_type="validation_zip")
             
-            # Clean up from custom share location
-            result = await cleanup_validation_zip(ctx, share_path="~/my-lza-config")
-            ```
+            # Clean up validation ZIP from custom location
+            cleanup_configuration(ctx, cleanup_type="validation_zip", path="~/custom/path")
+            
+            # Clean up retrieved configuration
+            cleanup_configuration(ctx, cleanup_type="retrieved_config", path="/tmp/lza-config-abc123")
         """
-        try:
-            await ctx.info("🧹 Cleaning up validation ZIP file...")
-            
-            # Expand the share path
-            expanded_path = os.path.expanduser(share_path)
-            zip_file_path = os.path.join(expanded_path, "config.zip")
-            
-            if not os.path.exists(zip_file_path):
-                await ctx.info(f"✅ ZIP file already cleaned up: {zip_file_path}")
-                return {
-                    "success": True,
-                    "message": "ZIP file already cleaned up",
-                    "zip_path": zip_file_path,
-                    "existed": False
-                }
-            
-            # Remove the ZIP file
-            os.remove(zip_file_path)
-            await ctx.info(f"✅ Successfully cleaned up ZIP file: {zip_file_path}")
-            
-            return {
-                "success": True,
-                "message": "ZIP file cleaned up successfully",
-                "zip_path": zip_file_path,
-                "existed": True
-            }
-            
-        except Exception as e:
-            error_message = f"Failed to clean up ZIP file: {str(e)}"
-            await ctx.error(error_message)
-            
-            return {
-                "success": False,
-                "error": error_message,
-                "zip_path": zip_file_path if 'zip_file_path' in locals() else None,
-                "troubleshooting": [
-                    "Check that the share path is correct",
-                    "Verify file system permissions",
-                    "Ensure the ZIP file is not locked by another process"
-                ]
-            }
+        await ctx.info(f"🧹 Cleaning up {cleanup_type}...")
+        result = await cleanup_configuration(ctx, cleanup_type, path)
+        return result
 
     logger.info("Validation tools registered successfully")
