@@ -74,9 +74,10 @@ def register_config_tools(mcp):
         1. Run checkAwsConnectivity() first to verify AWS credentials
         2. Call getConfigurationFromS3(bucket_name=None) to download and extract configuration
         3. Use the 'host_path' from the response to inspect configuration files with readFile or other tools
-        4. Optionally call cleanupConfiguration(cleanup_type="retrieved_config") when done (automatic cleanup occurs on next retrieval)
         
         IMPORTANT: Use 'host_path' from the response to access files for inspection. The 'container_path' is internal Docker path only.
+        
+        NOTE: Automatic cleanup occurs on next retrieval to keep the file system clean.
         
         RETURNS: Dictionary with success status, container_path, host_path (use this!), file_count, directory_count, root_files, root_folders, structure, zip_size, bucket_name, object_key, and llm_instructions.""",
     )  # nosemgrep: useless-inner-function
@@ -101,8 +102,8 @@ def register_config_tools(mcp):
         1. Run checkAwsConnectivity() first to verify AWS credentials (recommended)
         2. Call getConfigurationFromS3() to download and extract configuration
         3. Use the 'host_path' from the response to inspect configuration files
-        4. Optionally call cleanupConfiguration(cleanup_type="retrieved_config") when done
-           (automatic cleanup will occur on next retrieval if not manually cleaned)
+        
+        NOTE: Automatic cleanup will occur on next retrieval to keep the file system clean
 
         Args:
             bucket_name: Optional custom bucket name. If not provided, uses

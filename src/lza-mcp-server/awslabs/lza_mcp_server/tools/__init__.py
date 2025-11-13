@@ -16,14 +16,12 @@
 
 from .aws_services.manage_aws_service_tools import register_aws_tools
 from .config.manage_config_tools import register_config_tools
-from .validation import register_validation_tools
 from .pipeline.manage_pipeline_tools import register_pipeline_tools
 from .schema.manage_schema_tools import register_schema_tools
 
 __all__ = [
     "register_aws_tools",
     "register_config_tools",
-    "register_validation_tools",
     "register_pipeline_tools",
     "register_schema_tools",
 ]
