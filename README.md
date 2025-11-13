@@ -50,7 +50,7 @@ make build-local
 # Or build manually
 finch build -f Dockerfile.local -t lza-mcp-server:local .
 
-# Run locally with validation support
+# Run locally
 make run-local
 
 # Or run manually
@@ -74,16 +74,160 @@ finch compose up --build
 finch build -f Dockerfile.local -t lza-mcp-server:local .
 ```
 
-### Amazon Q Integration
+### MCP Server Configuration
 
-1. **Copy the MCP configuration:**
-```bash
-cp mcp-config.json ~/.aws/amazonq/mcp.json
+The LZA MCP server can be configured for use with any MCP-compatible client (Amazon Q, Claude Desktop, Kiro IDE, etc.).
+
+#### Minimum Required Configuration
+
+Add this configuration to your MCP settings file. Replace the placeholder paths with your actual system paths:
+
+**For Kiro IDE**: `.kiro/settings/mcp.json` (workspace) or `~/.kiro/settings/mcp.json` (global)
+**For Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+**For Amazon Q**: `~/.aws/amazonq/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "awslabs.lza-mcp-server": {
+      "command": "<REPO_PATH>/scripts/extract-aws-credentials.sh",
+      "args": [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "-v",
+        "<CONFIG_PATH>:/app/lza-config:rw",
+        "-e",
+        "LZA_CONFIG_HOST_PATH=<CONFIG_PATH>",
+        "-e",
+        "AWS_ACCESS_KEY_ID",
+        "-e",
+        "AWS_SECRET_ACCESS_KEY",
+        "-e",
+        "AWS_SESSION_TOKEN",
+        "-e",
+        "AWS_REGION",
+        "-e",
+        "FASTMCP_LOG_LEVEL=DEBUG",
+        "lza-mcp-server:local"
+      ],
+      "env": {
+        "AWS_PROFILE": "<YOUR_AWS_PROFILE>",
+        "AWS_REGION": "<YOUR_AWS_REGION>"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "getMinimumConfiguration",
+        "checkAwsConnectivity",
+        "searchJsonSchema",
+        "getFullSchema",
+        "getPipelineStatus",
+        "getConfigurationFromS3",
+        "diagnosePipelineErrors",
+        "releasePipeline",
+        "uploadConfigurationToS3"
+      ]
+    }
+  }
+}
 ```
 
-2. **Update paths in the configuration file to match your setup**
+#### Configuration Placeholders
 
-3. **Restart Amazon Q Developer**
+Replace these placeholders with your actual values:
+
+- `<REPO_PATH>`: Full path to your cloned lza-mcp-server repository
+  - Example: `/Users/username/repos/lza-mcp-server`
+  - Windows: `C:/Users/username/repos/lza-mcp-server`
+
+- `<CONFIG_PATH>`: Full path where LZA configurations will be stored/retrieved
+  - Example: `/Users/username/Documents/lza-config`
+  - Windows: `C:/Users/username/Documents/lza-config`
+  - This directory will be created automatically if it doesn't exist
+
+- `<YOUR_AWS_PROFILE>`: Your AWS CLI profile name
+  - Example: `default`, `lza-admin`, `production`
+  - Must be configured in `~/.aws/credentials`
+
+- `<YOUR_AWS_REGION>`: Your AWS home region
+  - Example: `us-east-1`, `eu-west-1`, `ap-southeast-2`
+
+#### Environment Variables
+
+The configuration uses these important environment variables:
+
+- **LZA_CONFIG_HOST_PATH**: Path on your local system where configurations are stored
+  - Must match the volume mount path before `:/app/lza-config`
+  - Used by the MCP server to provide correct file paths in responses
+
+- **AWS_PROFILE**: AWS credentials profile to use
+- **AWS_REGION**: Default AWS region for operations
+- **FASTMCP_LOG_LEVEL**: Logging level (DEBUG, INFO, WARNING, ERROR)
+
+#### Auto-Approved Tools
+
+The `autoApprove` list includes read-only and safe operations that don't modify your AWS environment:
+- Configuration retrieval and inspection
+- Schema searches
+- Pipeline status checks
+- AWS connectivity verification
+
+Tools that modify AWS resources (like `releasePipeline` and `uploadConfigurationToS3`) can be added to auto-approve if desired, but require explicit approval by default for safety.
+
+#### Example Configuration (macOS)
+
+```json
+{
+  "mcpServers": {
+    "awslabs.lza-mcp-server": {
+      "command": "/Users/jsmith/repos/lza-mcp-server/scripts/extract-aws-credentials.sh",
+      "args": [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "-v",
+        "/Users/jsmith/Documents/lza-config:/app/lza-config:rw",
+        "-e",
+        "LZA_CONFIG_HOST_PATH=/Users/jsmith/Documents/lza-config",
+        "-e",
+        "AWS_ACCESS_KEY_ID",
+        "-e",
+        "AWS_SECRET_ACCESS_KEY",
+        "-e",
+        "AWS_SESSION_TOKEN",
+        "-e",
+        "AWS_REGION",
+        "-e",
+        "FASTMCP_LOG_LEVEL=DEBUG",
+        "lza-mcp-server:local"
+      ],
+      "env": {
+        "AWS_PROFILE": "lza-admin",
+        "AWS_REGION": "us-east-1"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "getMinimumConfiguration",
+        "checkAwsConnectivity",
+        "searchJsonSchema",
+        "getFullSchema",
+        "getPipelineStatus",
+        "getConfigurationFromS3",
+        "diagnosePipelineErrors"
+      ]
+    }
+  }
+}
+```
+
+#### Restart Your MCP Client
+
+After updating the configuration:
+- **Kiro IDE**: Reload the MCP server from the MCP Server view
+- **Claude Desktop**: Restart the application
+- **Amazon Q**: Restart Amazon Q Developer
 
 ## AWS Permissions
 
@@ -228,11 +372,6 @@ make build-local
 - **uploadConfigurationToS3**: Upload configuration files to S3 bucket
 - **getConfigurationFromS3**: Retrieve and extract current LZA configuration from S3
 
-### Configuration Validation
-- **validateConfigurationFromS3**: Validate LZA configurations stored in S3 buckets
-- **validateConfigurationFromShare**: Validate configurations using Docker shared volumes
-- **cleanupConfiguration**: Clean up temporary validation files and retrieved configurations (planned)
-
 ### Pipeline Management
 - **releasePipeline**: Start the LZA pipeline execution
 - **getPipelineStatus**: Get current pipeline status and progress
@@ -262,20 +401,23 @@ The `getConfigurationFromS3` tool:
 - Users map their local directory (e.g., `~/Documents/lza-config`) to `/app/lza-config` in the container
 
 **Volume Mount Configuration**:
-The host path is determined by:
-1. Environment variable `LZA_CONFIG_HOST_PATH` (if set in MCP server configuration)
-2. Default: `~/Documents/lza-config`
+The host path is determined by the `LZA_CONFIG_HOST_PATH` environment variable in your MCP configuration:
 
-To configure a custom host path, add the environment variable to your MCP server configuration:
+1. **Set in MCP Configuration**: The `LZA_CONFIG_HOST_PATH` environment variable must match your volume mount path
+2. **Volume Mount**: Use `-v <CONFIG_PATH>:/app/lza-config:rw` to mount your local directory
+3. **Environment Variable**: Use `-e LZA_CONFIG_HOST_PATH=<CONFIG_PATH>` to tell the server where files are on your host
+
+**Important**: Both the volume mount path and the `LZA_CONFIG_HOST_PATH` environment variable must use the same path. This ensures the MCP server provides correct file paths that work on your local system.
+
+Example:
 ```json
 {
   "mcpServers": {
     "awslabs.lza-mcp-server": {
-      "command": "docker",
       "args": [
-        "run", "--rm", "-i",
-        "-v", "/your/custom/path:/app/lza-config:rw",
-        "-e", "LZA_CONFIG_HOST_PATH=/your/custom/path",
+        "docker", "run", "--rm", "-i",
+        "-v", "/Users/jsmith/Documents/lza-config:/app/lza-config:rw",
+        "-e", "LZA_CONFIG_HOST_PATH=/Users/jsmith/Documents/lza-config",
         ...
       ]
     }
@@ -283,50 +425,7 @@ To configure a custom host path, add the environment variable to your MCP server
 }
 ```
 
-## Configuration Validation
-
-The server provides two methods for validating LZA configurations before deployment.
-
-### S3-Based Validation
-
-Validates configurations stored in S3 buckets (recommended for production):
-
-```bash
-# 1. Check AWS connectivity
-checkAwsConnectivity()
-
-# 2. Create S3 bucket (if needed) using AWS CLI
-aws s3 mb s3://your-bucket-name --region your-region
-
-# 3. Create and upload configuration ZIP to S3
-cd /path/to/config && zip -r config.zip .
-aws s3 cp config.zip s3://your-bucket-name/config.zip
-
-# 4. Validate from S3
-validateConfigurationFromS3(s3_path="s3://your-bucket-name/config.zip")
-```
-
-### Local Shared Volume Validation
-
-Validates configurations using Docker shared volumes (for local development):
-
-```bash
-# 1. Create ZIP of configuration directory
-cd /path/to/config && zip -r ~/Documents/lza-config/config.zip .
-
-# 2. Run validation with shared volume
-validateConfigurationFromShare(local_share_path="~/Documents/lza-config")
-
-# 3. Clean up after successful upload (manual cleanup if needed)
-# Note: Automatic cleanup occurs on next retrieval
-```
-
-### Validation Requirements
-
-- ZIP files must contain the complete configuration directory structure
-- Include all subdirectories and supporting files (IAM policies, SCP policies, etc.)
-- Use `zip -r config.zip .` from within the configuration directory
-- Ensure all referenced files are included in the ZIP
+See the [MCP Server Configuration](#mcp-server-configuration) section for complete configuration examples.
 
 ## Configuration Cleanup
 
@@ -383,12 +482,7 @@ getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
 - **Invalid bucket name**: Bucket names must be 3-63 characters, lowercase, following AWS S3 naming rules
 - **Permission denied**: Verify IAM permissions include `s3:GetObject` for the configuration bucket
 - **Invalid ZIP file**: The downloaded file may be corrupted - check the S3 object integrity
-
-### Validation Issues
-- **ZIP file errors**: Ensure ZIP contains complete directory structure with `zip -r config.zip .`
-- **Missing files**: Include all subdirectories and referenced files (IAM policies, SCP policies)
 - **S3 download failures**: Verify AWS credentials and S3 bucket permissions
-- **Shared volume access**: Ensure Docker container has volume mount `-v ~/Documents/lza-config:/app/lza-config`
 
 ## Documentation
 

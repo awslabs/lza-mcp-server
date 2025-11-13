@@ -73,15 +73,13 @@ async def _handle_share_to_s3_upload(
         zip_file_path = None
         zip_location_type = None
 
+        # Get host path from environment variable (configured in Docker/MCP settings)
+        host_config_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
+        container_config_path = os.environ.get("LZA_CONFIG_CONTAINER_PATH", "/app/lza-config")
+
         possible_zip_paths = [
-            ("host", os.path.expanduser("~/Documents/lza-config/config.zip")),
-            (
-                "container",
-                os.path.join(
-                    os.environ.get("LZA_CONFIG_CONTAINER_PATH", "/app/lza-config"),
-                    "config.zip",
-                ),
-            ),
+            ("host", os.path.join(os.path.expanduser(host_config_path), "config.zip")),
+            ("container", os.path.join(container_config_path, "config.zip")),
         ]
 
         for location_type, path in possible_zip_paths:
@@ -102,9 +100,10 @@ async def _handle_share_to_s3_upload(
                 category=ErrorCategory.CONFIGURATION,
                 error_code="VALIDATION_ZIP_NOT_FOUND",
                 troubleshooting=[
-                    "Run validateConfigurationFromShare first to create the ZIP file",
-                    "Check that validation completed successfully",
+                    "Create a ZIP file of your configuration first",
+                    f"Place the ZIP file in {os.path.join(host_config_path, 'config.zip')}",
                     "Verify Docker volume mounts are correct",
+                    "Check that LZA_CONFIG_HOST_PATH environment variable is set correctly",
                 ],
                 context={"checked_paths": [path for _, path in possible_zip_paths]},
             )
@@ -291,12 +290,13 @@ async def _detect_share_validation_context(ctx: Context) -> Dict[str, Any]:
         Dict with detection result and share validation context
     """
     try:
+        # Get paths from environment variables (configured in Docker/MCP settings)
+        host_config_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
+        container_config_path = os.environ.get("LZA_CONFIG_CONTAINER_PATH", "/app/lza-config")
+        
         share_paths = [
-            os.path.expanduser("~/Documents/lza-config/config.zip"),
-            os.path.join(
-                os.environ.get("LZA_CONFIG_CONTAINER_PATH", "/app/lza-config"),
-                "config.zip",
-            ),
+            os.path.join(os.path.expanduser(host_config_path), "config.zip"),
+            os.path.join(container_config_path, "config.zip"),
         ]
 
         most_recent_path = None
@@ -314,13 +314,14 @@ async def _detect_share_validation_context(ctx: Context) -> Dict[str, Any]:
 
         # Use the most recent file if it's within 2 hours
         if most_recent_path and most_recent_age < 7200:  # 2 hours
+            # Determine location type by checking if path matches container path
+            location_type = "container" if most_recent_path.startswith(container_config_path) else "host"
+            
             return {
                 "detected": True,
                 "zip_path": most_recent_path,
                 "age_seconds": most_recent_age,
-                "location_type": "host"
-                if "Documents" in most_recent_path
-                else "container",
+                "location_type": location_type,
             }
         elif most_recent_path:
             await ctx.info(
@@ -442,22 +443,29 @@ async def tool_upload_configuration_to_s3(
     offer_pipeline_release: bool = True,
 ) -> Dict[str, Any]:
     """
-    Upload validated LZA configuration to S3 bucket with smart validation detection.
+    Upload LZA configuration to S3 bucket with smart detection.
 
     This tool enables uploading LZA configurations to S3 buckets for deployment through
-    the LZA pipeline. It intelligently detects which validation workflow was used and
-    handles the upload accordingly.
+    the LZA pipeline. It intelligently detects the configuration source and handles
+    the upload accordingly.
+
+    IMPORTANT - Docker Container Context:
+    This MCP server runs inside a Docker container. Paths work differently:
+    - The tool operates on the CONTAINER filesystem, not the host filesystem
+    - If you retrieved config with getConfigurationFromS3(), leave config_path EMPTY
+    - The tool will automatically find and use the retrieved configuration
+    - DO NOT pass the host_path from getConfigurationFromS3() - it won't work!
 
     Smart Detection Logic:
-    1. **S3 Validation Detection**: Checks for recent S3 validation context and performs
-       efficient S3-to-S3 copy from validation location to config bucket
-    2. **Share Validation Detection**: Checks for recent ZIP files in share locations
+    1. **S3 Detection**: Checks for recent S3 configurations and performs
+       efficient S3-to-S3 copy from source location to config bucket
+    2. **Share Location Detection**: Checks for ZIP files in share locations
        (Docker volumes) and uploads from there
-    3. **Direct Upload Fallback**: If no recent validation detected, discovers and
-       validates configuration, creates new ZIP, and uploads
+    3. **Direct Upload Fallback**: If no recent configuration detected, discovers
+       configuration, creates new ZIP, and uploads
 
     The tool automatically:
-    - Detects validation type from recent validation workflows
+    - Detects configuration source from recent operations
     - Performs S3-to-S3 copy for S3 validation (most efficient)
     - Uploads from share location for share validation
     - Falls back to configuration discovery and ZIP creation for direct uploads
@@ -467,9 +475,11 @@ async def tool_upload_configuration_to_s3(
     - Optionally offers pipeline release functionality
 
     Args:
-        config_path: Optional path to configuration folder. If not provided,
-                    the tool will first check share locations for validation ZIP,
-                    then search the workspace for valid LZA configurations.
+        config_path: Optional path to configuration folder WITHIN the container workspace.
+                    IMPORTANT: Leave this EMPTY if you used getConfigurationFromS3() - 
+                    the tool will automatically detect and use the retrieved config.
+                    Only provide a path if you have a custom container-relative path.
+                    DO NOT use the host_path from getConfigurationFromS3()!
         bucket_name: Optional custom bucket name. If not provided, the tool will
                     construct the default bucket name using the pattern:
                     "aws-accelerator-config-<accountID>-<region>"
@@ -479,15 +489,22 @@ async def tool_upload_configuration_to_s3(
     Returns:
         Dictionary containing upload results with success status and details
 
-    Example Usage:
-        # Upload from validation workflow (checks share location first)
-        result = await upload_configuration_to_s3(ctx)
+    TYPICAL WORKFLOW:
+        1. checkAwsConnectivity - ensure permissions and account information is inserted into context
+        2. getConfigurationFromS3() - downloads config to container workspace
+        3. User edits files using the host_path with bash/file tools
+        4. uploadConfigurationToS3() - NO PATH NEEDED, auto-detects the retrieved config
+        5. releasePipeline() - triggers deployment
 
-        # Upload specific configuration directory
-        result = await upload_configuration_to_s3(ctx, config_path="/path/to/config")
+    Example Usage:
+        # Upload configuration after getConfigurationFromS3() (RECOMMENDED)
+        result = await upload_configuration_to_s3(ctx)  # No path needed!
 
         # Upload to custom bucket
         result = await upload_configuration_to_s3(ctx, bucket_name="my-custom-bucket")
+
+        # Upload specific container-relative path (advanced use only)
+        result = await upload_configuration_to_s3(ctx, config_path="./my-config")
         :param offer_pipeline_release:
         :param bucket_name:
         :param config_path:
@@ -495,6 +512,33 @@ async def tool_upload_configuration_to_s3(
     """
     try:
         await ctx.info("📤 Starting LZA configuration upload to S3...")
+
+        # Check if user provided a host path (common mistake)
+        if config_path and (config_path.startswith("/Users/") or config_path.startswith("~/")):
+            error_message = (
+                f"The provided path '{config_path}' appears to be a host filesystem path. "
+                "This MCP server runs in a Docker container and cannot access host paths directly. "
+                "If you recently used getConfigurationFromS3(), simply call this function "
+                "WITHOUT the config_path parameter - it will automatically detect and use "
+                "the retrieved configuration."
+            )
+            await ctx.error(error_message)
+            
+            return create_structured_error_response(
+                error=error_message,
+                category=ErrorCategory.CONFIGURATION,
+                error_code="HOST_PATH_PROVIDED",
+                troubleshooting=[
+                    "Remove the config_path parameter and call uploadConfigurationToS3() without arguments",
+                    "The tool will automatically find the configuration from getConfigurationFromS3()",
+                    "If you need to specify a path, use a container-relative path like './my-config'",
+                ],
+                context={
+                    "provided_path": config_path,
+                    "path_type": "host_path",
+                    "recommendation": "Call uploadConfigurationToS3() without config_path parameter",
+                },
+            )
 
         # Step 1: Detect which validation workflow was used
         validation_detection = await _detect_validation_type(ctx)
@@ -557,14 +601,17 @@ async def tool_upload_configuration_to_s3(
             error_message = f"Unknown validation type detected: {validation_type}"
             await ctx.error(error_message)
 
+            # Get configured host path for error message
+            host_config_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
+            
             return create_structured_error_response(
                 error=error_message,
                 category=ErrorCategory.INTEGRATION,
                 error_code="UNKNOWN_VALIDATION_TYPE",
                 troubleshooting=[
-                    "Run validateConfigurationFromS3 for S3-based validation workflow",
-                    "Run validateConfigurationFromShare for share-based validation workflow",
-                    "Or provide config_path parameter for direct upload",
+                    "Provide config_path parameter for direct upload",
+                    f"Or create a ZIP file and place it in {os.path.join(host_config_path, 'config.zip')}",
+                    "Ensure LZA_CONFIG_HOST_PATH environment variable is set correctly",
                 ],
                 context={
                     "validation_type": validation_type,
@@ -581,10 +628,10 @@ async def tool_upload_configuration_to_s3(
             category=ErrorCategory.INTEGRATION,
             error_code="UPLOAD_ERROR",
             troubleshooting=[
-                "If using validation workflow, ensure validateConfigurationFromShare was run first",
                 "Check AWS credentials and S3 permissions",
                 "Verify network connectivity to AWS services",
-                "For direct upload, ensure config_path contains valid LZA configuration",
+                "Ensure config_path contains valid LZA configuration",
+                "Verify the ZIP file exists if using automatic detection",
             ],
             context={
                 "tool": "uploadConfigurationToS3",

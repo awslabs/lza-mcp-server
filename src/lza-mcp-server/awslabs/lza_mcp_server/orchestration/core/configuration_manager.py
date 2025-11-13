@@ -33,10 +33,7 @@ AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 
 async def cleanup_configuration_zip(ctx: Context, zip_path: str) -> Dict[str, Any]:
     """
-    Clean up ZIP file using the same logic as validation workflow.
-
-    This method reuses the exact same cleanup logic as _cleanup_zip_with_bash
-    from validation_tools.py to ensure consistent behavior and error handling.
+    Clean up ZIP file.
 
     Args:
         ctx: MCP context for logging
@@ -66,9 +63,7 @@ async def create_configuration_zip(
     """
     Create ZIP file from configuration folder using existing validation workflow logic.
 
-    This method reuses the exact same ZIP creation logic as _create_zip_with_bash
-    from validation_tools.py to ensure compatibility with the validation workflow
-    and consistent file structure preservation.
+    This method creates a ZIP file with consistent file structure preservation.
 
     Args:
         ctx: MCP context for logging and user interaction
@@ -131,9 +126,6 @@ async def select_configuration(ctx: Context, discovered_configs: List[str]) -> s
     """
     Select configuration from discovered options.
 
-    This method reuses the exact same logic as _select_configuration from validation_tools.py
-    to ensure consistent user selection interface patterns.
-
     Args:
         ctx: MCP context for logging and user interaction
         discovered_configs: List of discovered configuration paths
@@ -154,7 +146,6 @@ async def select_configuration(ctx: Context, discovered_configs: List[str]) -> s
 
     # For multiple configs, use the first one (in a real implementation,
     # this would prompt the user)
-    # This matches the exact behavior from validation_tools._select_configuration
     selected = discovered_configs[0]
     await ctx.info(f"Multiple configurations found, using: {selected}")
     return selected
@@ -173,9 +164,6 @@ class ConfigurationManager:
         """
         Discover LZA configurations in the workspace.
 
-        This method reuses the exact same logic as _discover_lza_configurations from validation_tools.py
-        to ensure consistent behavior across the MCP server.
-
         Args:
             ctx: MCP context for logging and user interaction
             workspace_path: Path to search for LZA configurations
@@ -186,7 +174,6 @@ class ConfigurationManager:
         discovered_configs = []
 
         # Search for directories containing both accounts-config.yaml and organization-config.yaml
-        # This is the same logic as validation_tools._discover_lza_configurations
         for root, dirs, files in os.walk(workspace_path):
             if "accounts-config.yaml" in files and "organization-config.yaml" in files:
                 discovered_configs.append(root)

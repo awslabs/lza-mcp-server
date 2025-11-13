@@ -359,7 +359,20 @@ class S3ConfigRetrieval:
                 "bucket_name": bucket_name,
                 "object_key": S3_OBJECT_KEY,
                 "message": "Configuration retrieved and extracted successfully",
-                "llm_instructions": f"To inspect the configuration files, use the host_path: {host_extract_path}. This is where the files are accessible on your local system.",
+                "llm_instructions": (
+                    f"IMPORTANT - Configuration Workflow:\n"
+                    f"1. Configuration has been extracted to the container workspace\n"
+                    f"2. To inspect/edit files, use host_path with bash commands or file tools: {host_extract_path}\n"
+                    f"3. After making changes, call uploadConfigurationToS3() WITHOUT any path parameter\n"
+                    f"4. The upload tool will automatically detect and use this retrieved configuration\n"
+                    f"5. DO NOT pass host_path or container_path to uploadConfigurationToS3()\n"
+                    f"\n"
+                    f"TYPICAL WORKFLOW:\n"
+                    f"  - getConfigurationFromS3() ← You are here\n"
+                    f"  - Edit files using bash/file tools at: {host_extract_path}\n"
+                    f"  - uploadConfigurationToS3() ← NO PATH NEEDED\n"
+                    f"  - releasePipeline() ← Deploy changes"
+                ),
             }
 
             await ctx.info("✅ Configuration retrieved successfully")

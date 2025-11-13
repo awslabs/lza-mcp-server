@@ -13,8 +13,8 @@
 # limitations under the License.
 
 
-# Use Ubuntu 22.04 base image
-FROM ubuntu:22.04
+# Use Python 3.11 slim base image
+FROM python:3.11-slim
 
 # Build argument for LZA release version (defaults to latest if not specified)
 ARG LZA_RELEASE=""
@@ -49,33 +49,19 @@ RUN mkdir -p /home/lzauser/.aws && chown -R lzauser:lzauser /home/lzauser/.aws
 # Change ownership to non-root user
 RUN chown -R lzauser:lzauser /app
 
-# Install base packages and Python
+# Install build-time packages, set up app, then remove packages
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-  python3.10 \
-  python3-pip \
   lsof \
   curl \
-  gnupg \
-  lsb-release \
   git \
   ca-certificates && \
-  curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-  apt-get install -y nodejs && \
-  npm install -g yarn && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
-
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir loguru pydantic pyyaml mcp fastapi uvicorn psutil && \
-    pip install --no-cache-dir -e .
-
-# Switch to non-root user
-USER lzauser
-
-# Clone the LZA repository and set up validator
-RUN mkdir -p /app/lza && \
+  # Install Python dependencies
+  pip install --no-cache-dir --upgrade pip && \
+  pip install --no-cache-dir loguru pydantic pyyaml mcp fastapi uvicorn psutil && \
+  pip install --no-cache-dir -e . && \
+  # Clone LZA repository and set up validator
+  mkdir -p /app/lza && \
   if [ -z "$LZA_RELEASE" ]; then \
     echo "No LZA_RELEASE specified, fetching latest release..." && \
     LATEST_RELEASE=$(curl -s https://api.github.com/repos/awslabs/landing-zone-accelerator-on-aws/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && \
@@ -85,20 +71,27 @@ RUN mkdir -p /app/lza && \
     echo "Using specified LZA release: $LZA_RELEASE" && \
     git clone --branch "$LZA_RELEASE" --depth 1 "$LZA_REPO_URL" /app/lza; \
   fi && \
-  cd /app/lza/source && \
-  chmod -R 755 /app/lza && \
-  yarn install && \
-  yarn build
+  # Create JSON schema files (run from /app directory)
+  chmod +x /app/docker-json-schema.sh && /app/docker-json-schema.sh && \
+  # Clean up: remove source and build packages
+  rm -rf /app/lza/source && \
+  apt-get purge -y --auto-remove \
+  lsof \
+  curl \
+  git \
+  ca-certificates && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-# Create JSON schema files
-RUN chmod +x /app/docker-json-schema.sh && /app/docker-json-schema.sh
+# Switch to non-root user
+USER lzauser
 
 # Expose port for MCP server
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python3 -c "import sys; sys.exit(0)"
+    CMD python -c "import sys; sys.exit(0)"
 
 # Entry point
-ENTRYPOINT ["python3", "-m", "awslabs.lza_mcp_server"]
+ENTRYPOINT ["python", "-m", "awslabs.lza_mcp_server"]

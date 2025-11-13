@@ -98,41 +98,9 @@ aws s3 mb s3://my-lza-config-bucket-test-123 --region us-east-1
 
 **Expected Result:** Configuration files uploaded to S3 with option to trigger pipeline execution.
 
-### Validation Tools
-
-#### Test 5: Validate Configuration from S3
-**Tool:** `validateConfigurationFromS3`
-
-**Sample Prompt:**
-```
-Validate the LZA configuration stored in s3://my-lza-config-bucket-test-123/
-```
-
-**Expected Result:** Validation report showing syntax check results and compliance status.
-
-#### Test 6: Validate Configuration from Local Share
-**Tool:** `validateConfigurationFromShare`
-
-**Sample Prompt:**
-```
-Validate my local LZA configuration files in ~/Documents/lza-config directory.
-```
-
-**Expected Result:** Local file validation with detailed error/success reporting.
-
-#### Test 7: Cleanup Validation Files
-**Tool:** `cleanupValidationZip`
-
-**Sample Prompt:**
-```
-Clean up the temporary validation files from ~/Documents/lza-config directory.
-```
-
-**Expected Result:** Temporary files and zip archives removed successfully.
-
 ### Pipeline Management Tools
 
-#### Test 8: Release Pipeline
+#### Test 5: Release Pipeline
 **Tool:** `releasePipeline`
 
 **Sample Prompt:**
@@ -162,19 +130,9 @@ Help me diagnose any errors in my failed LZA pipeline execution.
 
 **Expected Result:** Detailed error logs and diagnostic information for troubleshooting.
 
-#### Test 11: Release Pipeline
-**Tool:** `releasePipeline`
-
-**Sample Prompt:**
-```
-Start the LZA pipeline execution to deploy my configuration changes.
-```
-
-**Expected Result:** Pipeline execution initiated successfully with execution ID returned.
-
 ### Schema Management Tools
 
-#### Test 12: Search JSON Schema
+#### Test 8: Search JSON Schema
 **Tool:** `searchJsonSchema`
 
 **Sample Prompt:**
@@ -184,7 +142,7 @@ Search the LZA JSON schema for properties related to "vpc" and "networking" conf
 
 **Expected Result:** Relevant schema properties and configurations related to VPC and networking.
 
-#### Test 13: Get Full Schema
+#### Test 9: Get Full Schema
 **Tool:** `getFullSchema`
 
 **Sample Prompt:**
@@ -196,7 +154,7 @@ Get the complete LZA configuration schema for network-config.json with metadata 
 
 ## Complete End-to-End Workflow Test
 
-### Test 14: Full LZA Deployment Workflow
+### Test 10: Full LZA Deployment Workflow
 
 **Sample Prompts Sequence:**
 
@@ -215,56 +173,45 @@ Get the complete LZA configuration schema for network-config.json with metadata 
    Generate minimal LZA configuration templates and save them to ~/Documents/lza-test-config.
    ```
 
-4. **Validate locally:**
+4. **Upload to S3:**
    ```
-   Validate the configuration files in ~/Documents/lza-test-config directory.
-   ```
-
-5. **Upload to S3:**
-   ```
-   Upload the validated configuration to S3 bucket "lza-e2e-test-bucket-456".
+   Upload the configuration to S3 bucket "lza-e2e-test-bucket-456".
    ```
 
-6. **Deploy:**
+5. **Deploy:**
    ```
    Start the LZA pipeline to deploy my configuration.
    ```
 
-7. **Monitor:**
+6. **Monitor:**
    ```
    Check the pipeline status and show me detailed progress information.
    ```
 
-8. **Troubleshoot (if needed):**
+7. **Troubleshoot (if needed):**
    ```
    If there are any pipeline failures, help me diagnose the errors.
    ```
 
-9. **Schema reference:**
+8. **Schema reference:**
    ```
    Show me the schema for security-config.json so I can understand the available options.
    ```
-
-10. **Cleanup:**
-    ```
-    Clean up any temporary validation files from my local directory.
-    ```
 
 **Expected Result:** Complete LZA deployment workflow from initial setup through monitoring and troubleshooting.
 
 ## Verification Checklist
 
-- [ ] All 13 individual tools respond correctly
+- [ ] All individual tools respond correctly
 - [ ] MCP server loads without errors
 - [ ] AWS connectivity is verified
 - [ ] S3 bucket creation works
 - [ ] Configuration generation produces valid files
-- [ ] Validation tools catch syntax errors
 - [ ] Pipeline tools provide accurate status
 - [ ] Schema tools return relevant information
 - [ ] End-to-end workflow completes successfully
 - [ ] Error handling works appropriately
-- [ ] Cleanup operations remove temporary files
+- [ ] Configuration retrieval works correctly
 
 ## Troubleshooting
 

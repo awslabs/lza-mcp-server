@@ -75,7 +75,7 @@ lza-mcp-server/
             ├── __init__.py      # Tools package
             ├── aws_tools.py     # AWS connectivity and S3
             ├── config_tools.py  # Configuration generation
-            ├── validation_tools.py # Validation workflows
+            ├── pipeline_tools.py # Pipeline management
             └── schema_tools.py  # Schema search and discovery
 ```
 
@@ -211,7 +211,6 @@ The schema processing adds approximately 30-60 seconds to the Docker build time 
 1. **Choose the appropriate module**:
    - AWS operations → `tools/aws_services/`
    - Configuration generation and retrieval → `tools/config/`
-   - Validation workflows → `tools/validation/`
    - Schema operations → `tools/schema/`
    - Pipeline management → `tools/pipeline/`
 
@@ -336,8 +335,8 @@ Test these key workflows to validate functionality:
 1. **AWS Connectivity**: `Check my AWS connectivity`
 2. **Configuration Generation**: `Generate a minimum viable LZA configuration`
 3. **Configuration Retrieval**: `Retrieve my current LZA configuration from S3`
-4. **Validation Workflow**: `Validate my LZA configuration from s3://bucket/config.zip`
-5. **Schema Discovery**: `Search for VPC-related configuration options`
+4. **Schema Discovery**: `Search for VPC-related configuration options`
+5. **Pipeline Management**: `Show me the status of my LZA pipeline`
 
 For detailed testing procedures, coverage analysis, and troubleshooting, see [TESTING.md](TESTING.md).
 
@@ -389,12 +388,9 @@ For detailed testing procedures, coverage analysis, and troubleshooting, see [TE
 - **Config Tools** (`tools/config/`): Configuration generation, retrieval, and management
   - `get_minimum_configuration.py`: Generate minimal LZA configurations
   - `upload_config_s3.py`: Upload configurations to S3
-  - `get_config_s3.py`: **NEW** - Retrieve and extract configurations from S3
+  - `get_config_s3.py`: Retrieve and extract configurations from S3
   - `manage_config_tools.py`: Tool registration and coordination
   - `common.py`: Shared configuration utilities
-
-- **Validation Tools** (`tools/validation/`): Configuration validation workflows
-  - `validation_tools.py`: Validation and cleanup operations (includes unified `cleanupConfiguration`)
 
 - **Schema Tools** (`tools/schema/`): Schema discovery and analysis
   - `search_json_schema.py`: Search LZA configuration schemas
@@ -509,7 +505,7 @@ docker run --rm -it -e FASTMCP_LOG_LEVEL=DEBUG lza-mcp-server:latest
 
 ### Monitoring
 
-- **Log performance metrics** for validation operations
+- **Log performance metrics** for tool operations
 - **Monitor memory usage** during large file processing
 - **Track AWS API call patterns** to optimize costs
 - **Measure tool execution times**
@@ -535,10 +531,10 @@ docker run --rm -it -e FASTMCP_LOG_LEVEL=DEBUG lza-mcp-server:latest
 ### Planned Features
 
 1. **Enhanced Schema Search**: More sophisticated search algorithms
-2. **Configuration Validation**: Additional validation rules and checks
-3. **Template Management**: User-defined configuration templates
-4. **Batch Operations**: Process multiple configurations simultaneously
-5. **Integration APIs**: RESTful API in addition to MCP protocol
+2. **Template Management**: User-defined configuration templates
+3. **Batch Operations**: Process multiple configurations simultaneously
+4. **Integration APIs**: RESTful API in addition to MCP protocol
+5. **Enhanced Error Diagnostics**: More detailed pipeline error analysis
 
 ### Extension Points
 

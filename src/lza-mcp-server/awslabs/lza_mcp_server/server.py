@@ -42,11 +42,6 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates
 - **uploadConfigurationToS3**: Upload configuration files to S3 bucket
 
-### Validation
-- **validateConfigurationFromS3**: Validate LZA configurations stored in S3
-- **validateConfigurationFromShare**: Validate configurations from file shares
-- **cleanupValidationZip**: Clean up temporary validation files
-
 ### Pipeline Management
 - **releasePipeline**: Trigger execution of the LZA Configuration Pipeline
 - **getPipelineStatus**: Monitor pipeline execution status with stage progression
@@ -59,10 +54,9 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 
 1. Check AWS connectivity with `checkAwsConnectivity`
 2. Generate configuration with `getMinimumConfiguration`
-3. Validate configuration with `validateConfigurationFromS3`
-4. Upload to S3 with `uploadConfigurationToS3`
-5. Deploy with `releasePipeline`
-6. Monitor with `getPipelineStatus`
+3. Upload to S3 with `uploadConfigurationToS3`
+4. Deploy with `releasePipeline`
+5. Monitor with `getPipelineStatus`
 
 For detailed usage instructions, see the individual tool documentation.
 """,
@@ -74,14 +68,12 @@ def register_all_components():
     """Register all MCP tools and resources."""
     from .tools.aws_services import register_aws_tools
     from .tools.config import register_config_tools
-    from .tools import register_validation_tools
     from .tools.pipeline import register_pipeline_tools
     from .tools.schema import register_schema_tools
 
     # Register all tool categories
     register_aws_tools(mcp)
     register_config_tools(mcp)
-    register_validation_tools(mcp)
     register_pipeline_tools(mcp)
     register_schema_tools(mcp)
 
