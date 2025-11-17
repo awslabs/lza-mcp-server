@@ -21,6 +21,7 @@ from mcp.server.fastmcp import Context
 
 from .get_full_schema import tool_get_full_schema
 from .search_json_schema import tool_search_json_schema
+from .list_lza_versions import tool_list_lza_supported_versions
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +31,11 @@ def register_schema_tools(mcp):
 
     @mcp.tool(
         name="searchJsonSchema",
-        description="Search through LZA JSON schemas to find specific properties and configurations",
+        description="Search through LZA JSON schemas to find specific properties and configurations. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
     )  # nosemgrep: useless-inner-function
     async def search_json_schema(
         ctx: Context,
+        lza_version: str,
         search_terms: List[str],
         search_type: str = "general",
         max_results: int = 10,
@@ -45,6 +47,7 @@ def register_schema_tools(mcp):
     ) -> Dict[str, Any]:
         return await tool_search_json_schema(
             ctx,
+            lza_version,
             search_terms,
             search_type,
             max_results,
@@ -57,19 +60,28 @@ def register_schema_tools(mcp):
 
     @mcp.tool(
         name="getFullSchema",
-        description="Retrieve complete LZA configuration JSON schemas with optional property filtering",
+        description="Retrieve complete LZA configuration JSON schemas with optional property filtering. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
     )  # nosemgrep: useless-inner-function
     async def get_full_schema(
         ctx: Context,
+        lza_version: str,
         schema_path: str,
         property_path: Optional[str] = None,
         include_metadata: bool = True,
     ) -> Dict[str, Any]:
         return await tool_get_full_schema(
             ctx,
+            lza_version,
             schema_path,
             property_path,
             include_metadata,
         )
+
+    @mcp.tool(
+        name="listLzaSupportedVersions",
+        description="List all supported LZA versions with their schema information",
+    )  # nosemgrep: useless-inner-function
+    async def list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
+        return await tool_list_lza_supported_versions(ctx)
 
     logger.info("Schema tools registered successfully")

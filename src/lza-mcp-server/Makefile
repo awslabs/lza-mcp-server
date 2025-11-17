@@ -65,9 +65,16 @@ release: clean-cache py-compile format lint type-check security-check test-cover
 # Build local development Docker image
 build-local:
 	@echo "🐳 Building local development Docker image..."
-	@echo "  This will clone LZA repo and generate schemas during build"
-	@docker build -f Dockerfile.local -t lza-mcp-server:local .
+	@echo "  This will clone LZA versions and generate schemas during build"
+	@echo "  Default: v1.12.0 to latest"
+	@docker build -f Dockerfile.local --build-arg LZA_MIN_VERSION=v1.12.0 -t lza-mcp-server:local .
 	@echo "✅ Docker image built successfully"
+	@echo ""
+	@echo "📋 Build Info:"
+	@echo "  Versions: v1.12.0 to latest"
+	@echo "  Schemas: /app/json-schemas/{version}/"
+	@echo ""
+	@echo "💡 Custom build: docker build -f Dockerfile.local --build-arg LZA_MIN_VERSION=v1.10.0 -t lza-mcp-server:local ."
 
 # Run local Docker container with validation support
 run-local:

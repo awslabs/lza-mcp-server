@@ -257,6 +257,7 @@ class OptimizedSchemaSearcher:
 
 async def tool_search_json_schema_optimized(
     ctx: Context,
+    lza_version: str,
     search_terms: List[str],
     search_type: str = "general",
     max_results: int = 10,
@@ -269,23 +270,39 @@ async def tool_search_json_schema_optimized(
     """Optimized JSON schema search that handles large files efficiently."""
 
     try:
-        await ctx.info(f"Starting optimized search for terms: {search_terms}")
+        await ctx.info(f"Starting optimized search (version: {lza_version}) for terms: {search_terms}")
 
-        # Determine schema path
-        if schema_path is None:
-            schema_path = os.path.join("/app/json-output", "combined.json")
+        # Determine schema path based on version
+        if schema_path:
+            # Use custom path if provided
+            pass
+        else:
+            # Use version-specific path
+            schema_path = os.path.join("/app/json-schemas", lza_version, "combined.json")
 
         # Check if file exists
         if not os.path.exists(schema_path):
-            # Try local path for development
-            local_schema_path = "/Users/vmayberr/xdev/mte/lza-mcp-server/src/lza-mcp-server/json-output/combined.json"
-            if os.path.exists(local_schema_path):
-                schema_path = local_schema_path
+            # Check if version directory exists to provide better error message
+            version_dir = os.path.join("/app/json-schemas", lza_version)
+            if not os.path.exists(version_dir):
+                available_versions = []
+                schemas_base = "/app/json-schemas"
+                if os.path.exists(schemas_base):
+                    available_versions = [d for d in os.listdir(schemas_base) 
+                                        if os.path.isdir(os.path.join(schemas_base, d))]
+                
+                return {
+                    "success": False,
+                    "error": f"LZA version '{lza_version}' not found",
+                    "message": f"The specified LZA version '{lza_version}' is not available.",
+                    "available_versions": available_versions if available_versions else ["No versions found"],
+                    "hint": "Use 'latest' to access the most recent version, or specify a version like 'v1.12.0'",
+                }
             else:
                 return {
                     "success": False,
-                    "error": f"Schema file not found: {schema_path}",
-                    "message": "Schema file not available for search.",
+                    "error": f"Schema file not found for version '{lza_version}': {schema_path}",
+                    "message": f"Version directory exists but combined.json not found for '{lza_version}'",
                 }
 
         # Check file size and warn if large
@@ -337,6 +354,7 @@ async def tool_search_json_schema_optimized(
             "success": True,
             "message": f"Found {search_result.get('total_matches', 0)} matches for '{', '.join(search_terms)}' (showing {len(formatted_results)})",
             "search_info": {
+                "lza_version": lza_version,
                 "terms": search_terms,
                 "type": search_type,
                 "total_matches": search_result.get("total_matches", 0),

@@ -3,11 +3,18 @@
 # Exit on error
 set -e
 
+# This script is kept for backward compatibility with single-version builds
+# For multi-version processing, see download-lza-versions.sh
+
 # Define default variables
 DEFAULT_JSON_SCHEMA_PATH="source/packages/@aws-accelerator/config/lib/schemas"
 LZA_EXTRACTED_DIR="${LZA_VALIDATOR_SHARE_PATH:-/app/lza}"
 JSON_SOURCE_DIR="/app/json-source"
 JSON_OUTPUT_DIR="/app/json-output"
+
+echo "==================================================="
+echo "Legacy single-version JSON schema extraction"
+echo "==================================================="
 
 # Copy the JSON schema files to a separate directory for processing
 mkdir -p "$JSON_SOURCE_DIR"
