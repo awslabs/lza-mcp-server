@@ -21,6 +21,9 @@ from mcp.server.fastmcp import Context
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
 )
+from awslabs.lza_mcp_server.tools.aws_services.get_deployed_lza_version import (
+    tool_get_deployed_lza_version,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,5 +36,12 @@ def register_aws_tools(mcp):
     )
     async def check_aws_connectivity(ctx: Context) -> Dict[str, Any]:
         return await tool_check_aws_connectivity(ctx)
+
+    @mcp.tool(
+        name="getDeployedLzaVersion",
+        description="Get the currently deployed LZA version from the environment by reading the SSM parameter",
+    )
+    async def get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
+        return await tool_get_deployed_lza_version(ctx)
 
     logger.info("AWS tools registered successfully")

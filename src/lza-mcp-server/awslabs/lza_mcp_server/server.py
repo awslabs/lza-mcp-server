@@ -37,6 +37,7 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 
 ### AWS Services
 - **checkAwsConnectivity**: Verify AWS credentials and connectivity
+- **getDeployedLzaVersion**: Get the currently deployed LZA version from SSM Parameter Store
 
 ### Configuration Management
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates
@@ -48,15 +49,26 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 - **diagnosePipelineErrors**: Retrieve CodeBuild logs for failed executions
 
 ### Schema Management
-- **getConfigurationSchema**: Retrieve LZA configuration JSON schemas
+- **listLzaSupportedVersions**: List all supported LZA versions with schema information
+- **searchJsonSchema**: Search through LZA JSON schemas (requires lza_version parameter)
+- **getFullSchema**: Retrieve complete LZA configuration JSON schemas (requires lza_version parameter)
 
-## Typical Workflow
+## Typical Workflows
 
+### Deployment Workflow
 1. Check AWS connectivity with `checkAwsConnectivity`
 2. Generate configuration with `getMinimumConfiguration`
 3. Upload to S3 with `uploadConfigurationToS3`
 4. Deploy with `releasePipeline`
 5. Monitor with `getPipelineStatus`
+
+### Schema Query Workflow
+When working with LZA schemas, use this recommended workflow:
+1. Call `getDeployedLzaVersion` to get the currently deployed LZA version
+2. Use the returned version as the `lza_version` parameter in `searchJsonSchema` or `getFullSchema`
+3. This ensures schema queries match your deployed environment
+
+Alternatively, use `listLzaSupportedVersions` to see all available schema versions.
 
 For detailed usage instructions, see the individual tool documentation.
 """,

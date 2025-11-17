@@ -32,6 +32,7 @@ except ImportError:
 
 async def tool_search_json_schema(
     ctx: Context,
+    lza_version: str,
     search_terms: List[str],
     search_type: str = "general",
     max_results: int = 10,
@@ -45,6 +46,9 @@ async def tool_search_json_schema(
 
     This tool provides powerful search capabilities across all LZA JSON schemas to help
     users discover configuration options and understand the structure of LZA configurations.
+    
+    RECOMMENDED WORKFLOW: Call getDeployedLzaVersion() first to get the correct lza_version 
+    parameter that matches your deployed environment.
 
     The tool supports multiple search strategies:
 
@@ -67,29 +71,69 @@ async def tool_search_json_schema(
     can optionally include full schema content for detailed analysis.
 
     Args:
+        lza_version (str): LZA version to search (e.g., 'v1.12.0', 'v1.13.0', or 'latest')
         search_terms (List[str]): List of search terms to look for in the schemas
         search_type (str, optional): Type of search (general, property, pattern, relationship, complexity). Default: general
         max_results (int, optional): Maximum number of results to return. Default: 10
         include_metadata (bool, optional): Whether to include metadata in results. Default: True
         include_schema (bool, optional): Whether to include the full schema in results. Default: False
         filters (Dict, optional): Additional filters for complexity search (min/max depth, properties, required fields)
-        schema_path (str, optional): Optional path to schema file or directory (uses default if not provided)
+        schema_path (str, optional): Optional path to schema file or directory (overrides version-based path)
         format_level (str, optional): Detail level for results (minimal, standard, detailed). Default: standard
 
     Returns:
         Dictionary containing search results with matching schemas, relevance scores, and match locations
     """
     try:
-        # Check if we should use optimized search for large files
-        schema_file_path = schema_path or os.path.join(
-            "/app/json-output", "combined.json"
-        )
+        # Validate LZA version parameter
+        if not lza_version:
+            error_message = "lza_version parameter is required"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0', or 'latest')",
+            }
 
-        # Try local path for development
+        # Determine schema file path based on version
+        if schema_path:
+            # Use custom path if provided
+            schema_file_path = schema_path
+        else:
+            # Use version-specific path
+            schema_file_path = os.path.join(
+                "/app/json-schemas", lza_version, "combined.json"
+            )
+            await ctx.info(f"Using version-specific schema path: {schema_file_path}")
+
+        # Check if schema file exists
         if not os.path.exists(schema_file_path):
-            local_schema_path = "/Users/vmayberr/xdev/mte/lza-mcp-server/src/lza-mcp-server/json-output/combined.json"
-            if os.path.exists(local_schema_path):
-                schema_file_path = local_schema_path
+            # Check if version directory exists to provide better error message
+            version_dir = os.path.join("/app/json-schemas", lza_version)
+            if not os.path.exists(version_dir):
+                available_versions = []
+                schemas_base = "/app/json-schemas"
+                if os.path.exists(schemas_base):
+                    available_versions = [d for d in os.listdir(schemas_base) 
+                                        if os.path.isdir(os.path.join(schemas_base, d))]
+                
+                error_message = f"LZA version '{lza_version}' not found"
+                await ctx.error(error_message)
+                return {
+                    "success": False,
+                    "error": error_message,
+                    "message": f"The specified LZA version '{lza_version}' is not available.",
+                    "available_versions": available_versions if available_versions else ["No versions found"],
+                    "hint": "Use 'latest' to access the most recent version, or specify a version like 'v1.12.0'",
+                }
+            else:
+                error_message = f"Schema file not found for version '{lza_version}': {schema_file_path}"
+                await ctx.error(error_message)
+                return {
+                    "success": False,
+                    "error": error_message,
+                    "message": f"Version directory exists but combined.json not found for '{lza_version}'",
+                }
 
         # Check file size and use optimized search for large files
         if os.path.exists(schema_file_path):
@@ -102,6 +146,7 @@ async def tool_search_json_schema(
                 )
                 return await tool_search_json_schema_optimized(
                     ctx,
+                    lza_version,
                     search_terms,
                     search_type,
                     max_results,
@@ -113,7 +158,7 @@ async def tool_search_json_schema(
                 )
 
         await ctx.info(
-            f"Searching JSON schemas for terms: {search_terms}, type: {search_type}"
+            f"Searching JSON schemas (version: {lza_version}) for terms: {search_terms}, type: {search_type}"
         )
 
         # Import schema_search module
@@ -175,23 +220,8 @@ async def tool_search_json_schema(
                 ],
             }
 
-        # Determine schema path
-        if schema_path is None:
-            schema_path = os.path.join("/app/json-output", "combined.json")
-            await ctx.info(f"Using default schema path: {schema_path}")
-        else:
-            await ctx.info(f"Using user-provided schema path: {schema_path}")
-
-        # Check if the schema file exists
-        if not os.path.exists(schema_path):
-            error_message = f"Schema file not found: {schema_path}"
-            await ctx.error(error_message)
-            return {
-                "success": False,
-                "error": error_message,
-                "message": "Schema file not found. Please provide a valid path or ensure 'combined.json' is available.",
-                "troubleshooting": "The schema search function requires a combined.json file that contains all schemas with metadata.",
-            }
+        # Use the schema_file_path determined earlier
+        schema_path = schema_file_path
 
         # Prepare filters for complexity search
         if filters is None:
@@ -247,6 +277,7 @@ async def tool_search_json_schema(
                 "success": True,
                 "message": f"Found {search_result.get('total_matches', 0)} matches for '{', '.join(search_terms)}' (showing {len(formatted_results)})",
                 "search_info": {
+                    "lza_version": lza_version,
                     "terms": search_terms,
                     "type": search_type,
                     "total_matches": search_result.get("total_matches", 0),

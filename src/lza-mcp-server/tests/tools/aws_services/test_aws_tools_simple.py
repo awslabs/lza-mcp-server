@@ -154,7 +154,7 @@ class TestRegisterAwsTools:
 
         # Verify that tool registration was called
         assert (
-            mock_mcp.tool.call_count == 1
+            mock_mcp.tool.call_count == 2
         )
 
         # Verify the tools were registered with correct names
@@ -162,6 +162,7 @@ class TestRegisterAwsTools:
         tool_names = [call[1]["name"] for call in tool_calls]
 
         assert "checkAwsConnectivity" in tool_names
+        assert "getDeployedLzaVersion" in tool_names
 
 
 class TestEnvironmentVariableHandling:

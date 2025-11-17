@@ -44,16 +44,14 @@ finch build -t lza-mcp-server:lambda .
 
 #### For Local Development
 ```bash
-# Build local development image (includes LZA repo and schema generation)
+# Build local development image (defaults to v1.12.0 to latest)
 make build-local
-
-# Or build manually
-finch build -f Dockerfile.local -t lza-mcp-server:local .
 
 # Run locally
 make run-local
 
-# Or run manually
+# Or build/run manually
+finch build -f Dockerfile.local --build-arg LZA_MIN_VERSION=v1.12.0 -t lza-mcp-server:local .
 finch run -d \
   --name lza-mcp-server \
   -p 8000:8000 \
@@ -120,6 +118,7 @@ Add this configuration to your MCP settings file. Replace the placeholder paths 
       "autoApprove": [
         "getMinimumConfiguration",
         "checkAwsConnectivity",
+        "listLzaSupportedVersions",
         "searchJsonSchema",
         "getFullSchema",
         "getPipelineStatus",
@@ -211,6 +210,7 @@ Tools that modify AWS resources (like `releasePipeline` and `uploadConfiguration
       "autoApprove": [
         "getMinimumConfiguration",
         "checkAwsConnectivity",
+        "listLzaSupportedVersions",
         "searchJsonSchema",
         "getFullSchema",
         "getPipelineStatus",
@@ -312,6 +312,14 @@ The MCP server requires specific IAM permissions to interact with AWS services f
         "arn:${PARTITION}:s3:::aws-accelerator*",
         "arn:${PARTITION}:s3:::aws-accelerator*/*"
       ]
+    },
+    {
+      "Sid": "SSMStatement",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter"
+      ],
+      "Resource": "arn:aws:ssm:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:parameter/accelerator/*"
     }
   ]
 }
@@ -334,33 +342,78 @@ Replace the following placeholders with your specific values:
 - **IAM**: Read access to roles and policies used by LZA
 - **KMS**: Access to KMS keys with the accelerator alias for encryption operations
 - **S3**: Read/write access to LZA configuration buckets for configuration management
+- **SSM**: Read access to Systems Manager parameters to retrieve the deployed LZA version
 
 ## Schema Management
 
-The server includes automated LZA schema management that generates schemas during Docker image build.
+The server includes automated LZA schema management that generates schemas for multiple LZA versions during Docker image build.
+
+### Multi-Version Schema Support
+
+The MCP server supports multiple LZA versions simultaneously, allowing you to:
+- Search schemas for specific LZA versions
+- Compare configurations across different LZA releases
+- Work with schemas matching your deployed LZA version
+- Access the latest LZA schemas automatically
 
 ### Schema Generation
 
 Schemas are automatically generated when building the Docker image:
 
 ```bash
-# Build local image (generates schemas automatically)
+# Build local image (generates schemas automatically, defaults to v1.12.0 to latest)
 make build-local
+
+# Or specify custom version range
+finch build -f Dockerfile.local \
+  --build-arg LZA_MIN_VERSION=v1.10.0 \
+  --build-arg LZA_MAX_VERSION=v1.14.0 \
+  -t lza-mcp-server:local .
 ```
 
 ### How It Works
 
-1. **Clone**: Docker build clones the latest LZA source code from GitHub
-2. **Extract**: Extracts JSON schema files from `source/packages/@aws-accelerator/config/lib/schemas`
-3. **Process**: Resolves `$ref` references and generates metadata during build
-4. **Output**: Creates `json-output/combined.json` with all schemas and metadata
-5. **Embed**: Schemas are embedded in the Docker image
+1. **Fetch**: Queries GitHub API for all LZA releases
+2. **Filter**: Determines versions between min (default v1.12.0) and max (latest)
+3. **Clone**: Clones each version from GitHub
+4. **Extract**: Extracts JSON schema files from `source/packages/@aws-accelerator/config/lib/schemas`
+5. **Process**: Resolves `$ref` references and generates metadata for each version
+6. **Organize**: Creates version-specific directories
+7. **Symlink**: Creates `latest` symlink pointing to the newest version
 
 ### Schema Files Location
 
-- **Container**: `/app/json-output/combined.json`
-- **LZA Source**: `/app/lza` (cloned during build)
-- **Local Development**: Schemas generated in Docker image only
+- **Container**: `/app/json-schemas/{version}/` (e.g., `/app/json-schemas/v1.12.0/`)
+- **Latest**: `/app/json-schemas/latest` (symlink to newest version)
+
+### Using Schema Tools
+
+All schema search and retrieval tools require specifying an LZA version:
+
+```bash
+# List available versions
+listLzaSupportedVersions()
+
+# Search schemas for a specific version
+searchJsonSchema(
+  lza_version="v1.12.0",
+  search_terms=["vpc", "subnet"]
+)
+
+# Use latest version
+searchJsonSchema(
+  lza_version="latest",
+  search_terms=["security"]
+)
+
+# Get full schema for a specific version
+getFullSchema(
+  lza_version="v1.13.0",
+  schema_path="network-config-schema.json"
+)
+```
+
+For detailed API documentation, see [SCHEMA_TOOLS_API.md](SCHEMA_TOOLS_API.md).
 
 ## Available Tools
 
@@ -378,8 +431,9 @@ make build-local
 - **diagnosePipelineErrors**: Retrieve logs for failed pipeline executions
 
 ### Schema Search
-- **searchJsonSchema**: Search LZA configuration schemas by terms, properties, patterns, or complexity
-- **getFullSchema**: Retrieve complete schema details or specific properties
+- **listLzaSupportedVersions**: List all supported LZA versions with schema information
+- **searchJsonSchema**: Search LZA configuration schemas by terms, properties, patterns, or complexity (requires lza_version parameter)
+- **getFullSchema**: Retrieve complete schema details or specific properties (requires lza_version parameter)
 
 ## Configuration Retrieval
 
@@ -467,6 +521,9 @@ getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
 - **Search returns no results**: Verify Docker image was built successfully
 - **Outdated schemas**: Rebuild Docker image to get latest LZA schemas
 - **Network issues during build**: Check internet connectivity for GitHub access during Docker build
+- **Version not found**: Use `listLzaSupportedVersions()` to see available versions, or rebuild with desired version range
+- **Missing lza_version parameter**: All schema tools now require the `lza_version` parameter (e.g., "latest", "v1.12.0")
+- **Invalid version specified**: Check available versions with `listLzaSupportedVersions()` and use one from the list
 
 ### Container Issues
 - **Finch VM not started**: Run `finch vm start` before using Finch commands

@@ -16,9 +16,9 @@
 # Use Python 3.11 slim base image
 FROM python:3.11-slim
 
-# Build argument for LZA release version (defaults to latest if not specified)
-ARG LZA_RELEASE=""
-# If using a different repo URL, you MUST specify version to use
+# Build arguments for LZA release versions
+ARG LZA_MIN_VERSION="v1.12.0"
+ARG LZA_MAX_VERSION=""
 ARG LZA_REPO_URL="https://github.com/awslabs/landing-zone-accelerator-on-aws.git"
 
 # Set environment variables
@@ -55,26 +55,18 @@ RUN apt-get update && \
   lsof \
   curl \
   git \
-  ca-certificates && \
+  ca-certificates \
+  jq && \
   # Install Python dependencies
   pip install --no-cache-dir --upgrade pip && \
   pip install --no-cache-dir loguru pydantic pyyaml mcp fastapi uvicorn psutil && \
   pip install --no-cache-dir -e . && \
-  # Clone LZA repository and set up validator
-  mkdir -p /app/lza && \
-  if [ -z "$LZA_RELEASE" ]; then \
-    echo "No LZA_RELEASE specified, fetching latest release..." && \
-    LATEST_RELEASE=$(curl -s https://api.github.com/repos/awslabs/landing-zone-accelerator-on-aws/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && \
-    echo "Using latest release: $LATEST_RELEASE" && \
-    git clone --branch "$LATEST_RELEASE" --depth 1 "$LZA_REPO_URL" /app/lza; \
-  else \
-    echo "Using specified LZA release: $LZA_RELEASE" && \
-    git clone --branch "$LZA_RELEASE" --depth 1 "$LZA_REPO_URL" /app/lza; \
-  fi && \
-  # Create JSON schema files (run from /app directory)
-  chmod +x /app/docker-json-schema.sh && /app/docker-json-schema.sh && \
+  # Download and process multiple LZA releases
+  chmod +x /app/docker-json-schema.sh && \
+  chmod +x /app/download-lza-versions.sh && \
+  /app/download-lza-versions.sh "$LZA_MIN_VERSION" "$LZA_MAX_VERSION" "$LZA_REPO_URL" && \
   # Clean up: remove source and build packages
-  rm -rf /app/lza/source && \
+  rm -rf /app/lza-temp && \
   apt-get purge -y --auto-remove \
   lsof \
   curl \
