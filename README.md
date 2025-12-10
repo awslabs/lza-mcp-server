@@ -72,6 +72,8 @@ finch compose up --build
 finch build -f Dockerfile.local -t lza-mcp-server:local .
 ```
 
+**Resource Limits**: The container is configured with 1 CPU and 1GB memory limit (512MB reserved) to prevent resource exhaustion and ensure stable operation.
+
 ### MCP Server Configuration
 
 The LZA MCP server can be configured for use with any MCP-compatible client (Amazon Q, Claude Desktop, Kiro IDE, etc.).
