@@ -71,7 +71,7 @@ async def tool_search_json_schema(
     can optionally include full schema content for detailed analysis.
 
     Args:
-        lza_version (str): LZA version to search (e.g., 'v1.12.0', 'v1.13.0', or 'latest')
+        lza_version (str): LZA version to search (e.g., 'v1.12.0', 'v1.13.0'). Call getDeployedLzaVersion() to get the correct version.
         search_terms (List[str]): List of search terms to look for in the schemas
         search_type (str, optional): Type of search (general, property, pattern, relationship, complexity). Default: general
         max_results (int, optional): Maximum number of results to return. Default: 10
@@ -92,7 +92,20 @@ async def tool_search_json_schema(
             return {
                 "success": False,
                 "error": error_message,
-                "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0', or 'latest')",
+                "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
+            }
+        
+        # Reject "latest" to ensure version-specific searches
+        if lza_version.lower() == "latest":
+            error_message = "The 'latest' version is not allowed for schema searches"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Schema searches must use a specific LZA version to ensure accuracy with your deployed environment.",
+                "required_action": "Call getDeployedLzaVersion() to get the currently deployed LZA version, then use that version string",
+                "example": "If getDeployedLzaVersion() returns 'v1.12.0', use lza_version='v1.12.0'",
             }
 
         # Determine schema file path based on version
@@ -124,7 +137,7 @@ async def tool_search_json_schema(
                     "error": error_message,
                     "message": f"The specified LZA version '{lza_version}' is not available.",
                     "available_versions": available_versions if available_versions else ["No versions found"],
-                    "hint": "Use 'latest' to access the most recent version, or specify a version like 'v1.12.0'",
+                    "hint": "Call getDeployedLzaVersion() to get the correct version, or use listLzaSupportedVersions() to see all available versions",
                 }
             else:
                 error_message = f"Schema file not found for version '{lza_version}': {schema_file_path}"

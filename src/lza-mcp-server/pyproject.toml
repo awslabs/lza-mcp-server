@@ -39,6 +39,7 @@ coverage = {extras = ["toml"], version = ">=7.4.0"}
 moto = {extras = ["s3", "codepipeline", "cloudformation"], version = ">=4.2.0"}
 factory-boy = ">=3.3.0"
 faker = ">=22.0.0"
+hypothesis = ">=6.100.0"
 ruff = ">=0.1.0"
 mypy = ">=1.8.0"
 bandit = ">=1.7.0"
@@ -79,7 +80,9 @@ markers = [
     "aws: Tests that interact with AWS services",
     "config: Configuration validation tests",
     "schema: Schema validation and search tests",
-    "pipeline: Pipeline operation tests"
+    "pipeline: Pipeline operation tests",
+    "uc_merge: UC merge workflow tests",
+    "property: Property-based tests"
 ]
 filterwarnings = [
     "error",

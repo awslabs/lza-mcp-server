@@ -23,3 +23,7 @@ class ErrorCategory:
     S3 = "s3"
     INTEGRATION = "integration"
     SYSTEM = "system"
+    VALIDATION = "validation"
+    FILE_NOT_FOUND = "file_not_found"
+    FILE_OPERATION = "file_operation"
+    SECURITY = "security"

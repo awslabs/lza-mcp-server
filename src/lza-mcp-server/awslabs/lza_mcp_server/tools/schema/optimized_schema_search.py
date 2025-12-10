@@ -296,7 +296,7 @@ async def tool_search_json_schema_optimized(
                     "error": f"LZA version '{lza_version}' not found",
                     "message": f"The specified LZA version '{lza_version}' is not available.",
                     "available_versions": available_versions if available_versions else ["No versions found"],
-                    "hint": "Use 'latest' to access the most recent version, or specify a version like 'v1.12.0'",
+                    "hint": "Call getDeployedLzaVersion() to get the correct version, or use listLzaSupportedVersions() to see all available versions",
                 }
             else:
                 return {

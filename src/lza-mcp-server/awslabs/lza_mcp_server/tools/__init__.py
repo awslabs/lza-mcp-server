@@ -18,10 +18,12 @@ from .aws_services.manage_aws_service_tools import register_aws_tools
 from .config.manage_config_tools import register_config_tools
 from .pipeline.manage_pipeline_tools import register_pipeline_tools
 from .schema.manage_schema_tools import register_schema_tools
+from .uc_merge.manage_uc_merge_tools import register_uc_merge_tools
 
 __all__ = [
     "register_aws_tools",
     "register_config_tools",
     "register_pipeline_tools",
     "register_schema_tools",
+    "register_uc_merge_tools",
 ]

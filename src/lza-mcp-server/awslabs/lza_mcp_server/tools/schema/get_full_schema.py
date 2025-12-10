@@ -140,7 +140,7 @@ async def tool_get_full_schema(
     This enables efficient exploration of large schemas by focusing on relevant sections.
 
     Args:
-        lza_version (str): LZA version to use (e.g., 'v1.12.0', 'v1.13.0', or 'latest')
+        lza_version (str): LZA version to use (e.g., 'v1.12.0', 'v1.13.0'). Call getDeployedLzaVersion() to get the correct version.
         schema_path (str): The path to the schema (returned by searchJsonSchema as 'schema_ref')
         property_path (str, optional): Optional path to a specific property within the schema (extracted from searchJsonSchema match_locations)
         include_metadata (bool, optional): Whether to include metadata in the result. Default: True
@@ -156,8 +156,56 @@ async def tool_get_full_schema(
             return {
                 "success": False,
                 "error": error_message,
-                "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0', or 'latest')",
+                "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
             }
+        
+        # Reject "latest" to ensure version-specific searches
+        if lza_version.lower() == "latest":
+            error_message = "The 'latest' version is not allowed for schema retrieval"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Schema retrieval must use a specific LZA version to ensure accuracy with your deployed environment.",
+                "required_action": "Call getDeployedLzaVersion() to get the currently deployed LZA version, then use that version string",
+                "example": "If getDeployedLzaVersion() returns 'v1.12.0', use lza_version='v1.12.0'",
+            }
+
+        await ctx.info(f"Retrieving schema (version: {lza_version}): {schema_path}")
+        if property_path:
+            await ctx.info(f"Looking for specific property path: {property_path}")
+
+        # Use version-specific path
+        combined_schema_path = os.path.join("/app/json-schemas", lza_version, "combined.json")
+
+        if not os.path.exists(combined_schema_path):
+            # Check if version directory exists to provide better error message
+            version_dir = os.path.join("/app/json-schemas", lza_version)
+            if not os.path.exists(version_dir):
+                available_versions = []
+                schemas_base = "/app/json-schemas"
+                if os.path.exists(schemas_base):
+                    available_versions = [d for d in os.listdir(schemas_base) 
+                                        if os.path.isdir(os.path.join(schemas_base, d))]
+                
+                error_message = f"LZA version '{lza_version}' not found"
+                await ctx.error(error_message)
+                return {
+                    "success": False,
+                    "error": error_message,
+                    "message": f"The specified LZA version '{lza_version}' is not available.",
+                    "available_versions": available_versions if available_versions else ["No versions found"],
+                    "hint": "Call getDeployedLzaVersion() to get the correct version, or use listLzaSupportedVersions() to see all available versions",
+                }
+            else:
+                error_message = f"Combined schema file not found for version '{lza_version}' at: {combined_schema_path}"
+                await ctx.error(error_message)
+                return {
+                    "success": False,
+                    "error": error_message,
+                    "message": f"Version directory exists but combined.json not found for '{lza_version}'",
+                }
 
         await ctx.info(f"Retrieving schema (version: {lza_version}): {schema_path}")
         if property_path:

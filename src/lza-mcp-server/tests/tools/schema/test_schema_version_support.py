@@ -158,7 +158,7 @@ class TestSchemaVersionSupport:
 
     @pytest.mark.asyncio
     async def test_search_with_latest_version(self):
-        """Test search using 'latest' as version."""
+        """Test that search rejects 'latest' as version and directs to getDeployedLzaVersion."""
         mock_context = MockContext()
         server = Mock()
         registered_tools = {}
@@ -175,28 +175,48 @@ class TestSchemaVersionSupport:
 
         search_func = registered_tools["searchJsonSchema"]
 
-        mock_schema_data = {
-            "accounts-config.yaml": {
-                "_metadata": {"title": "Test Schema"},
-                "type": "object",
-            }
-        }
+        result = await search_func(
+            mock_context,
+            lza_version="latest",
+            search_terms=["test"],
+        )
 
-        def mock_exists(path):
-            return "latest" in path and path.endswith("combined.json")
+        # Should reject 'latest' and provide guidance
+        assert result["success"] is False
+        assert "latest" in result["error"].lower()
+        assert "getDeployedLzaVersion" in result["required_action"]
+        assert "example" in result
 
-        with patch("os.path.exists", side_effect=mock_exists):
-            with patch("os.path.getsize", return_value=1024):
-                with patch("builtins.open", mock_open(read_data=json.dumps(mock_schema_data))):
-                    # This will fail on import but that's ok for this test
-                    result = await search_func(
-                        mock_context,
-                        lza_version="latest",
-                        search_terms=["test"],
-                    )
+    @pytest.mark.asyncio
+    async def test_get_schema_with_latest_version(self):
+        """Test that get_full_schema rejects 'latest' as version and directs to getDeployedLzaVersion."""
+        mock_context = MockContext()
+        server = Mock()
+        registered_tools = {}
 
-        # Should attempt to use 'latest' version
-        assert "lza_version" in str(result) or "error" in result
+        def mock_tool_decorator(name, **kwargs):
+            def decorator(func):
+                registered_tools[name] = func
+                return func
+
+            return decorator
+
+        server.tool = mock_tool_decorator
+        register_schema_tools(server)
+
+        get_schema_func = registered_tools["getFullSchema"]
+
+        result = await get_schema_func(
+            mock_context,
+            lza_version="latest",
+            schema_path="accounts-config.yaml",
+        )
+
+        # Should reject 'latest' and provide guidance
+        assert result["success"] is False
+        assert "latest" in result["error"].lower()
+        assert "getDeployedLzaVersion" in result["required_action"]
+        assert "example" in result
 
     @pytest.mark.asyncio
     async def test_search_result_includes_version(self):

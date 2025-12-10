@@ -26,10 +26,11 @@ logger = logging.getLogger(__name__)
 log_level = os.environ.get("FASTMCP_LOG_LEVEL", "INFO")
 logging.getLogger().setLevel(log_level)
 
-# Initialize the FastMCP server
-mcp = FastMCP(
-    "awslabs.lza-mcp-server",
-    instructions="""# AWS Landing Zone Accelerator (LZA) MCP Server
+# Check if UC Merge tools should be enabled
+_enable_uc_merge = os.environ.get("ENABLE_UC_MERGE", "false").lower() in ("true", "1", "yes")
+
+# Build instructions based on enabled features
+_base_instructions = """# AWS Landing Zone Accelerator (LZA) MCP Server
 
 This MCP server helps manage LZA configurations and pipeline operations for the AWS Landing Zone Accelerator solution.
 
@@ -42,6 +43,7 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 ### Configuration Management
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates
 - **uploadConfigurationToS3**: Upload configuration files to S3 bucket
+- **getConfigurationFromS3**: Retrieve and extract current LZA configuration from S3
 
 ### Pipeline Management
 - **releasePipeline**: Trigger execution of the LZA Configuration Pipeline
@@ -51,7 +53,22 @@ This MCP server helps manage LZA configurations and pipeline operations for the 
 ### Schema Management
 - **listLzaSupportedVersions**: List all supported LZA versions with schema information
 - **searchJsonSchema**: Search through LZA JSON schemas (requires lza_version parameter)
-- **getFullSchema**: Retrieve complete LZA configuration JSON schemas (requires lza_version parameter)
+- **getFullSchema**: Retrieve complete LZA configuration JSON schemas (requires lza_version parameter)"""
+
+_uc_merge_instructions = """
+
+### UC Merge Tools (Universal Configuration)
+- **validateLzaForUcMerge**: Validate LZA installation compatibility with UC merge
+- **get_uc_releases**: Discover available UC release versions
+- **get_uc_network_models**: Get network deployment model comparison
+- **start_uc_merge_session**: Initialize a UC merge session
+- **readLzaConfigFile**: Read LZA configuration files
+- **readUcFile**: Read UC files from session
+- **updateUcFile**: Update UC files in session
+- **getUcNetworkCustomizationGuide**: Get customization guidance
+- **copyUcToLzaConfig**: Copy UC configuration to LZA directory"""
+
+_workflow_instructions = """
 
 ## Typical Workflows
 
@@ -71,7 +88,17 @@ When working with LZA schemas, use this recommended workflow:
 Alternatively, use `listLzaSupportedVersions` to see all available schema versions.
 
 For detailed usage instructions, see the individual tool documentation.
-""",
+"""
+
+_instructions = _base_instructions
+if _enable_uc_merge:
+    _instructions += _uc_merge_instructions
+_instructions += _workflow_instructions
+
+# Initialize the FastMCP server
+mcp = FastMCP(
+    "awslabs.lza-mcp-server",
+    instructions=_instructions,
     dependencies=["pydantic", "PyYAML", "boto3"],
 )
 
@@ -83,11 +110,21 @@ def register_all_components():
     from .tools.pipeline import register_pipeline_tools
     from .tools.schema import register_schema_tools
 
-    # Register all tool categories
+    # Register core tool categories
     register_aws_tools(mcp)
     register_config_tools(mcp)
     register_pipeline_tools(mcp)
     register_schema_tools(mcp)
+
+    # Conditionally register UC Merge tools based on environment variable
+    enable_uc_merge = os.environ.get("ENABLE_UC_MERGE", "false").lower() in ("true", "1", "yes")
+    
+    if enable_uc_merge:
+        from .tools.uc_merge import register_uc_merge_tools
+        register_uc_merge_tools(mcp)
+        logger.info("UC Merge tools enabled and registered")
+    else:
+        logger.info("UC Merge tools disabled (set ENABLE_UC_MERGE=true to enable)")
 
     logger.info("All MCP components registered successfully")
 

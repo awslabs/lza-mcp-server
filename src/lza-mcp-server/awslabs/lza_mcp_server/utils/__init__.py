@@ -13,7 +13,3 @@
 # limitations under the License.
 
 """Utilities package for the LZA MCP Server."""
-
-from .utils import validate_configuration_impl
-
-__all__ = ['validate_configuration_impl']
