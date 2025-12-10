@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   lza-mcp-server:
@@ -12,6 +12,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
       - FASTMCP_LOG_LEVEL=${FASTMCP_LOG_LEVEL:-INFO}
+      - ENABLE_UC_MERGE=${ENABLE_UC_MERGE:-false}
     ports:
       - "8000:8000"
     volumes:

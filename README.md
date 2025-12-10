@@ -108,6 +108,8 @@ Add this configuration to your MCP settings file. Replace the placeholder paths 
         "AWS_REGION",
         "-e",
         "FASTMCP_LOG_LEVEL=DEBUG",
+        "-e",
+        "ENABLE_UC_MERGE=false",
         "lza-mcp-server:local"
       ],
       "env": {
@@ -163,6 +165,10 @@ The configuration uses these important environment variables:
 - **AWS_PROFILE**: AWS credentials profile to use
 - **AWS_REGION**: Default AWS region for operations
 - **FASTMCP_LOG_LEVEL**: Logging level (DEBUG, INFO, WARNING, ERROR)
+- **ENABLE_UC_MERGE**: Enable Universal Configuration merge tools (true/false, default: false)
+  - Set to `true` to enable 9 additional UC merge workflow tools
+  - Reduces context size by ~56% when disabled (default)
+  - Only needed when performing UC merge operations
 
 #### Auto-Approved Tools
 
@@ -200,6 +206,8 @@ Tools that modify AWS resources (like `releasePipeline` and `uploadConfiguration
         "AWS_REGION",
         "-e",
         "FASTMCP_LOG_LEVEL=DEBUG",
+        "-e",
+        "ENABLE_UC_MERGE=false",
         "lza-mcp-server:local"
       ],
       "env": {
@@ -415,6 +423,51 @@ getFullSchema(
 
 For detailed API documentation, see [SCHEMA_TOOLS_API.md](SCHEMA_TOOLS_API.md).
 
+## Universal Configuration
+
+The local Docker image includes LZA Universal Configuration release artifacts for reference and deployment.
+
+### What's Included
+
+During build, the latest (or specified) Universal Configuration release is downloaded:
+- **Configuration packages**: All ZIP files from the release (hub-and-spoke, shared-vpc, etc.)
+- **Documentation**: Complete docs folder from the source repository
+
+### Build Arguments
+
+Control which release is downloaded:
+
+```bash
+# Use latest release (default)
+make build-local
+
+# Specify a version
+finch build -f Dockerfile.local \
+  --build-arg LZA_UC_RELEASE=v1.0.0 \
+  -t lza-mcp-server:local .
+```
+
+### File Structure
+
+Artifacts are organized by release version in `/app/lza-uc/{version}/`:
+
+```
+/app/lza-uc/
+└── v1.0.0/
+    ├── hub-and-spoke/              # Configuration files
+    ├── hub-and-spoke-for-govcloud-us/
+    ├── shared-vpc/
+    └── docs/                       # Documentation
+```
+
+### How It Works
+
+1. **Fetch Release**: Downloads release metadata from GitHub API
+2. **Download ZIPs**: Retrieves all configuration ZIP files from the release
+3. **Extract Configs**: Unpacks each ZIP to its own directory (removes intermediate `config/` folder)
+4. **Download Source**: Fetches source code archive for the release tag
+5. **Extract Docs**: Copies documentation folder to the release directory
+
 ## Available Tools
 
 ### AWS Services
@@ -434,6 +487,18 @@ For detailed API documentation, see [SCHEMA_TOOLS_API.md](SCHEMA_TOOLS_API.md).
 - **listLzaSupportedVersions**: List all supported LZA versions with schema information
 - **searchJsonSchema**: Search LZA configuration schemas by terms, properties, patterns, or complexity (requires lza_version parameter)
 - **getFullSchema**: Retrieve complete schema details or specific properties (requires lza_version parameter)
+
+### Universal Configuration Merge (Optional)
+Enable with `ENABLE_UC_MERGE=true` to access these tools:
+- **validateLzaForUcMerge**: Validate LZA installation compatibility
+- **get_uc_releases**: Discover available UC release versions
+- **get_uc_network_models**: Get network deployment model comparison
+- **start_uc_merge_session**: Initialize a UC merge session
+- **readLzaConfigFile**: Read LZA configuration files
+- **readUcFile**: Read UC files from session
+- **updateUcFile**: Update UC files in session
+- **getUcNetworkCustomizationGuide**: Get customization guidance
+- **copyUcToLzaConfig**: Copy UC configuration to LZA directory
 
 ## Configuration Retrieval
 

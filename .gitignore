@@ -4,3 +4,6 @@ lza-mcp-server/src/lza-mcp-server/.coverage
 lza-mcp-server/src/lza-mcp-server/coverage.xml.kiro/
 
 .kiro/
+
+# Hypothesis test artifacts
+.hypothesis/

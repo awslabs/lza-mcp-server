@@ -20,6 +20,7 @@ import re
 import tempfile
 import zipfile
 import shutil
+from pathlib import Path
 from typing import Dict, Any, Optional
 
 from botocore.exceptions import ClientError
@@ -31,6 +32,7 @@ from awslabs.lza_mcp_server.utils.error_handling import create_structured_error_
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
 from awslabs.lza_mcp_server.tools.aws_services.common import categorize_aws_error
 from awslabs.lza_mcp_server.constants import S3_OBJECT_KEY
+from awslabs.lza_mcp_server.tools.uc_merge.common import set_extracted_lza_config_path
 
 logger = logging.getLogger(__name__)
 
@@ -341,6 +343,9 @@ class S3ConfigRetrieval:
                 "object_key": S3_OBJECT_KEY,
             }
             self._last_temp_directory = temp_extract_path
+            
+            # Set the extracted path for UC merge tools to use
+            set_extracted_lza_config_path(Path(temp_extract_path))
 
             # Extract metadata
             metadata = self._extract_zip_metadata(temp_zip_path, temp_extract_path)

@@ -10,6 +10,8 @@
         "-e",
         "FASTMCP_LOG_LEVEL=INFO",
         "-e",
+        "ENABLE_UC_MERGE=false",
+        "-e",
         "AWS_ACCESS_KEY_ID",
         "-e",
         "AWS_SECRET_ACCESS_KEY",
@@ -23,8 +25,7 @@
         "AWS_PROFILE": "default"
       },
       "disabled": false,
-      "autoApprove": [
-      ]
+      "autoApprove": []
     }
   }
 }
