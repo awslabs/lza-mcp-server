@@ -17,6 +17,11 @@ import sys
 import logging
 from typing import Dict, Any, List, Optional
 from mcp.server.fastmcp import Context
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_string_input,
+    validate_lza_version,
+    validate_integer_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +91,18 @@ async def tool_search_json_schema(
     """
     try:
         # Validate LZA version parameter
+        is_valid, validation_error = validate_string_input(
+            lza_version, "lza_version", min_length=1, max_length=50
+        )
+        if not is_valid:
+            await ctx.error(validation_error)
+            return {
+                "success": False,
+                "error": validation_error,
+                "message": "Invalid LZA version format",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
+            }
+        
         if not lza_version:
             error_message = "lza_version parameter is required"
             await ctx.error(error_message)
@@ -94,6 +111,62 @@ async def tool_search_json_schema(
                 "error": error_message,
                 "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
                 "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
+            }
+        
+        # Validate search_terms
+        if not search_terms or not isinstance(search_terms, list):
+            error_message = "search_terms must be a non-empty list"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": "Please provide search terms as a list of strings",
+            }
+        
+        for term in search_terms:
+            is_valid, validation_error = validate_string_input(
+                term, "search_term", min_length=1, max_length=200
+            )
+            if not is_valid:
+                await ctx.error(validation_error)
+                return {
+                    "success": False,
+                    "error": validation_error,
+                    "message": "Invalid search term format",
+                }
+        
+        # Validate max_results
+        is_valid, validation_error = validate_integer_range(
+            max_results, "max_results", min_value=1, max_value=100
+        )
+        if not is_valid:
+            await ctx.error(validation_error)
+            return {
+                "success": False,
+                "error": validation_error,
+                "message": "max_results must be between 1 and 100",
+            }
+        
+        # Validate search_type
+        valid_search_types = ["general", "property", "pattern", "relationship", "complexity"]
+        if search_type not in valid_search_types:
+            error_message = f"Invalid search_type: {search_type}. Must be one of: {', '.join(valid_search_types)}"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": f"search_type must be one of: {', '.join(valid_search_types)}",
+            }
+        
+        # Validate format_level
+        valid_format_levels = ["minimal", "standard", "detailed"]
+        if format_level not in valid_format_levels:
+            error_message = f"Invalid format_level: {format_level}. Must be one of: {', '.join(valid_format_levels)}"
+            await ctx.error(error_message)
+            return {
+                "success": False,
+                "error": error_message,
+                "message": f"format_level must be one of: {', '.join(valid_format_levels)}",
             }
         
         # Reject "latest" to ensure version-specific searches
