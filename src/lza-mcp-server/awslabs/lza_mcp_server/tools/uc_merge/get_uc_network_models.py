@@ -18,6 +18,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List
 from mcp.server.fastmcp import Context
+from awslabs.lza_mcp_server.utils.input_validation import validate_string_input
 
 from . import common
 
@@ -61,6 +62,24 @@ async def tool_get_uc_network_models(
         ```
     """
     await ctx.info(f"Discovering network models for UC release: {uc_release}")
+    
+    # Validate uc_release input
+    is_valid, validation_error = validate_string_input(
+        uc_release, "uc_release", min_length=1, max_length=50
+    )
+    if not is_valid:
+        error_msg = f"Invalid uc_release parameter: {validation_error}"
+        await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg,
+            "error_code": "INVALID_UC_RELEASE",
+            "troubleshooting": [
+                "UC release must be a valid string (1-50 characters)",
+                "Call get_uc_releases() first to discover available releases",
+            ],
+            "next_steps": "Call get_uc_releases() to discover available UC release versions"
+        }
     
     # Validate uc_release parameter is provided
     if not uc_release:

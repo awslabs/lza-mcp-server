@@ -25,6 +25,7 @@ from ...aws_access import (
     retry_with_exponential_backoff,
     handle_aws_error,
 )
+from ...utils.input_validation import validate_string_input
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -62,6 +63,20 @@ async def tool_release_pipeline(
         }
     """
     logger.info(f"Starting pipeline release for: {pipeline_name}")
+
+    # Validate pipeline_name input
+    is_valid, validation_error = validate_string_input(
+        pipeline_name, "pipeline_name", min_length=1, max_length=100
+    )
+    if not is_valid:
+        return format_error_response(
+            error=f"Invalid pipeline name: {validation_error}",
+            message=validation_error,
+            troubleshooting=[
+                "Pipeline names must be 1-100 characters long",
+                "Provide a valid pipeline name",
+            ],
+        )
 
     is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
     if not is_valid:

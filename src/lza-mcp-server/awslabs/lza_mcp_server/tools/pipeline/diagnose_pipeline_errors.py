@@ -33,6 +33,7 @@ from ...aws_access import (
     get_codebuild_client,
     get_logs_client,
 )
+from ...utils.input_validation import validate_string_input
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -90,6 +91,20 @@ async def tool_diagnose_pipeline_errors(
     """
     logger.info(f"Diagnosing pipeline errors for: {pipeline_name}")
 
+    # Validate pipeline_name input
+    is_valid, validation_error = validate_string_input(
+        pipeline_name, "pipeline_name", min_length=1, max_length=100
+    )
+    if not is_valid:
+        return format_error_response(
+            error=f"Invalid pipeline name: {validation_error}",
+            message=validation_error,
+            troubleshooting=[
+                "Pipeline names must be 1-100 characters long",
+                "Provide a valid pipeline name",
+            ],
+        )
+
     is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
     if not is_valid:
         return format_error_response(
@@ -104,6 +119,20 @@ async def tool_diagnose_pipeline_errors(
         )
 
     if execution_id is not None:
+        # Validate execution_id input
+        is_valid, validation_error = validate_string_input(
+            execution_id, "execution_id", min_length=1, max_length=100
+        )
+        if not is_valid:
+            return format_error_response(
+                error=f"Invalid execution ID: {validation_error}",
+                message=validation_error,
+                troubleshooting=[
+                    "Execution IDs must be valid strings",
+                    "Provide a valid execution ID",
+                ],
+            )
+        
         is_valid, validation_error = validate_execution_id_local(execution_id)
         if not is_valid:
             return format_error_response(
