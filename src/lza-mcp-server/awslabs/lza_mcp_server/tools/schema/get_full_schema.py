@@ -1,5 +1,3 @@
-from typing import Optional
-
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +14,12 @@ from typing import Optional
 
 import os
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from mcp.server.fastmcp import Context
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_string_input,
+    validate_json_schema_path,
+)
 
 
 def _load_combined_schemas(combined_schema_path: str) -> Dict[str, Any]:
@@ -150,6 +152,18 @@ async def tool_get_full_schema(
     """
     try:
         # Validate LZA version parameter
+        is_valid, validation_error = validate_string_input(
+            lza_version, "lza_version", min_length=1, max_length=50
+        )
+        if not is_valid:
+            await ctx.error(validation_error)
+            return {
+                "success": False,
+                "error": validation_error,
+                "message": "Invalid LZA version format",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
+            }
+        
         if not lza_version:
             error_message = "lza_version parameter is required"
             await ctx.error(error_message)
@@ -159,6 +173,29 @@ async def tool_get_full_schema(
                 "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
                 "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
             }
+        
+        # Validate schema_path parameter
+        is_valid, validation_error = validate_json_schema_path(schema_path)
+        if not is_valid:
+            await ctx.error(validation_error)
+            return {
+                "success": False,
+                "error": validation_error,
+                "message": "Invalid schema path format",
+            }
+        
+        # Validate property_path if provided
+        if property_path:
+            is_valid, validation_error = validate_string_input(
+                property_path, "property_path", min_length=1, max_length=500
+            )
+            if not is_valid:
+                await ctx.error(validation_error)
+                return {
+                    "success": False,
+                    "error": validation_error,
+                    "message": "Invalid property path format",
+                }
         
         # Reject "latest" to ensure version-specific searches
         if lza_version.lower() == "latest":

@@ -16,7 +16,6 @@
 
 import logging
 import os
-import re
 import tempfile
 import zipfile
 import shutil
@@ -33,6 +32,7 @@ from awslabs.lza_mcp_server.error_categories import ErrorCategory
 from awslabs.lza_mcp_server.tools.aws_services.common import categorize_aws_error
 from awslabs.lza_mcp_server.constants import S3_OBJECT_KEY
 from awslabs.lza_mcp_server.tools.uc_merge.common import set_extracted_lza_config_path
+from awslabs.lza_mcp_server.utils.input_validation import validate_s3_bucket_name
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ class S3ConfigRetrieval:
 
     def _validate_bucket_name(self, bucket_name: str) -> Dict[str, Any]:
         """
-        Validate bucket name format.
+        Validate bucket name format using centralized validation.
 
         Args:
             bucket_name: Bucket name to validate
@@ -118,31 +118,14 @@ class S3ConfigRetrieval:
         Returns:
             Dictionary with validation result and LLM-friendly error message if invalid
         """
-        if not bucket_name:
+        is_valid, error_message = validate_s3_bucket_name(bucket_name)
+        
+        if not is_valid:
             return {
                 "valid": False,
-                "error": "Bucket name cannot be empty.",
+                "error": f"The bucket name '{bucket_name}' is invalid. {error_message}",
             }
-
-        if len(bucket_name) < 3 or len(bucket_name) > 63:
-            return {
-                "valid": False,
-                "error": f"The bucket name '{bucket_name}' is invalid. Bucket names must be 3-63 characters, lowercase, and follow AWS S3 naming rules.",
-            }
-
-        if not bucket_name.islower():
-            return {
-                "valid": False,
-                "error": f"The bucket name '{bucket_name}' is invalid. Bucket names must be 3-63 characters, lowercase, and follow AWS S3 naming rules.",
-            }
-
-        # Check for invalid characters (basic check)
-        if not re.match(r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$", bucket_name):
-            return {
-                "valid": False,
-                "error": f"The bucket name '{bucket_name}' is invalid. Bucket names must be 3-63 characters, lowercase, and follow AWS S3 naming rules.",
-            }
-
+        
         return {"valid": True}
 
     async def get_configuration(

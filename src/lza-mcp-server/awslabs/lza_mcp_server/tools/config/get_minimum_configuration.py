@@ -18,6 +18,10 @@ import yaml
 import logging
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import Context
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_string_input,
+    validate_file_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +83,26 @@ async def tool_get_minimum_configuration(
         + (f" for {config_type}" if config_type else "")
         + (f" to {save_to_directory}" if save_to_directory else "")
     )
+
+    # Validate config_type if provided
+    if config_type:
+        is_valid, validation_error = validate_string_input(
+            config_type, "config_type", min_length=1, max_length=50
+        )
+        if not is_valid:
+            error_message = f"Invalid config_type: {validation_error}"
+            await ctx.error(error_message)
+            return {"error": error_message}
+    
+    # Validate save_to_directory if provided
+    if save_to_directory:
+        is_valid, validation_error = validate_file_path(
+            save_to_directory, allow_absolute=True
+        )
+        if not is_valid:
+            error_message = f"Invalid save_to_directory: {validation_error}"
+            await ctx.error(error_message)
+            return {"error": error_message}
 
     # Define the path to the minimum configuration files
     min_config_dir = os.environ.get(

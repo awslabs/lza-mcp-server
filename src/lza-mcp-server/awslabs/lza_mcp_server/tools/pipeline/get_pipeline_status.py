@@ -26,6 +26,7 @@ from ...aws_access import (
     retry_with_exponential_backoff,
     handle_aws_error,
 )
+from ...utils.input_validation import validate_string_input
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -54,7 +55,12 @@ def get_stage_description(stage_name: str) -> str:
     """Get a description of what happens in a specific LZA pipeline stage."""
     stage_descriptions = {
         "Source": "Retrieves LZA source code from GitHub and configuration files from the aws-accelerator-config repository",
-        "Build": "Transpiles the LZA source code and performs input/type validation for configuration files",
+        "Prepare": "Creates and validates AWS accounts, generates accounts via Control Tower Account Factory, and creates/validates OUs",
+        "Accounts": "Validates all accounts are part of the AWS Organization and creates/attaches Service Control Policies (SCPs)",
+        "Bootstrap": "Runs AWS CDK bootstrap to initialize environments and deploys CDK toolkit CloudFormation templates",
+        "Logging": "Deploys centralized KMS keys, logging infrastructure, S3 buckets, Kinesis streams, and Data Firehose",
+        "Organization": "Deploys AWS Organization-wide resources like trusted services, policies, Cost and Usage Reports, and Budgets",
+        "SecurityAudit": "Deploys security service dependencies for Macie, GuardDuty, Security Hub in the audit account",
         "Deploy": "Deploys infrastructure across multiple sub-actions including networking, security, operations, and customizations",
     }
     return stage_descriptions.get(stage_name, f"Stage: {stage_name}")
@@ -151,6 +157,20 @@ async def tool_get_pipeline_status(
     # Save whether a specific execution ID was provided (before it gets overwritten)
     original_execution_id_provided = execution_id is not None
 
+    # Validate pipeline_name input
+    is_valid, validation_error = validate_string_input(
+        pipeline_name, "pipeline_name", min_length=1, max_length=100
+    )
+    if not is_valid:
+        return format_error_response(
+            error=f"Invalid pipeline name: {validation_error}",
+            message=validation_error,
+            troubleshooting=[
+                "Pipeline names must be 1-100 characters long",
+                "Provide a valid pipeline name",
+            ],
+        )
+
     is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
     if not is_valid:
         return format_error_response(
@@ -165,6 +185,20 @@ async def tool_get_pipeline_status(
         )
 
     if execution_id is not None:
+        # Validate execution_id input
+        is_valid, validation_error = validate_string_input(
+            execution_id, "execution_id", min_length=1, max_length=100
+        )
+        if not is_valid:
+            return format_error_response(
+                error=f"Invalid execution ID: {validation_error}",
+                message=validation_error,
+                troubleshooting=[
+                    "Execution IDs must be valid strings",
+                    "Provide a valid execution ID",
+                ],
+            )
+        
         is_valid, validation_error = validate_execution_id_local(execution_id)
         if not is_valid:
             return format_error_response(
@@ -367,18 +401,13 @@ async def tool_get_pipeline_status(
         logger.info(f"🔍   End Time: {end_time}")
 
         # Step 5: Get current pipeline state (equivalent to: aws codepipeline get-pipeline-state --name PIPELINE)
-        # Get pipeline state when a specific execution ID was originally provided or when execution is in progress
+        # Always get pipeline state to count completed stages
         stage_states = []
-        if original_execution_id_provided or status.upper() == "IN_PROGRESS":
-            logger.info("🔍 Step 5: Getting current pipeline state")
-            state_response = await retry_with_exponential_backoff(
-                codepipeline.get_pipeline_state, name=pipeline_name
-            )
-            stage_states = state_response["stageStates"]
-        else:
-            logger.info(
-                f"🔍 Step 5: Skipping pipeline state for most recent completed execution (status: {status})"
-            )
+        logger.info("🔍 Step 5: Getting current pipeline state")
+        state_response = await retry_with_exponential_backoff(
+            codepipeline.get_pipeline_state, name=pipeline_name
+        )
+        stage_states = state_response["stageStates"]
 
         # Step 6: Find currently in-progress stages (equivalent to CLI query for InProgress stages)
         logger.info("🔍 Step 6: Finding in-progress stages")
@@ -386,6 +415,7 @@ async def tool_get_pipeline_status(
         current_action = None
         current_stage_number = 0
         in_progress_stages = []
+        completed_stages = 0
 
         if stage_states:
             # Find all stages that are currently InProgress (equivalent to CLI query)
@@ -416,12 +446,17 @@ async def tool_get_pipeline_status(
                         logger.info(
                             f"✅ Found in-progress stage: {stage_name} (stage {i + 1})"
                         )
+                    elif stage_status.upper() == "SUCCEEDED":
+                        completed_stages += 1
+                        logger.info(
+                            f"✅ Stage {i + 1} ({stage_name}) completed successfully"
+                        )
                 else:
                     logger.info(
                         f"🔍   Stage {i + 1} ({stage_name}): no latestExecution"
                     )
 
-            logger.info(f"🔍 Found {len(in_progress_stages)} in-progress stages")
+            logger.info(f"🔍 Found {len(in_progress_stages)} in-progress stages and {completed_stages} completed stages")
 
             # Determine current stage based on in-progress stages (ignore execution status)
             if in_progress_stages:
@@ -452,10 +487,10 @@ async def tool_get_pipeline_status(
 
         # Determine current stage based on execution status if not found from stage states
         if not current_stage:
-            if status.upper() == "IN_PROGRESS":
-                # Pipeline execution is IN_PROGRESS but no stages show InProgress
+            if status.upper() == "INPROGRESS":
+                # Pipeline execution is INPROGRESS but no stages show InProgress
                 logger.warning(
-                    "⚠️ Pipeline execution is IN_PROGRESS but no stages show InProgress status"
+                    "⚠️ Pipeline execution is INPROGRESS but no stages show InProgress status"
                 )
                 current_stage_number = 1  # Assume it's starting
                 current_stage = pipeline_stages[0]["name"] if pipeline_stages else None
@@ -474,8 +509,10 @@ async def tool_get_pipeline_status(
             progress_text = f"Currently on stage {current_stage_number} of {total_stages}: {current_stage}"
             if current_action:
                 progress_text += f" (action: {current_action})"
+            if completed_stages > 0:
+                progress_text += f" - {completed_stages} stages completed"
         else:
-            if len(in_progress_stages) == 0 and status.upper() == "IN_PROGRESS":
+            if len(in_progress_stages) == 0 and status.upper() == "INPROGRESS":
                 progress_text = "Pipeline execution is in progress but no stages are currently active"
             elif status.upper() in ["SUCCEEDED", "FAILED", "STOPPED", "STOPPING"]:
                 progress_text = f"Pipeline execution {status.lower()}"
@@ -487,6 +524,7 @@ async def tool_get_pipeline_status(
             "total_stages": total_stages,
             "current_stage_name": current_stage,
             "current_action_name": current_action,
+            "completed_stages": completed_stages,
             "progress_text": progress_text,
             "current_stage_description": get_stage_description(current_stage)
             if current_stage
@@ -517,9 +555,11 @@ async def tool_get_pipeline_status(
             response_data["current_action"] = current_action
 
         # Create appropriate message based on status and current stage
-        if status.upper() == "IN_PROGRESS":
+        if status.upper() == "INPROGRESS":
             if current_stage:
                 message = f"Pipeline is on stage '{current_stage}' (stage {current_stage_number} of {total_stages})"
+                if completed_stages > 0:
+                    message += f" - {completed_stages} stages completed"
             elif len(in_progress_stages) > 0:
                 stage_names = [stage["stage_name"] for stage in in_progress_stages]
                 message = f"Pipeline has {len(in_progress_stages)} active stages: {', '.join(stage_names)}"

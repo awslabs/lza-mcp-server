@@ -144,6 +144,22 @@ class TestPipelineToolsIntegration:
                     f"Invalid status: {result['status']}"
                 )
 
+            # Verify stage_progress structure
+            if "stage_progress" in result:
+                stage_progress = result["stage_progress"]
+                assert "total_stages" in stage_progress, (
+                    "stage_progress should have 'total_stages'"
+                )
+                assert "completed_stages" in stage_progress, (
+                    "stage_progress should have 'completed_stages'"
+                )
+                assert isinstance(stage_progress["completed_stages"], int), (
+                    "completed_stages should be an integer"
+                )
+                assert stage_progress["completed_stages"] >= 0, (
+                    "completed_stages should be non-negative"
+                )
+
             # If execution is found, verify execution_id format
             if "execution_id" in result:
                 execution_id = result["execution_id"]
@@ -262,7 +278,7 @@ class TestPipelineToolsIntegration:
         result = await release_func(mock_context, pipeline_name=long_name)
 
         assert result["success"] is False, "Too long pipeline name should fail"
-        assert "too long" in result["error"].lower(), "Should mention length limit"
+        assert "exceeds maximum length" in result["error"].lower(), "Should mention length limit"
 
     @pytest.mark.asyncio
     async def test_error_diagnosis_validation(self, mock_context, registered_tools):

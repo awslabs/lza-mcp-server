@@ -30,6 +30,11 @@ from awslabs.lza_mcp_server.tools.config.common import (
     ErrorCategory,
 )
 from awslabs.lza_mcp_server.utils.error_handling import create_structured_error_response
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_string_input,
+    validate_file_path,
+    validate_s3_bucket_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -512,6 +517,44 @@ async def tool_upload_configuration_to_s3(
     """
     try:
         await ctx.info("📤 Starting LZA configuration upload to S3...")
+
+        # Validate config_path if provided
+        if config_path:
+            is_valid, validation_error = validate_file_path(
+                config_path, allow_absolute=False
+            )
+            if not is_valid:
+                error_message = f"Invalid config_path: {validation_error}"
+                await ctx.error(error_message)
+                return create_structured_error_response(
+                    error=error_message,
+                    category=ErrorCategory.CONFIGURATION,
+                    error_code="INVALID_CONFIG_PATH",
+                    troubleshooting=[
+                        "Provide a valid relative path within the container",
+                        "Do not use absolute paths or paths outside the workspace",
+                        "If you used getConfigurationFromS3(), leave config_path empty",
+                    ],
+                    context={"config_path": config_path},
+                )
+        
+        # Validate bucket_name if provided
+        if bucket_name:
+            is_valid, validation_error = validate_s3_bucket_name(bucket_name)
+            if not is_valid:
+                error_message = f"Invalid bucket_name: {validation_error}"
+                await ctx.error(error_message)
+                return create_structured_error_response(
+                    error=error_message,
+                    category=ErrorCategory.CONFIGURATION,
+                    error_code="INVALID_BUCKET_NAME",
+                    troubleshooting=[
+                        "Bucket names must be 3-63 characters",
+                        "Use only lowercase letters, numbers, hyphens, and dots",
+                        "Bucket name must start and end with a letter or number",
+                    ],
+                    context={"bucket_name": bucket_name},
+                )
 
         # Check if user provided a host path (common mistake)
         if config_path and (config_path.startswith("/Users/") or config_path.startswith("~/")):
