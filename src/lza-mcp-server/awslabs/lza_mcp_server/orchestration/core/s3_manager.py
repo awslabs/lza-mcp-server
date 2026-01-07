@@ -14,6 +14,7 @@
 
 """S3 Configuration Upload tools for the LZA MCP Server."""
 
+import asyncio
 import logging
 import os
 from typing import Dict, Any
@@ -31,10 +32,12 @@ from awslabs.lza_mcp_server.constants import (
     DEFAULT_REGION,
     BUCKET_NAME_PATTERN,
     S3_OBJECT_KEY,
+    AWS_OPERATION_TIMEOUT,
 )
 from awslabs.lza_mcp_server.orchestration.core.s3_upload_error import S3UploadError
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
 from awslabs.lza_mcp_server.tools.aws_services.common import categorize_aws_error
+from awslabs.lza_mcp_server.utils.timeout_utils import with_timeout, TimeoutError
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -109,6 +112,10 @@ class S3Manager:
         """
         Verify that the specified S3 bucket exists and is accessible.
 
+        Timeout Protection (T-005, T-012):
+        - Operation timeout: AWS_OPERATION_TIMEOUT (300s)
+        - Prevents hanging on unresponsive S3 endpoints
+
         Args:
             bucket_name: Name of the S3 bucket to verify
 
@@ -117,10 +124,23 @@ class S3Manager:
 
         Raises:
             S3UploadError: If there's an access issue or other S3 error with structured information
+            TimeoutError: If operation exceeds timeout limit
         """
         try:
             s3_client = self._get_s3_client()
-            s3_client.head_bucket(Bucket=bucket_name)
+            
+            # Wrap S3 operation with timeout protection (T-005, T-012)
+            async def _check_bucket():
+                return await asyncio.get_event_loop().run_in_executor(
+                    None, s3_client.head_bucket, bucket_name
+                )
+            
+            await with_timeout(
+                _check_bucket(),
+                timeout=AWS_OPERATION_TIMEOUT,
+                operation_name=f"S3 bucket verification for '{bucket_name}'"
+            )
+            
             self.logger.info(f"Bucket exists and is accessible: {bucket_name}")
             return True
 
@@ -159,6 +179,27 @@ class S3Manager:
                         "operation": "bucket_verification",
                     },
                 )
+        
+        except TimeoutError as e:
+            # Handle timeout errors specifically (T-005, T-012)
+            self.logger.error(f"Bucket verification timed out for {bucket_name}: {str(e)}")
+            raise S3UploadError(
+                message=f"Bucket verification timed out after {AWS_OPERATION_TIMEOUT} seconds for '{bucket_name}'",
+                category=ErrorCategory.S3,
+                error_code="BUCKET_VERIFICATION_TIMEOUT",
+                troubleshooting=[
+                    "Check network connectivity to AWS S3",
+                    "Verify the bucket name is correct",
+                    "Check if AWS S3 service is experiencing issues",
+                    "Try again with a shorter timeout or better network connection",
+                ],
+                context={
+                    "bucket_name": bucket_name,
+                    "operation": "bucket_verification",
+                    "timeout_seconds": AWS_OPERATION_TIMEOUT,
+                },
+            )
+        
         except Exception as e:
             self.logger.error(
                 f"Unexpected error checking bucket {bucket_name}: {str(e)}"
@@ -309,6 +350,11 @@ class S3Manager:
         """
         Upload ZIP file to S3 bucket with progress reporting and upload verification.
 
+        Timeout Protection (T-005, T-012):
+        - Operation timeout: AWS_OPERATION_TIMEOUT (300s)
+        - Prevents hanging on large file uploads or slow connections
+        - Ensures responsive behavior even with network issues
+
         Args:
             zip_path: Local path to the ZIP file
             bucket_name: Target S3 bucket name
@@ -320,6 +366,7 @@ class S3Manager:
         Raises:
             ClientError: If S3 upload fails
             FileNotFoundError: If ZIP file doesn't exist
+            TimeoutError: If operation exceeds timeout limit
         """
         import time
         import hashlib
@@ -352,7 +399,7 @@ class S3Manager:
             )
             start_time = time.time()
 
-            # Perform the upload with metadata
+            # Perform the upload with metadata and timeout protection (T-005, T-012)
             extra_args = {
                 "Metadata": {
                     "original-filename": os.path.basename(zip_path),
@@ -362,7 +409,18 @@ class S3Manager:
                 }
             }
 
-            s3_client.upload_file(zip_path, bucket_name, key, ExtraArgs=extra_args)
+            # Wrap S3 upload with timeout protection
+            async def _upload_file():
+                return await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: s3_client.upload_file(zip_path, bucket_name, key, ExtraArgs=extra_args)
+                )
+            
+            await with_timeout(
+                _upload_file(),
+                timeout=AWS_OPERATION_TIMEOUT,
+                operation_name=f"S3 upload to s3://{bucket_name}/{key}"
+            )
 
             upload_time = time.time() - start_time
             upload_speed = file_size / upload_time if upload_time > 0 else 0
@@ -371,10 +429,20 @@ class S3Manager:
                 f"Upload completed in {upload_time:.2f} seconds ({upload_speed / 1024 / 1024:.2f} MB/s)"
             )
 
-            # Verify upload by checking object existence and size
+            # Verify upload by checking object existence and size with timeout protection
             self.logger.info("Verifying upload...")
             try:
-                response = s3_client.head_object(Bucket=bucket_name, Key=key)
+                # Wrap verification with timeout
+                async def _verify_upload():
+                    return await asyncio.get_event_loop().run_in_executor(
+                        None, s3_client.head_object, bucket_name, key
+                    )
+                
+                response = await with_timeout(
+                    _verify_upload(),
+                    timeout=AWS_OPERATION_TIMEOUT,
+                    operation_name=f"S3 upload verification for s3://{bucket_name}/{key}"
+                )
                 uploaded_size = response["ContentLength"]
                 uploaded_etag = response["ETag"].strip('"')
 
@@ -409,6 +477,34 @@ class S3Manager:
                 "uploaded_etag": uploaded_etag if "uploaded_etag" in locals() else None,
                 "message": f"Successfully uploaded configuration to s3://{bucket_name}/{key}",
             }
+
+        except TimeoutError as e:
+            # Handle timeout errors specifically (T-005, T-012)
+            error_message = f"S3 upload timed out after {AWS_OPERATION_TIMEOUT} seconds: {str(e)}"
+            self.logger.error(error_message)
+
+            error_response = create_structured_error_response(
+                error=error_message,
+                category=ErrorCategory.S3,
+                error_code="S3_UPLOAD_TIMEOUT",
+                troubleshooting=[
+                    "Check network connectivity to AWS S3",
+                    "Verify the file size is reasonable for upload",
+                    "Consider using multipart upload for large files",
+                    "Check if AWS S3 service is experiencing issues",
+                    "Try again with a better network connection",
+                ],
+                context={
+                    "bucket_name": bucket_name,
+                    "object_key": key,
+                    "file_size": file_size if "file_size" in locals() else None,
+                    "operation": "s3_upload",
+                    "timeout_seconds": AWS_OPERATION_TIMEOUT,
+                },
+                operation="s3_upload",
+            )
+
+            return error_response
 
         except ClientError as e:
             error_info = categorize_aws_error(e)
@@ -487,6 +583,11 @@ class S3Manager:
 
         This method performs an efficient S3-to-S3 copy without downloading the file locally.
 
+        Timeout Protection (T-005, T-012):
+        - Operation timeout: AWS_OPERATION_TIMEOUT (300s)
+        - Prevents hanging on large object copies
+        - Ensures responsive behavior
+
         Args:
             source_bucket: Source S3 bucket name
             source_key: Source S3 object key
@@ -495,6 +596,9 @@ class S3Manager:
 
         Returns:
             Dictionary with copy result and details
+
+        Raises:
+            TimeoutError: If operation exceeds timeout limit
         """
         try:
             self.logger.info(
@@ -503,10 +607,17 @@ class S3Manager:
 
             s3_client = self._get_s3_client()
 
-            # Verify source object exists
+            # Verify source object exists with timeout protection
             try:
-                source_response = s3_client.head_object(
-                    Bucket=source_bucket, Key=source_key
+                async def _verify_source():
+                    return await asyncio.get_event_loop().run_in_executor(
+                        None, s3_client.head_object, source_bucket, source_key
+                    )
+                
+                source_response = await with_timeout(
+                    _verify_source(),
+                    timeout=AWS_OPERATION_TIMEOUT,
+                    operation_name=f"S3 source verification for s3://{source_bucket}/{source_key}"
                 )
                 source_size = source_response["ContentLength"]
                 self.logger.info(f"Source object verified: {source_size} bytes")
@@ -536,17 +647,34 @@ class S3Manager:
                     },
                 )
 
-            # Perform the copy operation
+            # Perform the copy operation with timeout protection
             copy_source = {"Bucket": source_bucket, "Key": source_key}
 
-            s3_client.copy_object(
-                CopySource=copy_source, Bucket=target_bucket, Key=target_key
+            async def _copy_object():
+                return await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: s3_client.copy_object(
+                        CopySource=copy_source, Bucket=target_bucket, Key=target_key
+                    )
+                )
+            
+            await with_timeout(
+                _copy_object(),
+                timeout=AWS_OPERATION_TIMEOUT,
+                operation_name=f"S3 copy from s3://{source_bucket}/{source_key} to s3://{target_bucket}/{target_key}"
             )
 
-            # Verify the copy was successful
+            # Verify the copy was successful with timeout protection
             try:
-                target_response = s3_client.head_object(
-                    Bucket=target_bucket, Key=target_key
+                async def _verify_target():
+                    return await asyncio.get_event_loop().run_in_executor(
+                        None, s3_client.head_object, target_bucket, target_key
+                    )
+                
+                target_response = await with_timeout(
+                    _verify_target(),
+                    timeout=AWS_OPERATION_TIMEOUT,
+                    operation_name=f"S3 copy verification for s3://{target_bucket}/{target_key}"
                 )
                 target_size = target_response["ContentLength"]
 
@@ -600,6 +728,32 @@ class S3Manager:
                 "operation": "s3_to_s3_copy",
                 "message": f"Successfully copied {source_size} bytes from s3://{source_bucket}/{source_key} to s3://{target_bucket}/{target_key}",
             }
+
+        except TimeoutError as e:
+            # Handle timeout errors specifically (T-005, T-012)
+            error_message = f"S3 copy operation timed out after {AWS_OPERATION_TIMEOUT} seconds: {str(e)}"
+            self.logger.error(error_message)
+
+            return create_structured_error_response(
+                error=error_message,
+                category=ErrorCategory.S3,
+                error_code="S3_COPY_TIMEOUT",
+                troubleshooting=[
+                    "Check network connectivity to AWS S3",
+                    "Verify the object size is reasonable for copying",
+                    "Check if AWS S3 service is experiencing issues",
+                    "Try again with a better network connection",
+                    "Consider using AWS CLI for very large objects",
+                ],
+                context={
+                    "source_bucket": source_bucket,
+                    "source_key": source_key,
+                    "target_bucket": target_bucket,
+                    "target_key": target_key,
+                    "operation": "s3_to_s3_copy",
+                    "timeout_seconds": AWS_OPERATION_TIMEOUT,
+                },
+            )
 
         except ClientError as e:
             error_info = categorize_aws_error(e)

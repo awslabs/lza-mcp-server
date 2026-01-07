@@ -21,7 +21,13 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
 
-from .constants import DEFAULT_REGION, MAX_RETRY_ATTEMPTS, INITIAL_RETRY_DELAY
+from .constants import (
+    DEFAULT_REGION,
+    MAX_RETRY_ATTEMPTS,
+    INITIAL_RETRY_DELAY,
+    AWS_CONNECT_TIMEOUT,
+    AWS_READ_TIMEOUT,
+)
 from .error_categories import ErrorCategory
 from .utils.error_handling import (
     format_error_response,
@@ -52,10 +58,15 @@ def get_aws_session() -> boto3.Session:
 
 
 def get_s3_client() -> boto3.client:
-    """Create an S3 client using the configured AWS session with retry configuration.
+    """Create an S3 client using the configured AWS session with retry and timeout configuration.
+
+    Timeout Configuration (T-005, T-012):
+    - connect_timeout: Maximum time to establish connection (10s)
+    - read_timeout: Maximum time to wait for data (60s)
+    - Prevents hanging operations and ensures responsive behavior
 
     Returns:
-        boto3.client: S3 client configured with the current session and retry logic
+        boto3.client: S3 client configured with the current session, retry logic, and timeouts
 
     Raises:
         NoCredentialsError: If AWS credentials are not properly configured
@@ -65,6 +76,8 @@ def get_s3_client() -> boto3.client:
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
     )
     return session.client("s3", config=config)
 
@@ -94,10 +107,15 @@ def download_from_s3(bucket: str, key: str, local_path: str) -> bool:
 
 
 def get_codepipeline_client() -> boto3.client:
-    """Create a CodePipeline client using the configured AWS session with retry configuration.
+    """Create a CodePipeline client using the configured AWS session with retry and timeout configuration.
+
+    Timeout Configuration (T-005, T-012):
+    - connect_timeout: Maximum time to establish connection (10s)
+    - read_timeout: Maximum time to wait for data (60s)
+    - Prevents hanging operations and ensures responsive behavior
 
     Returns:
-        boto3.client: CodePipeline client configured with the current session and retry logic
+        boto3.client: CodePipeline client configured with the current session, retry logic, and timeouts
 
     Raises:
         NoCredentialsError: If AWS credentials are not properly configured
@@ -107,15 +125,22 @@ def get_codepipeline_client() -> boto3.client:
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
     )
     return session.client("codepipeline", config=config)
 
 
 def get_codebuild_client() -> boto3.client:
-    """Create a CodeBuild client using the configured AWS session with retry configuration.
+    """Create a CodeBuild client using the configured AWS session with retry and timeout configuration.
+
+    Timeout Configuration (T-005, T-012):
+    - connect_timeout: Maximum time to establish connection (10s)
+    - read_timeout: Maximum time to wait for data (60s)
+    - Prevents hanging operations and ensures responsive behavior
 
     Returns:
-        boto3.client: CodeBuild client configured with the current session and retry logic
+        boto3.client: CodeBuild client configured with the current session, retry logic, and timeouts
 
     Raises:
         NoCredentialsError: If AWS credentials are not properly configured
@@ -125,15 +150,22 @@ def get_codebuild_client() -> boto3.client:
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
     )
     return session.client("codebuild", config=config)
 
 
 def get_logs_client() -> boto3.client:
-    """Create a CloudWatch Logs client using the configured AWS session with retry configuration.
+    """Create a CloudWatch Logs client using the configured AWS session with retry and timeout configuration.
+
+    Timeout Configuration (T-005, T-012):
+    - connect_timeout: Maximum time to establish connection (10s)
+    - read_timeout: Maximum time to wait for data (60s)
+    - Prevents hanging operations and ensures responsive behavior
 
     Returns:
-        boto3.client: CloudWatch Logs client configured with the current session and retry logic
+        boto3.client: CloudWatch Logs client configured with the current session, retry logic, and timeouts
 
     Raises:
         NoCredentialsError: If AWS credentials are not properly configured
@@ -143,6 +175,8 @@ def get_logs_client() -> boto3.client:
     config = Config(
         retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
         max_pool_connections=50,
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
     )
     return session.client("logs", config=config)
 
