@@ -44,7 +44,7 @@ finch build -t lza-mcp-server:lambda .
 
 #### For Local Development
 ```bash
-# Build local development image (defaults to v1.12.0 to latest)
+# Build local development image
 make build-local
 
 # Run locally
@@ -171,6 +171,9 @@ The configuration uses these important environment variables:
   - Set to `true` to enable 9 additional UC merge workflow tools
   - Reduces context size by ~56% when disabled (default)
   - Only needed when performing UC merge operations
+- **SKIP_SCHEMA_VALIDATION**: Skip schema integrity validation at startup (true/false, default: false)
+  - Only use for testing/debugging - not recommended for production
+  - Schemas are validated with SHA-256 checksums to detect tampering
 
 #### Auto-Approved Tools
 
@@ -371,7 +374,7 @@ The MCP server supports multiple LZA versions simultaneously, allowing you to:
 Schemas are automatically generated when building the Docker image:
 
 ```bash
-# Build local image (generates schemas automatically, defaults to v1.12.0 to latest)
+# Build local image (generates schemas automatically)
 make build-local
 
 # Or specify custom version range
@@ -384,24 +387,22 @@ finch build -f Dockerfile.local \
 ### How It Works
 
 1. **Fetch**: Queries GitHub API for all LZA releases
-2. **Filter**: Determines versions between min (default v1.12.0) and max (latest)
+2. **Filter**: Determines versions between min and max versions
 3. **Clone**: Clones each version from GitHub
 4. **Extract**: Extracts JSON schema files from `source/packages/@aws-accelerator/config/lib/schemas`
 5. **Process**: Resolves `$ref` references and generates metadata for each version
 6. **Organize**: Creates version-specific directories
-7. **Symlink**: Creates `latest` symlink pointing to the newest version
 
 ### Schema Files Location
 
 - **Container**: `/app/json-schemas/{version}/` (e.g., `/app/json-schemas/v1.12.0/`)
-- **Latest**: `/app/json-schemas/latest` (symlink to newest version)
 
 ### Using Schema Tools
 
-All schema search and retrieval tools require specifying an LZA version:
+All schema search and retrieval tools require specifying an explicit LZA version:
 
 ```bash
-# List available versions
+# List available versions first
 listLzaSupportedVersions()
 
 # Search schemas for a specific version
@@ -410,18 +411,14 @@ searchJsonSchema(
   search_terms=["vpc", "subnet"]
 )
 
-# Use latest version
-searchJsonSchema(
-  lza_version="latest",
-  search_terms=["security"]
-)
-
 # Get full schema for a specific version
 getFullSchema(
   lza_version="v1.13.0",
   schema_path="network-config-schema.json"
 )
 ```
+
+**Note**: The `lza_version` parameter must be an explicit version (e.g., "v1.12.0"). Use `listLzaSupportedVersions()` to see all available versions.
 
 For detailed API documentation, see [SCHEMA_TOOLS_API.md](SCHEMA_TOOLS_API.md).
 
@@ -589,7 +586,7 @@ getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
 - **Outdated schemas**: Rebuild Docker image to get latest LZA schemas
 - **Network issues during build**: Check internet connectivity for GitHub access during Docker build
 - **Version not found**: Use `listLzaSupportedVersions()` to see available versions, or rebuild with desired version range
-- **Missing lza_version parameter**: All schema tools now require the `lza_version` parameter (e.g., "latest", "v1.12.0")
+- **Missing lza_version parameter**: All schema tools require the `lza_version` parameter (e.g. "v1.12.0")
 - **Invalid version specified**: Check available versions with `listLzaSupportedVersions()` and use one from the list
 
 ### Container Issues

@@ -434,6 +434,14 @@ class TestJsonSchemaPathValidation:
         is_valid, msg = validate_json_schema_path("accounts-config")
         assert is_valid
     
+    def test_valid_schema_path_with_json_extension(self):
+        is_valid, msg = validate_json_schema_path("accounts-config.json")
+        assert is_valid
+    
+    def test_valid_schema_path_organization_config(self):
+        is_valid, msg = validate_json_schema_path("organization-config.json")
+        assert is_valid
+    
     def test_empty_schema_path(self):
         is_valid, msg = validate_json_schema_path("")
         assert not is_valid
@@ -446,6 +454,10 @@ class TestJsonSchemaPathValidation:
     
     def test_schema_path_with_special_chars(self):
         is_valid, msg = validate_json_schema_path("accounts_config")
+        assert not is_valid
+    
+    def test_schema_path_with_invalid_extension(self):
+        is_valid, msg = validate_json_schema_path("accounts-config.yaml")
         assert not is_valid
     
     def test_schema_path_too_long(self):

@@ -268,7 +268,7 @@ async def tool_get_full_schema(
                     "error": error_message,
                     "message": f"The specified LZA version '{lza_version}' is not available.",
                     "available_versions": available_versions if available_versions else ["No versions found"],
-                    "hint": "Use 'latest' to access the most recent version, or specify a version like 'v1.12.0'",
+                    "hint": "Specify a version like 'v1.12.0'",
                 }
             else:
                 error_message = f"Combined schema file not found for version '{lza_version}' at: {combined_schema_path}"
