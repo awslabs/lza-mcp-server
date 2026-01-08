@@ -17,6 +17,12 @@ services:
       - "8000:8000"
     volumes:
       - ~/.aws:/home/lzauser/.aws:ro
+      # Writable tmpfs for runtime operations (config extraction and UC sessions)
+      - type: tmpfs
+        target: /app/lza-config
+        tmpfs:
+          size: 200M
+    read_only: true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]

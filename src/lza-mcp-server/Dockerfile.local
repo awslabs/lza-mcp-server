@@ -50,6 +50,10 @@ COPY lza-minimum-configuration/ /app/lza-minimum-configuration/
 # Create .aws directory for mounted credentials
 RUN mkdir -p /home/lzauser/.aws && chown -R lzauser:lzauser /home/lzauser/.aws
 
+# Create writable directory for runtime operations (config extraction and UC sessions)
+RUN mkdir -p /app/lza-config && \
+    chown -R lzauser:lzauser /app/lza-config
+
 # Change ownership to non-root user
 RUN chown -R lzauser:lzauser /app
 
@@ -129,7 +133,11 @@ RUN apt-get update && \
   unzip \
   ca-certificates && \
   apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
+  rm -rf /var/lib/apt/lists/* && \
+  # Mark static resources as read-only (schemas, UC configs, minimum configs)
+  chmod -R a-w /app/json-schemas /app/lza-uc /app/lza-minimum-configuration && \
+  # Keep /app/lza-config writable for runtime operations (config extraction and UC sessions)
+  chmod -R u+w /app/lza-config
 
 # Switch to non-root user
 USER lzauser
