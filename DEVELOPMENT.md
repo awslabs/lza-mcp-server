@@ -177,22 +177,25 @@ If you need to modify the schema processing logic:
 
 **Schema Not Found Errors**:
 ```bash
-# Check if combined.json was created
-docker run --rm -it lza-mcp-server:latest ls -la /app/json-output/
+# Check if schemas were created
+docker run --rm lza-mcp-server:latest ls -la /app/json-schemas/
 
-# Check schema processing logs
+# Check schema processing logs during build
 docker build --progress=plain -t lza-mcp-server:debug . 2>&1 | grep -A 10 -B 10 "json-schema"
 ```
 
+**Note**: Distroless images don't have shell. Use single commands or copy files out for inspection.
+
 **Search Not Working**:
 ```bash
-# Test search module directly
-docker run --rm -it lza-mcp-server:latest python3 -c "
-from json_schema.src.schema_search import search_json_schemas
-result = search_json_schemas('/app/json-output/combined.json', ['vpc'], 'general', 5)
-print(result)
-"
+# Copy schema file out for inspection
+docker cp container-name:/app/json-schemas/v1.12.0/ ./local-schemas/
+
+# Check logs for search errors
+docker logs container-name 2>&1 | grep -i schema
 ```
+
+**Note**: Distroless images don't have Python CLI access. Use logs and file extraction for debugging.
 
 #### Schema Processing Performance
 
@@ -318,14 +321,8 @@ docker build -t lza-mcp-server:dev .
 # Test with MCP Inspector
 npx @modelcontextprotocol/inspector docker run --rm -it lza-mcp-server:dev
 
-# Test schema processing
-docker run --rm -it lza-mcp-server:dev python3 -c "
-import sys
-sys.path.append('/app/json-schema/src')
-from schema_search import search_json_schemas
-result = search_json_schemas('/app/json-output/combined.json', ['vpc'], 'general', 3)
-print(f'Found {result[\"total_matches\"]} matches')
-"
+# Check container contents (distroless - no shell)
+docker run --rm lza-mcp-server:dev ls -la /app/json-schemas/
 ```
 
 #### Manual Testing Scenarios
@@ -486,12 +483,32 @@ npx @modelcontextprotocol/inspector docker run --rm -it lza-mcp-server:latest
 docker run --rm -it -e FASTMCP_LOG_LEVEL=DEBUG lza-mcp-server:latest
 ```
 
+#### Distroless Container Debugging
+
+The production image uses distroless base (no shell) for security. Debugging requires different approaches:
+
+```bash
+# View logs (primary debugging method)
+docker logs -f container-name
+
+# Copy files out for inspection
+docker cp container-name:/app/file.log ./local-file.log
+
+# Check running processes
+docker top container-name
+
+# Inspect container configuration
+docker inspect container-name
+```
+
+**Note**: Cannot use `docker exec -it container /bin/bash` with distroless images. For interactive debugging, temporarily switch to `python:3.11-slim` base in the builder stage's final FROM line.
+
 ### Debugging Tools
 
 - **MCP Inspector**: Test MCP protocol compliance
-- **Docker logs**: View container output and errors
+- **Docker logs**: View container output and errors (primary method for distroless)
 - **AWS CLI**: Test AWS operations independently
-- **Python debugger**: Use `pdb` for step-through debugging
+- **File extraction**: Copy files from container for inspection
 
 ## Performance Optimization
 
@@ -521,8 +538,9 @@ docker run --rm -it -e FASTMCP_LOG_LEVEL=DEBUG lza-mcp-server:latest
 
 ### Container Security
 
-- **Use minimal base images** to reduce attack surface
-- **Don't run as root** in containers
+- **Use distroless base images** to minimize attack surface (T-007 mitigation)
+- **Multi-stage builds** separate build tools from runtime
+- **Don't run as root** - distroless runs as nonroot user (uid 65532)
 - **Scan images** for vulnerabilities
 - **Keep dependencies updated**
 

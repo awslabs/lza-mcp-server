@@ -251,7 +251,4 @@ Verify AWS credentials:
 aws sts get-caller-identity --profile isengard_personal
 ```
 
-Test container manually:
-```bash
-finch run --rm -it lza-mcp-server:local /bin/bash
-```
+**Note**: The production image uses distroless base (no shell). Cannot use `finch run -it container /bin/bash`. Use logs and file extraction for debugging.
