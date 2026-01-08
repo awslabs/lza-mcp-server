@@ -65,29 +65,35 @@ class SchemaSearchConfig:
         return file_size > cls.LARGE_FILE_THRESHOLD
 
     @classmethod
-    def get_schema_paths(cls) -> Dict[str, str]:
-        """Get possible schema file paths."""
-        return {
-            "container": "/app/json-output/combined.json",
-            "local_dev": "/Users/vmayberr/xdev/mte/lza-mcp-server/src/lza-mcp-server/json-output/combined.json",
-            "relative": os.path.join(
-                os.path.dirname(__file__), "../../../json-output/combined.json"
-            ),
-        }
-
-    @classmethod
-    def find_schema_file(cls, preferred_path: str = None) -> str:
-        """Find the schema file, trying multiple locations."""
-        if preferred_path and os.path.exists(preferred_path):
-            return preferred_path
-
-        paths = cls.get_schema_paths()
-
-        for name, path in paths.items():
-            if os.path.exists(path):
-                return path
-
-        raise FileNotFoundError("Schema file not found in any expected location")
+    def get_schema_version_path(cls, version: str, base_dir: str = "/app/json-schemas") -> str:
+        """Get path to schema file for a specific LZA version.
+        
+        Args:
+            version: LZA version (e.g., "v1.12.0") - must be explicit
+            base_dir: Base directory containing versioned schemas
+            
+        Returns:
+            Path to combined.json for the specified version
+            
+        Raises:
+            FileNotFoundError: If schema file doesn't exist for version
+            ValueError: If version is "latest" (not supported)
+        """
+        if version == "latest":
+            raise ValueError(
+                'Version "latest" is not supported. '
+                'Please specify an explicit version (e.g., "v1.12.0"). '
+                'Use listLzaSupportedVersions() to see available versions.'
+            )
+        
+        schema_path = os.path.join(base_dir, version, "combined.json")
+        
+        if not os.path.exists(schema_path):
+            raise FileNotFoundError(
+                f"Schema file not found for version {version}: {schema_path}"
+            )
+        
+        return schema_path
 
 
 # Environment-based configuration overrides

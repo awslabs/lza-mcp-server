@@ -32,13 +32,16 @@ class MockContext:
     async def error(self, message):
         pass
 
+    async def debug(self, message):
+        pass
+
 
 class TestListLzaSupportedVersions:
     """Test cases for list_lza_supported_versions tool."""
 
     @pytest.mark.asyncio
     async def test_list_versions_success(self):
-        """Test successful listing of LZA versions."""
+        """Test successful listing of LZA versions (symlinks are now skipped)."""
         mock_context = MockContext()
 
         with (
@@ -55,8 +58,10 @@ class TestListLzaSupportedVersions:
             result = await tool_list_lza_supported_versions(mock_context)
 
         assert result["success"] is True
-        assert len(result["versions"]) == 3
-        assert result["latest_version"] == "v1.13.0"
+        # Only 2 versions because 'latest' symlink is skipped
+        assert len(result["versions"]) == 2
+        assert result["versions"][0]["version"] == "v1.13.0"
+        assert result["versions"][1]["version"] == "v1.12.0"
         assert "schemas_directory" in result
         assert "usage_hint" in result
 
@@ -131,7 +136,7 @@ class TestListLzaSupportedVersions:
 
     @pytest.mark.asyncio
     async def test_list_versions_with_symlink(self):
-        """Test handling of symlinked version directories."""
+        """Test that symlinked version directories are skipped."""
         mock_context = MockContext()
 
         def mock_islink(path):
@@ -148,11 +153,11 @@ class TestListLzaSupportedVersions:
             result = await tool_list_lza_supported_versions(mock_context)
 
         assert result["success"] is True
-        # Find the 'latest' version entry
-        latest_entry = next(v for v in result["versions"] if v["version"] == "latest")
-        assert latest_entry["is_symlink"] is True
-        assert latest_entry["symlink_target"] == "v1.13.0"
-        assert result["latest_version"] == "v1.13.0"
+        # Symlinks are now skipped, so only v1.13.0 should be in results
+        assert len(result["versions"]) == 1
+        assert result["versions"][0]["version"] == "v1.13.0"
+        # Verify 'latest' is not in the results
+        assert not any(v["version"] == "latest" for v in result["versions"])
 
     @pytest.mark.asyncio
     async def test_list_versions_incomplete_schemas(self):
@@ -216,7 +221,7 @@ class TestListLzaSupportedVersions:
 
     @pytest.mark.asyncio
     async def test_list_versions_readlink_error(self):
-        """Test handling when reading symlink fails."""
+        """Test that symlinks are skipped (readlink is not called)."""
         mock_context = MockContext()
 
         def mock_islink(path):
@@ -236,14 +241,12 @@ class TestListLzaSupportedVersions:
             result = await tool_list_lza_supported_versions(mock_context)
 
         assert result["success"] is True
-        # Should still succeed but without symlink target
-        assert len(result["versions"]) == 1
-        assert result["versions"][0]["is_symlink"] is True
-        assert "symlink_target" not in result["versions"][0]
+        # Symlinks are skipped, so no versions should be returned
+        assert len(result["versions"]) == 0
 
     @pytest.mark.asyncio
     async def test_list_versions_sorting(self):
-        """Test that versions are sorted correctly with 'latest' first."""
+        """Test that versions are sorted correctly (newest first, symlinks skipped)."""
         mock_context = MockContext()
 
         def mock_islink(path):
@@ -260,11 +263,11 @@ class TestListLzaSupportedVersions:
             result = await tool_list_lza_supported_versions(mock_context)
 
         assert result["success"] is True
-        # 'latest' should be first
-        assert result["versions"][0]["version"] == "latest"
-        # Rest should be sorted
+        # 'latest' symlink should be skipped, only real versions returned
+        assert len(result["versions"]) == 3
+        # Versions should be sorted in reverse order (newest first)
         version_names = [v["version"] for v in result["versions"]]
-        assert version_names[0] == "latest"
+        assert version_names == ["v1.13.0", "v1.12.0", "v1.11.0"]
 
     @pytest.mark.asyncio
     async def test_list_versions_unexpected_error(self):

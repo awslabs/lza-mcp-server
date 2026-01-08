@@ -69,7 +69,10 @@ RUN apt-get update && \
   # Download and process multiple LZA releases for schema generation
   chmod +x /app/docker-json-schema.sh && \
   chmod +x /app/download-lza-versions.sh && \
+  chmod +x /app/generate-schema-checksums.sh && \
   /app/download-lza-versions.sh "$LZA_MIN_VERSION" "$LZA_MAX_VERSION" "$LZA_REPO_URL" && \
+  # Generate checksums for schema integrity validation
+  /app/generate-schema-checksums.sh /app/json-schemas /app/json-schemas/checksums.sha256 && \
   # Download and extract LZA Universal Configuration release artifacts
   mkdir -p /app/lza-uc && \
   if [ -z "$LZA_UC_RELEASE" ]; then \

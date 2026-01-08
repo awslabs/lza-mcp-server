@@ -64,24 +64,10 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
 
         # Collect information about each version
         versions_info: List[Dict[str, Any]] = []
-        latest_version = None
 
         for version_dir in sorted(version_dirs):
             version_path = os.path.join(schemas_base, version_dir)
             combined_json_path = os.path.join(version_path, "combined.json")
-            
-            # Check if this is a symlink (likely the 'latest' link)
-            is_symlink = os.path.islink(version_path)
-            
-            # Get symlink target if applicable
-            symlink_target = None
-            if is_symlink:
-                try:
-                    symlink_target = os.readlink(version_path)
-                    if version_dir == "latest":
-                        latest_version = symlink_target
-                except Exception:
-                    pass
 
             # Check if combined.json exists
             has_combined_json = os.path.exists(combined_json_path)
@@ -92,32 +78,38 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
                 try:
                     file_size = os.path.getsize(combined_json_path)
                     file_size_mb = round(file_size / (1024 * 1024), 2)
-                except Exception:
-                    pass
+                except (OSError, IOError) as e:
+                    # File existed but can't be read - potential integrity issue
+                    error_msg = (
+                        f"Schema file integrity issue: Cannot read {version_dir}/combined.json. "
+                        f"File passed validation at startup but is now inaccessible. "
+                        f"Error: {str(e)}"
+                    )
+                    await ctx.error(error_msg)
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "hint": "This may indicate file tampering or filesystem issues. Restart the container.",
+                    }
 
             version_info = {
                 "version": version_dir,
-                "is_symlink": is_symlink,
                 "has_schemas": has_combined_json,
                 "status": "ready" if has_combined_json else "incomplete",
             }
-
-            if symlink_target:
-                version_info["symlink_target"] = symlink_target
             
             if file_size_mb is not None:
                 version_info["schema_size_mb"] = file_size_mb
 
             versions_info.append(version_info)
 
-        # Sort versions: put 'latest' first, then sort others
-        versions_info.sort(key=lambda x: (x["version"] != "latest", x["version"]), reverse=False)
+        # Sort versions in reverse order (newest first)
+        versions_info.sort(key=lambda x: x["version"], reverse=True)
 
         return {
             "success": True,
             "message": f"Found {len(versions_info)} LZA version(s)",
             "versions": versions_info,
-            "latest_version": latest_version,
             "schemas_directory": schemas_base,
             "usage_hint": "Use the 'version' field value as the lza_version parameter in searchJsonSchema and getFullSchema",
         }

@@ -116,12 +116,7 @@ for VERSION in "${VERSIONS_TO_PROCESS[@]}"; do
     echo ""
 done
 
-# Create a symlink to the latest version for convenience
-LATEST_VERSION="${VERSIONS_TO_PROCESS[0]}"
-ln -sf "$LATEST_VERSION" /app/json-schemas/latest
-
 echo "==================================================="
 echo "All versions processed successfully!"
 echo "JSON schemas available in: /app/json-schemas/"
-echo "Latest version ($LATEST_VERSION) symlinked at: /app/json-schemas/latest"
 echo "==================================================="

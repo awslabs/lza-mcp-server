@@ -427,7 +427,7 @@ def validate_json_schema_path(schema_path: str) -> Tuple[bool, str]:
     """Validate JSON schema path format.
     
     Args:
-        schema_path: Schema path to validate (e.g., "accounts-config")
+        schema_path: Schema path to validate (e.g., "accounts-config.json" or "accounts-config")
         
     Returns:
         Tuple of (is_valid, error_message)
@@ -438,9 +438,9 @@ def validate_json_schema_path(schema_path: str) -> Tuple[bool, str]:
     if not isinstance(schema_path, str):
         return False, "Schema path must be a string"
     
-    # Schema paths should be alphanumeric with hyphens
-    if not re.match(r'^[a-z0-9-]+$', schema_path):
-        return False, "Schema path must contain only lowercase letters, numbers, and hyphens"
+    # Schema paths should be alphanumeric with hyphens, optionally ending with .json
+    if not re.match(r'^[a-z0-9-]+(?:\.json)?$', schema_path):
+        return False, "Schema path must contain only lowercase letters, numbers, hyphens, and optionally end with .json"
     
     if len(schema_path) > 100:
         return False, "Schema path exceeds maximum length of 100 characters"
