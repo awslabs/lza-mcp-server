@@ -132,7 +132,7 @@ class S3Manager:
             # Wrap S3 operation with timeout protection (T-005, T-012)
             async def _check_bucket():
                 return await asyncio.get_event_loop().run_in_executor(
-                    None, s3_client.head_bucket, bucket_name
+                    None, lambda: s3_client.head_bucket(Bucket=bucket_name)
                 )
             
             await with_timeout(
@@ -435,7 +435,7 @@ class S3Manager:
                 # Wrap verification with timeout
                 async def _verify_upload():
                     return await asyncio.get_event_loop().run_in_executor(
-                        None, s3_client.head_object, bucket_name, key
+                        None, lambda: s3_client.head_object(Bucket=bucket_name, Key=key)
                     )
                 
                 response = await with_timeout(
@@ -611,7 +611,7 @@ class S3Manager:
             try:
                 async def _verify_source():
                     return await asyncio.get_event_loop().run_in_executor(
-                        None, s3_client.head_object, source_bucket, source_key
+                        None, lambda: s3_client.head_object(Bucket=source_bucket, Key=source_key)
                     )
                 
                 source_response = await with_timeout(
@@ -668,7 +668,7 @@ class S3Manager:
             try:
                 async def _verify_target():
                     return await asyncio.get_event_loop().run_in_executor(
-                        None, s3_client.head_object, target_bucket, target_key
+                        None, lambda: s3_client.head_object(Bucket=target_bucket, Key=target_key)
                     )
                 
                 target_response = await with_timeout(
