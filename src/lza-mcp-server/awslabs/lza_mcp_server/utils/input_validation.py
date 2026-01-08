@@ -23,7 +23,7 @@ Security Mitigation: T-008 - Comprehensive input sanitization
 
 import re
 from pathlib import Path
-from typing import Tuple, Any, Dict, Optional, List
+from typing import Tuple, Any, Optional, List
 from urllib.parse import urlparse
 
 

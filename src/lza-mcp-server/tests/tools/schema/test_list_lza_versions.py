@@ -15,8 +15,7 @@
 """Unit tests for list_lza_supported_versions tool."""
 
 import pytest
-import os
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from awslabs.lza_mcp_server.tools.schema.list_lza_versions import (
     tool_list_lza_supported_versions,
@@ -199,7 +198,7 @@ class TestListLzaSupportedVersions:
 
     @pytest.mark.asyncio
     async def test_list_versions_getsize_error(self):
-        """Test handling when getting file size fails."""
+        """Test handling when getting file size fails - indicates integrity issue."""
         mock_context = MockContext()
 
         def mock_getsize(path):
@@ -214,10 +213,9 @@ class TestListLzaSupportedVersions:
         ):
             result = await tool_list_lza_supported_versions(mock_context)
 
-        assert result["success"] is True
-        # Should still succeed but without size information
-        assert len(result["versions"]) == 1
-        assert "schema_size_mb" not in result["versions"][0]
+        assert result["success"] is False
+        assert "integrity" in result["error"].lower()
+        assert "Restart the MCP server" in result["hint"]
 
     @pytest.mark.asyncio
     async def test_list_versions_readlink_error(self):

@@ -31,7 +31,7 @@ def register_schema_tools(mcp):
 
     @mcp.tool(
         name="searchJsonSchema",
-        description="Search through LZA JSON schemas to find specific properties and configurations. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
+        description="Search through LZA JSON schemas to find specific properties and configurations. Searches ACROSS ALL SCHEMAS for the specified version. For schema-specific queries, use getFullSchema instead. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
     )  # nosemgrep: useless-inner-function
     async def search_json_schema(
         ctx: Context,
@@ -42,7 +42,6 @@ def register_schema_tools(mcp):
         include_metadata: bool = True,
         include_schema: bool = False,
         filters: Optional[Dict] = None,
-        schema_path: Optional[str] = None,
         format_level: str = "standard",
     ) -> Dict[str, Any]:
         return await tool_search_json_schema(
@@ -54,13 +53,12 @@ def register_schema_tools(mcp):
             include_metadata,
             include_schema,
             filters,
-            schema_path,
             format_level,
         )
 
     @mcp.tool(
         name="getFullSchema",
-        description="Retrieve complete LZA configuration JSON schemas with optional property filtering. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
+        description="Retrieve complete LZA configuration JSON schemas with optional property filtering. Use this for schema-specific queries with the schema_path parameter. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
     )  # nosemgrep: useless-inner-function
     async def get_full_schema(
         ctx: Context,
