@@ -63,7 +63,7 @@ class TestSchemaVersionSupport:
         )
 
         assert result["success"] is False
-        assert "lza_version parameter is required" in result["error"]
+        assert "lza_version cannot be empty" in result["error"]
 
     @pytest.mark.asyncio
     async def test_get_schema_with_missing_lza_version(self):
@@ -88,11 +88,11 @@ class TestSchemaVersionSupport:
         result = await get_schema_func(
             mock_context,
             lza_version="",
-            schema_path="accounts-config.yaml",
+            schema_path="accounts-config.json",
         )
 
         assert result["success"] is False
-        assert "lza_version parameter is required" in result["error"]
+        assert "lza_version cannot be empty" in result["error"]
 
     @pytest.mark.asyncio
     async def test_search_with_nonexistent_version(self):
@@ -149,7 +149,7 @@ class TestSchemaVersionSupport:
                 result = await get_schema_func(
                     mock_context,
                     lza_version="v99.99.99",
-                    schema_path="accounts-config.yaml",
+                    schema_path="accounts-config.json",
                 )
 
         assert result["success"] is False
@@ -209,7 +209,7 @@ class TestSchemaVersionSupport:
         result = await get_schema_func(
             mock_context,
             lza_version="latest",
-            schema_path="accounts-config.yaml",
+            schema_path="accounts-config.json",
         )
 
         # Should reject 'latest' and provide guidance
@@ -238,7 +238,7 @@ class TestSchemaVersionSupport:
         search_func = registered_tools["searchJsonSchema"]
 
         mock_schema_data = {
-            "accounts-config.yaml": {
+            "accounts-config.json": {
                 "_metadata": {
                     "title": "Test Schema",
                     "searchIndex": {
@@ -294,7 +294,7 @@ class TestSchemaVersionSupport:
         get_schema_func = registered_tools["getFullSchema"]
 
         mock_schema_data = {
-            "accounts-config.yaml": {
+            "accounts-config.json": {
                 "_metadata": {"title": "Test Schema"},
                 "type": "object",
                 "properties": {"test": {"type": "string"}},
@@ -309,9 +309,9 @@ class TestSchemaVersionSupport:
                 result = await get_schema_func(
                     mock_context,
                     lza_version="v1.13.0",
-                    schema_path="accounts-config.yaml",
+                    schema_path="accounts-config.json",
                 )
 
         assert result["success"] is True
         assert result["lza_version"] == "v1.13.0"
-        assert result["schema_path"] == "accounts-config.yaml"
+        assert result["schema_path"] == "accounts-config.json"

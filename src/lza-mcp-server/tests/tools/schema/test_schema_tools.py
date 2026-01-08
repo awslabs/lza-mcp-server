@@ -48,7 +48,7 @@ class TestSchemaTools:
     def mock_schema_data(self):
         """Fixture providing mock schema data for testing."""
         return {
-            "accounts-config.yaml": {
+            "accounts-config.json": {
                 "_metadata": {
                     "title": "Accounts Configuration Schema",
                     "description": "Schema for LZA accounts configuration",
@@ -73,7 +73,7 @@ class TestSchemaTools:
                     "mandatoryAccounts": {"type": "array", "items": {"type": "object"}}
                 },
             },
-            "network-config.yaml": {
+            "network-config.json": {
                 "_metadata": {
                     "title": "Network Configuration Schema",
                     "description": "Schema for LZA network configuration including VPCs and subnets",
@@ -110,7 +110,7 @@ class TestSchemaTools:
         return {
             "results": [
                 {
-                    "path": "accounts-config.yaml",
+                    "path": "accounts-config.json",
                     "relevance_score": 1.5,
                     "match_locations": [
                         "title:exact",
@@ -408,12 +408,12 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="accounts-config.yaml",
+                schema_path="accounts-config.json",
                 include_metadata=True,
             )
 
         assert result["success"] is True
-        assert result["schema_path"] == "accounts-config.yaml"
+        assert result["schema_path"] == "accounts-config.json"
         assert "metadata" in result
         assert "schema" in result
         assert result["metadata"]["title"] == "Accounts Configuration Schema"
@@ -445,7 +445,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="accounts-config.yaml",
+                schema_path="accounts-config.json",
                 property_path="mandatoryAccounts",
                 include_metadata=True,
             )
@@ -482,7 +482,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="accounts-config.yaml",
+                schema_path="accounts-config.json",
                 property_path="nonexistent.property",
             )
 
@@ -511,7 +511,7 @@ class TestSchemaTools:
         with patch("os.path.exists", return_value=False):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="accounts-config.yaml"
+                lza_version="v1.13.0", schema_path="accounts-config.json"
             )
 
         assert result["success"] is False
@@ -542,7 +542,7 @@ class TestSchemaTools:
         ):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="accounts-config.yaml"
+                lza_version="v1.13.0", schema_path="accounts-config.json"
             )
 
         assert result["success"] is False
@@ -575,7 +575,7 @@ class TestSchemaTools:
         ):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="nonexistent-schema.yaml"
+                lza_version="v1.13.0", schema_path="nonexistent-schema.json"
             )
 
         assert result["success"] is False
@@ -610,7 +610,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="accounts-config.yaml",
+                schema_path="accounts-config.json",
                 include_metadata=False,
             )
 
@@ -619,8 +619,8 @@ class TestSchemaTools:
         assert "schema" in result
 
     @pytest.mark.asyncio
-    async def test_search_json_schema_custom_schema_path(self, mock_mcp_context):
-        """Test JSON schema search with custom schema path - test parameter validation."""
+    async def test_search_json_schema_parameter_validation(self, mock_mcp_context):
+        """Test JSON schema search parameter validation."""
         server = Mock()
         registered_tools = {}
 
@@ -636,13 +636,11 @@ class TestSchemaTools:
 
         search_func = registered_tools["searchJsonSchema"]
 
-        custom_path = "/custom/path/schemas.json"
-
-        # Test with file not found to verify parameter handling
+        # Test with invalid version to verify parameter handling
         with patch("os.path.exists", return_value=False):
             result = await search_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["test"], schema_path=custom_path
+                lza_version="v99.99.99", search_terms=["test"]
             )
 
         assert result["success"] is False
@@ -725,7 +723,7 @@ class TestSchemaTools:
 
         # Create complex nested schema data
         complex_schema_data = {
-            "network-config.yaml": {
+            "network-config.json": {
                 "_metadata": {"title": "Network Configuration Schema"},
                 "type": "object",
                 "properties": {
@@ -754,7 +752,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="network-config.yaml",
+                schema_path="network-config.json",
                 property_path="vpcs",
             )
 
@@ -798,7 +796,7 @@ class TestSchemaTools:
         with patch("os.path.exists", side_effect=Exception("Unexpected error")):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="test-schema.yaml"
+                lza_version="v1.13.0", schema_path="test-schema.json"
             )
 
         assert result["success"] is False
@@ -827,19 +825,19 @@ class TestSchemaTools:
 
         # Create schema data with references
         schema_with_refs = {
-            "accounts-config.yaml": {
+            "accounts-config.json": {
                 "_metadata": {
                     "title": "Accounts Configuration Schema",
                     "relationships": {
                         "references": [
                             {
-                                "schema": "organization-config.yaml",
+                                "schema": "organization-config.json",
                                 "paths": ["organizationalUnits"],
                             },
-                            {"schema": "iam-config.yaml", "paths": ["roles"]},
+                            {"schema": "iam-config.json", "paths": ["roles"]},
                         ],
                         "referencedBy": [
-                            {"schema": "network-config.yaml", "paths": ["accountIds"]}
+                            {"schema": "network-config.json", "paths": ["accountIds"]}
                         ],
                     },
                 },
@@ -869,7 +867,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="accounts-config.yaml",
+                schema_path="accounts-config.json",
                 include_metadata=True,
             )
 
@@ -899,14 +897,14 @@ class TestSchemaTools:
 
         # Create schema data with complex dependencies
         complex_schema = {
-            "network-config.yaml": {
+            "network-config.json": {
                 "_metadata": {
                     "title": "Network Configuration Schema",
                     "relationships": {
                         "references": [
-                            {"schema": "accounts-config.yaml", "paths": ["accountIds"]},
+                            {"schema": "accounts-config.json", "paths": ["accountIds"]},
                             {
-                                "schema": "security-config.yaml",
+                                "schema": "security-config.json",
                                 "paths": ["securityGroups"],
                             },
                         ]
@@ -926,7 +924,7 @@ class TestSchemaTools:
                                 "securityGroups": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "security-config.yaml#/definitions/SecurityGroup"
+                                        "$ref": "security-config.json#/definitions/SecurityGroup"
                                     },
                                 },
                             },
@@ -943,7 +941,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="network-config.yaml",
+                schema_path="network-config.json",
                 property_path="vpcs",
                 include_metadata=True,
             )
@@ -973,7 +971,7 @@ class TestSchemaTools:
 
         # Create schema with validation constraints
         validation_schema = {
-            "iam-config.yaml": {
+            "iam-config.json": {
                 "_metadata": {
                     "title": "IAM Configuration Schema",
                     "searchIndex": {
@@ -1026,7 +1024,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="iam-config.yaml",
+                schema_path="iam-config.json",
                 property_path="roles",
                 include_metadata=True,
             )
@@ -1057,7 +1055,7 @@ class TestSchemaTools:
 
         # Create schema with version information
         versioned_schema = {
-            "global-config.yaml": {
+            "global-config.json": {
                 "_metadata": {
                     "title": "Global Configuration Schema",
                     "version": "1.2.0",
@@ -1093,7 +1091,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="global-config.yaml",
+                schema_path="global-config.json",
                 include_metadata=True,
             )
 
@@ -1124,24 +1122,24 @@ class TestSchemaTools:
 
         # Create schema with potential circular references
         circular_ref_schema = {
-            "organization-config.yaml": {
+            "organization-config.json": {
                 "_metadata": {
                     "title": "Organization Configuration Schema",
                     "relationships": {
                         "references": [
-                            {"schema": "accounts-config.yaml", "paths": ["accounts"]},
+                            {"schema": "accounts-config.json", "paths": ["accounts"]},
                             {
-                                "schema": "organization-config.yaml",
+                                "schema": "organization-config.json",
                                 "paths": ["parentOu"],
                             },  # Self-reference
                         ],
                         "referencedBy": [
                             {
-                                "schema": "accounts-config.yaml",
+                                "schema": "accounts-config.json",
                                 "paths": ["organizationalUnits"],
                             },
                             {
-                                "schema": "organization-config.yaml",
+                                "schema": "organization-config.json",
                                 "paths": ["childOus"],
                             },  # Self-reference
                         ],
@@ -1189,7 +1187,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="organization-config.yaml",
+                schema_path="organization-config.json",
                 property_path="organizationalUnits",
                 include_metadata=True,
             )
@@ -1221,7 +1219,7 @@ class TestSchemaTools:
 
         # Create deeply nested schema
         nested_schema = {
-            "security-config.yaml": {
+            "security-config.json": {
                 "_metadata": {"title": "Security Configuration Schema"},
                 "type": "object",
                 "properties": {
@@ -1262,7 +1260,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="security-config.yaml",
+                schema_path="security-config.json",
                 property_path="centralSecurityServices.guardduty.s3Protection",
                 include_metadata=False,
             )
@@ -1298,7 +1296,7 @@ class TestSchemaTools:
         ):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="invalid-schema.yaml"
+                lza_version="v1.13.0", schema_path="invalid-schema.json"
             )
 
         assert result["success"] is False
@@ -1325,7 +1323,7 @@ class TestSchemaTools:
 
         # Create schema with rich metadata
         metadata_rich_schema = {
-            "network-config.yaml": {
+            "network-config.json": {
                 "_metadata": {
                     "title": "Network Configuration Schema",
                     "description": "Comprehensive network configuration for LZA",
@@ -1357,14 +1355,14 @@ class TestSchemaTools:
                     },
                     "relationships": {
                         "references": [
-                            {"schema": "accounts-config.yaml", "paths": ["accountIds"]},
+                            {"schema": "accounts-config.json", "paths": ["accountIds"]},
                             {
-                                "schema": "security-config.yaml",
+                                "schema": "security-config.json",
                                 "paths": ["securityGroups"],
                             },
                         ],
                         "referencedBy": [
-                            {"schema": "iam-config.yaml", "paths": ["vpcEndpoints"]}
+                            {"schema": "iam-config.json", "paths": ["vpcEndpoints"]}
                         ],
                     },
                 },
@@ -1382,7 +1380,7 @@ class TestSchemaTools:
             result = await get_schema_func(
                 mock_mcp_context,
                 lza_version="v1.13.0",
-                schema_path="network-config.yaml",
+                schema_path="network-config.json",
                 include_metadata=True,
             )
 

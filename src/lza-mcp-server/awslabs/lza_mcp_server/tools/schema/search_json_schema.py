@@ -19,20 +19,10 @@ from typing import Dict, Any, List, Optional
 from mcp.server.fastmcp import Context
 from awslabs.lza_mcp_server.utils.input_validation import (
     validate_string_input,
-    validate_lza_version,
     validate_integer_range,
 )
 
 logger = logging.getLogger(__name__)
-
-# Import optimized search functionality
-try:
-    from .optimized_schema_search import tool_search_json_schema_optimized
-
-    OPTIMIZED_SEARCH_AVAILABLE = True
-except ImportError:
-    OPTIMIZED_SEARCH_AVAILABLE = False
-    logger.warning("Optimized search not available, falling back to standard search")
 
 
 async def tool_search_json_schema(
@@ -44,13 +34,12 @@ async def tool_search_json_schema(
     include_metadata: bool = True,
     include_schema: bool = False,
     filters: Optional[Dict] = None,
-    schema_path: Optional[str] = None,
     format_level: str = "standard",
 ) -> Dict[str, Any]:
     """Search JSON schemas using different search strategies.
 
-    This tool provides powerful search capabilities across all LZA JSON schemas to help
-    users discover configuration options and understand the structure of LZA configurations.
+    This tool searches ACROSS ALL SCHEMAS for the specified LZA version. To retrieve a 
+    specific schema or property within a schema, use getFullSchema instead.
     
     RECOMMENDED WORKFLOW: Call getDeployedLzaVersion() first to get the correct lza_version 
     parameter that matches your deployed environment.
@@ -83,11 +72,15 @@ async def tool_search_json_schema(
         include_metadata (bool, optional): Whether to include metadata in results. Default: True
         include_schema (bool, optional): Whether to include the full schema in results. Default: False
         filters (Dict, optional): Additional filters for complexity search (min/max depth, properties, required fields)
-        schema_path (str, optional): Optional path to schema file or directory (overrides version-based path)
         format_level (str, optional): Detail level for results (minimal, standard, detailed). Default: standard
 
     Returns:
         Dictionary containing search results with matching schemas, relevance scores, and match locations
+        
+    Note:
+        This tool does NOT support schema_path parameter. It always searches across all schemas
+        for the specified LZA version. For schema-specific queries, use getFullSchema with the
+        schema_path parameter instead.
     """
     try:
         # Validate LZA version parameter
@@ -181,16 +174,11 @@ async def tool_search_json_schema(
                 "example": "If getDeployedLzaVersion() returns 'v1.12.0', use lza_version='v1.12.0'",
             }
 
-        # Determine schema file path based on version
-        if schema_path:
-            # Use custom path if provided
-            schema_file_path = schema_path
-        else:
-            # Use version-specific path
-            schema_file_path = os.path.join(
-                "/app/json-schemas", lza_version, "combined.json"
-            )
-            await ctx.info(f"Using version-specific schema path: {schema_file_path}")
+        # Use version-specific path (schema_path parameter removed)
+        schema_file_path = os.path.join(
+            "/app/json-schemas", lza_version, "combined.json"
+        )
+        await ctx.info(f"Using version-specific schema path: {schema_file_path}")
 
         # Check if schema file exists
         if not os.path.exists(schema_file_path):
@@ -220,28 +208,6 @@ async def tool_search_json_schema(
                     "error": error_message,
                     "message": f"Version directory exists but combined.json not found for '{lza_version}'",
                 }
-
-        # Check file size and use optimized search for large files
-        if os.path.exists(schema_file_path):
-            file_size = os.path.getsize(schema_file_path)
-            if (
-                file_size > 2 * 1024 * 1024 and OPTIMIZED_SEARCH_AVAILABLE
-            ):  # 2MB threshold
-                await ctx.info(
-                    f"Large schema file detected ({file_size / (1024 * 1024):.1f}MB), using optimized search"
-                )
-                return await tool_search_json_schema_optimized(
-                    ctx,
-                    lza_version,
-                    search_terms,
-                    search_type,
-                    max_results,
-                    include_metadata,
-                    include_schema,
-                    filters,
-                    schema_path,
-                    format_level,
-                )
 
         await ctx.info(
             f"Searching JSON schemas (version: {lza_version}) for terms: {search_terms}, type: {search_type}"
@@ -306,8 +272,8 @@ async def tool_search_json_schema(
                 ],
             }
 
-        # Use the schema_file_path determined earlier
-        schema_path = schema_file_path
+        # Use the schema_file_path for the search
+        schema_path_for_search = schema_file_path
 
         # Prepare filters for complexity search
         if filters is None:
@@ -318,7 +284,7 @@ async def tool_search_json_schema(
             include_schema_actual = include_schema and format_level == "detailed"
 
             search_result = search_json_schemas(
-                schema_path=schema_path,
+                schema_path=schema_path_for_search,
                 search_terms=search_terms,
                 search_type=search_type,
                 max_results=max_results,

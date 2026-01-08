@@ -40,12 +40,13 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
                 "hint": "Ensure the Docker container has been built with the download-lza-versions.sh script",
             }
 
-        # Get all directories in the schemas base
+        # Get all directories in the schemas base (skip symlinks)
         try:
             all_items = os.listdir(schemas_base)
             version_dirs = [
                 item for item in all_items 
                 if os.path.isdir(os.path.join(schemas_base, item))
+                and not os.path.islink(os.path.join(schemas_base, item))
             ]
         except Exception as e:
             return {
@@ -79,7 +80,7 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
                     file_size = os.path.getsize(combined_json_path)
                     file_size_mb = round(file_size / (1024 * 1024), 2)
                 except (OSError, IOError) as e:
-                    # File existed but can't be read - potential integrity issue
+                    # File existed but can't be read - critical integrity issue
                     error_msg = (
                         f"Schema file integrity issue: Cannot read {version_dir}/combined.json. "
                         f"File passed validation at startup but is now inaccessible. "
@@ -89,7 +90,8 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
                     return {
                         "success": False,
                         "error": error_msg,
-                        "hint": "This may indicate file tampering or filesystem issues. Restart the container.",
+                        "message": "Schema file integrity compromised",
+                        "hint": "This may indicate file tampering or filesystem issues. Restart the MCP server.",
                     }
 
             version_info = {

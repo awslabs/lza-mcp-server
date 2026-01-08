@@ -60,11 +60,6 @@ class SchemaSearchConfig:
             return requested_max
 
     @classmethod
-    def should_use_optimized_search(cls, file_size: int) -> bool:
-        """Determine if optimized search should be used."""
-        return file_size > cls.LARGE_FILE_THRESHOLD
-
-    @classmethod
     def get_schema_version_path(cls, version: str, base_dir: str = "/app/json-schemas") -> str:
         """Get path to schema file for a specific LZA version.
         
