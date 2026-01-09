@@ -33,6 +33,7 @@ help:
 	@echo "  format             Format code with ruff"
 	@echo "  type-check         Run type checking with mypy"
 	@echo "  security-check     Run security analysis with bandit"
+	@echo "  scan-container     Scan Docker image for vulnerabilities with Trivy (optional)"
 	@echo ""
 	@echo "Docker Commands:"
 	@echo "  build-local        Build local development Docker image"
@@ -61,6 +62,8 @@ py-compile:
 
 # Complete pre-commit verification pipeline
 release: clean-cache py-compile format lint type-check security-check test-coverage
+	@echo "🔒 Running dependency vulnerability scan..."
+	@poetry run pip-audit
 	@echo "✅ Release verification complete - ready for code review!"
 	@echo ""
 	@echo "📋 Verification Summary:"
@@ -69,6 +72,7 @@ release: clean-cache py-compile format lint type-check security-check test-cover
 	@echo "  ✓ Code linted with ruff"
 	@echo "  ✓ Type checking passed"
 	@echo "  ✓ Security analysis passed"
+	@echo "  ✓ Dependency vulnerabilities checked"
 	@echo "  ✓ All tests passed with coverage ≥38%"
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
@@ -141,6 +145,18 @@ security-check:
 	@poetry run bandit -r awslabs/ -f json -o bandit-report.json || true
 	@poetry run bandit -r awslabs/ --severity-level medium
 	@echo "✅ Security analysis complete"
+
+# Container vulnerability scanning (optional)
+scan-container:
+	@echo "🔍 Scanning container for vulnerabilities with Trivy..."
+	@echo "  Image: $(DOCKER_IMAGE_NAME)"
+	@if command -v trivy >/dev/null 2>&1; then \
+		trivy image --severity HIGH,CRITICAL $(DOCKER_IMAGE_NAME); \
+	else \
+		echo "⚠️  Trivy not installed. Install with: brew install trivy"; \
+		echo "   Or run via Docker: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image $(DOCKER_IMAGE_NAME)"; \
+	fi
+	@echo "✅ Container scan complete"
 
 # Fast feedback loop for development (< 30 seconds)
 test-fast:

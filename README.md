@@ -21,9 +21,17 @@ pip install -e .
 ```
 
 2. **Configure AWS credentials:**
+
+> **Security Best Practice:** We recommend using temporary credentials via AWS IAM Identity Center (SSO) or IAM roles instead of long-term access keys. See [AWS Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp) for more information.
+
 ```bash
+# Option 1: AWS IAM Identity Center (SSO) - Recommended
+aws configure sso
+
+# Option 2: AWS CLI with named profile
 aws configure
-# or set environment variables
+
+# Option 3: Environment variables (for local development only)
 export AWS_ACCESS_KEY_ID=your-key
 export AWS_SECRET_ACCESS_KEY=your-secret
 export AWS_REGION=us-east-1

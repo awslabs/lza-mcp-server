@@ -266,6 +266,56 @@ The schema processing adds approximately 30-60 seconds to the Docker build time 
 
 3. **Register the tool** in the module's `register_*_tools()` function
 
+#### Input Validation Patterns
+
+**All MCP tools MUST validate inputs at entry point.** Use validation utilities from `utils/input_validation.py`:
+
+```python
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_string_input,
+    validate_file_path,
+    validate_s3_bucket_name,
+    validate_s3_key,
+    validate_pipeline_name,
+    validate_execution_id,
+)
+
+@mcp.tool()
+async def example_tool(ctx: Context, name: str, bucket: str, file_path: str):
+    # VALIDATE FIRST - all inputs must be validated before processing
+    is_valid, error = validate_string_input(name, "name", min_length=1, max_length=100)
+    if not is_valid:
+        return {"success": False, "error": error}
+    
+    is_valid, error = validate_s3_bucket_name(bucket)
+    if not is_valid:
+        return {"success": False, "error": error}
+    
+    is_valid, error = validate_file_path(file_path, base_directory=Path("/app/config"))
+    if not is_valid:
+        return {"success": False, "error": error}
+    
+    # THEN PROCESS - only after all validation passes
+    ...
+```
+
+**Validation Patterns:**
+
+| Validator | Pattern | Purpose |
+|-----------|---------|---------|
+| `validate_s3_bucket_name()` | `^[a-z0-9][a-z0-9.-]*[a-z0-9]$` (3-63 chars) | AWS S3 bucket naming rules |
+| `validate_s3_key()` | No `..`, no leading `/`, max 1024 bytes | Prevent path traversal |
+| `validate_file_path()` | No `..`, no absolute paths, within base_directory | Prevent path traversal |
+| `validate_pipeline_name()` | `^[A-Za-z0-9._-]+$` (1-100 chars) | AWS CodePipeline naming |
+| `validate_execution_id()` | UUID format (36 chars) | AWS execution ID format |
+| `validate_session_id()` | `^uc-session-\d{8}-\d{6}$` | UC merge session format |
+| `validate_lza_version()` | `^v?\d+\.\d+\.\d+$` | Semantic version format |
+| `validate_email()` | RFC 5321 email format | Email validation |
+| `validate_account_id()` | `^\d{12}$` | AWS account ID (12 digits) |
+| `sanitize_command_argument()` | Removes shell metacharacters | Prevent command injection |
+
+**Test coverage:** Run `make test-coverage` to verify validation coverage.
+
 #### Modifying Existing Tools
 
 1. **Update the tool function** with your changes
@@ -345,6 +395,44 @@ For detailed testing procedures, coverage analysis, and troubleshooting, see [TE
 - **Use type hints** for all function parameters and return values
 - **Write comprehensive docstrings** with examples
 - **Use meaningful variable names** and clear logic flow
+
+#### Security Scanning
+
+**Container Vulnerability Scanning (Optional):**
+
+Scan Docker images for security vulnerabilities using Trivy:
+
+```bash
+# Install Trivy (one-time setup)
+brew install trivy
+
+# Scan container for vulnerabilities
+make scan-container
+
+# Or run without installing Trivy locally
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy:latest image lza-mcp-server:local --severity HIGH,CRITICAL
+```
+
+Trivy scans for:
+- OS package vulnerabilities
+- Python dependency vulnerabilities (complements pip-audit)
+- Base image security issues
+- Known CVEs
+
+**Code Security Scanning (Required):**
+
+Run before committing code:
+
+```bash
+# Complete pre-commit verification (includes Bandit + pip-audit)
+make release
+```
+
+This runs:
+- Bandit - Python code security analysis
+- pip-audit - Dependency vulnerability scanning
+- Plus: linting, formatting, type checking, and tests
 
 #### Documentation Standards
 
