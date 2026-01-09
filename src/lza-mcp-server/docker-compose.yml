@@ -22,7 +22,13 @@ services:
         target: /app/lza-config
         tmpfs:
           size: 200M
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=200m
     read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
