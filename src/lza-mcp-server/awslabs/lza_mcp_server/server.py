@@ -145,27 +145,17 @@ def main():
 
     # Validate schema integrity on startup (T-015)
     schema_dir = Path(os.environ.get("LZA_SCHEMA_DIR", "/app/json-schemas"))
-    skip_validation = os.environ.get("SKIP_SCHEMA_VALIDATION", "false").lower() in (
-        "true",
-        "1",
-        "yes",
-    )
 
-    if not skip_validation:
-        try:
-            from .utils.integrity import validate_schemas_on_startup
+    try:
+        from .utils.integrity import validate_schemas_on_startup
 
-            # Validate schemas - fail fast if tampering detected
-            validate_schemas_on_startup(schema_dir=schema_dir, fail_on_error=True)
-        except ImportError:
-            logger.warning("Schema integrity validation module not available")
-        except Exception as e:
-            logger.error(f"Schema integrity validation failed: {e}")
-            raise
-    else:
-        logger.warning(
-            "Schema integrity validation SKIPPED (SKIP_SCHEMA_VALIDATION=true)"
-        )
+        # Validate schemas - fail fast if tampering detected
+        validate_schemas_on_startup(schema_dir=schema_dir, fail_on_error=True)
+    except ImportError:
+        logger.warning("Schema integrity validation module not available")
+    except Exception as e:
+        logger.error(f"Schema integrity validation failed: {e}")
+        raise
 
     # Register all components
     register_all_components()

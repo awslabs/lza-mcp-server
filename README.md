@@ -171,9 +171,8 @@ The configuration uses these important environment variables:
   - Set to `true` to enable 9 additional UC merge workflow tools
   - Reduces context size by ~56% when disabled (default)
   - Only needed when performing UC merge operations
-- **SKIP_SCHEMA_VALIDATION**: Skip schema integrity validation at startup (true/false, default: false)
-  - Only use for testing/debugging - not recommended for production
-  - Schemas are validated with SHA-256 checksums to detect tampering
+
+Schema integrity validation runs automatically at startup using SHA-256 checksums to detect tampering.
 
 #### Auto-Approved Tools
 
