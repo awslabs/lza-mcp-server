@@ -309,20 +309,40 @@ The MCP server requires specific IAM permissions to interact with AWS services f
       }
     },
     {
-      "Sid": "S3Statement",
+      "Sid": "S3ReadAccess",
       "Effect": "Allow",
       "Action": [
         "s3:GetBucketEncryption",
         "s3:GetBucketVersioning",
         "s3:GetObject",
         "s3:ListBuckets",
-        "s3:ListObject",
-        "s3:PutBucketVersioning",
-        "s3:PutObject"
+        "s3:ListObject"
       ],
       "Resource": [
         "arn:${PARTITION}:s3:::aws-accelerator*",
         "arn:${PARTITION}:s3:::aws-accelerator*/*"
+      ]
+    },
+    {
+      "Sid": "S3ConfigUpload",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutBucketVersioning"
+      ],
+      "Resource": [
+        "arn:${PARTITION}:s3:::aws-accelerator-config-*",
+        "arn:${PARTITION}:s3:::aws-accelerator-config-*/zipped/*",
+        "arn:${PARTITION}:s3:::aws-accelerator-config-*/config/*"
+      ]
+    },
+    {
+      "Sid": "DenyBuildspecModification",
+      "Effect": "Deny",
+      "Action": "s3:PutObject",
+      "Resource": [
+        "arn:${PARTITION}:s3:::*/buildspec*.yml",
+        "arn:${PARTITION}:s3:::*/buildspec*.yaml"
       ]
     },
     {
