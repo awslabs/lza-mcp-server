@@ -132,7 +132,7 @@ async def tool_diagnose_pipeline_errors(
                     "Provide a valid execution ID",
                 ],
             )
-        
+
         is_valid, validation_error = validate_execution_id_local(execution_id)
         if not is_valid:
             return format_error_response(

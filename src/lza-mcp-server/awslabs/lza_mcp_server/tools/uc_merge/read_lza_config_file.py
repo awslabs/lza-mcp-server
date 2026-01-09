@@ -15,7 +15,6 @@
 """Read LZA configuration files from extracted S3 configuration."""
 
 import logging
-from pathlib import Path
 from typing import Dict, Any
 
 from mcp.server.fastmcp import Context
@@ -35,15 +34,15 @@ logger = logging.getLogger(__name__)
 
 def get_next_steps_for_file(file_name: str) -> str:
     """Get context-aware next steps based on filename.
-    
+
     Args:
         file_name: Name of the file that was read
-        
+
     Returns:
         Context-aware next steps guidance
     """
     file_name_lower = file_name.lower()
-    
+
     if "accounts-config" in file_name_lower:
         return (
             "Parse the YAML content and extract the mandatory account emails "
@@ -58,9 +57,7 @@ def get_next_steps_for_file(file_name: str) -> str:
             "and global-config.yaml."
         )
     elif "network-config" in file_name_lower:
-        return (
-            "Verify minimal configuration (empty transitGateways, vpcs, endpointPolicies arrays)."
-        )
+        return "Verify minimal configuration (empty transitGateways, vpcs, endpointPolicies arrays)."
     elif "iam-config" in file_name_lower:
         return (
             "Verify minimal configuration (empty providers, policySets, roleSets, "
@@ -70,26 +67,23 @@ def get_next_steps_for_file(file_name: str) -> str:
         return "Review the file content and proceed with validation or customization as needed."
 
 
-async def read_lza_config_file(
-    ctx: Context,
-    file_path: str
-) -> Dict[str, Any]:
+async def read_lza_config_file(ctx: Context, file_path: str) -> Dict[str, Any]:
     """Read a configuration file from the extracted LZA configuration.
-    
+
     This tool reads files from the LZA configuration directory that was
     extracted via getConfigurationFromS3(). It validates paths for security
     and provides context-aware guidance based on the file being read.
-    
+
     Common files to review:
     - accounts-config.yaml: Account structure and emails
     - global-config.yaml: Global settings including homeRegion
     - network-config.yaml: Network configuration
     - iam-config.yaml: IAM configuration
-    
+
     Args:
         ctx: MCP context for logging
         file_path: Relative path to file (e.g., "accounts-config.yaml")
-        
+
     Returns:
         Dictionary with file content and metadata:
         {
@@ -103,11 +97,11 @@ async def read_lza_config_file(
     """
     try:
         await ctx.info(f"Reading LZA config file: {file_path}")
-        
+
         # Use the standard extracted config path
         # This matches what getConfigurationFromS3 uses
         base_directory = LZA_CONFIG_BASE_PATH / "retrieved-config"
-        
+
         # Check if the base directory exists
         if not base_directory.exists():
             return create_error_response(
@@ -121,22 +115,20 @@ async def read_lza_config_file(
                     "Call getConfigurationFromS3() to retrieve the LZA configuration",
                     "Verify the configuration was extracted successfully",
                     "Check that the configuration directory exists at /app/lza-config/retrieved-config",
-                    "Ensure getConfigurationFromS3() completed without errors"
+                    "Ensure getConfigurationFromS3() completed without errors",
                 ],
                 context={
                     "expected_directory": str(base_directory),
-                    "file_path": file_path
+                    "file_path": file_path,
                 },
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration before reading files."
+                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration before reading files.",
             )
-        
+
         # Validate path security
         is_valid, error_message, resolved_path = validate_path_security(
-            file_path,
-            base_directory,
-            operation="read"
+            file_path, base_directory, operation="read"
         )
-        
+
         if not is_valid:
             error_info = categorize_uc_merge_error(Exception(error_message))
             return create_error_response(
@@ -144,13 +136,10 @@ async def read_lza_config_file(
                 error_code=error_info["error_code"],
                 category=error_info["category"],
                 troubleshooting=error_info["troubleshooting"],
-                context={
-                    "file_path": file_path,
-                    "base_directory": str(base_directory)
-                },
-                next_steps="Provide a valid relative path within the configuration directory."
+                context={"file_path": file_path, "base_directory": str(base_directory)},
+                next_steps="Provide a valid relative path within the configuration directory.",
             )
-        
+
         # Check if file exists
         if not resolved_path.exists():
             return create_error_response(
@@ -161,16 +150,16 @@ async def read_lza_config_file(
                     f"Verify the file path is correct: {file_path}",
                     "Check that the file exists in the extracted configuration",
                     "List available files in the configuration directory",
-                    "Ensure getConfigurationFromS3() extracted all files successfully"
+                    "Ensure getConfigurationFromS3() extracted all files successfully",
                 ],
                 context={
                     "file_path": file_path,
                     "resolved_path": str(resolved_path),
-                    "base_directory": str(base_directory)
+                    "base_directory": str(base_directory),
                 },
-                next_steps="Verify the file path and retry the operation."
+                next_steps="Verify the file path and retry the operation.",
             )
-        
+
         # Check if it's a file (not a directory)
         if not resolved_path.is_file():
             return create_error_response(
@@ -180,27 +169,24 @@ async def read_lza_config_file(
                 troubleshooting=[
                     f"The path points to a directory, not a file: {file_path}",
                     "Provide a path to a specific file",
-                    "Use a file path like 'accounts-config.yaml' instead of a directory"
+                    "Use a file path like 'accounts-config.yaml' instead of a directory",
                 ],
-                context={
-                    "file_path": file_path,
-                    "resolved_path": str(resolved_path)
-                },
-                next_steps="Provide a path to a file, not a directory."
+                context={"file_path": file_path, "resolved_path": str(resolved_path)},
+                next_steps="Provide a path to a file, not a directory.",
             )
-        
+
         # Read file content
         try:
             content = resolved_path.read_text(encoding="utf-8")
             size_bytes = resolved_path.stat().st_size
-            
+
             await ctx.info(
                 f"Successfully read {file_path} ({format_file_size(size_bytes)})"
             )
-            
+
             # Get context-aware next steps
             next_steps = get_next_steps_for_file(resolved_path.name)
-            
+
             return create_success_response(
                 data={
                     "file_path": file_path,
@@ -208,9 +194,9 @@ async def read_lza_config_file(
                     "size_bytes": size_bytes,
                     "size_formatted": format_file_size(size_bytes),
                 },
-                next_steps=next_steps
+                next_steps=next_steps,
             )
-            
+
         except UnicodeDecodeError as e:
             return create_error_response(
                 error_message=f"Failed to decode file as UTF-8: {str(e)}",
@@ -220,13 +206,10 @@ async def read_lza_config_file(
                     "File may not be a text file or uses a different encoding",
                     "Verify the file is a valid YAML or text configuration file",
                     "Check if the file is corrupted",
-                    "Ensure the file was extracted correctly from S3"
+                    "Ensure the file was extracted correctly from S3",
                 ],
-                context={
-                    "file_path": file_path,
-                    "error": str(e)
-                },
-                next_steps="Verify the file is a valid text file and retry."
+                context={"file_path": file_path, "error": str(e)},
+                next_steps="Verify the file is a valid text file and retry.",
             )
         except PermissionError as e:
             return create_error_response(
@@ -237,13 +220,10 @@ async def read_lza_config_file(
                     "Check file system permissions",
                     "Ensure the user has read access to the file",
                     "Verify the file is not locked by another process",
-                    "Check container permissions and volume mounts"
+                    "Check container permissions and volume mounts",
                 ],
-                context={
-                    "file_path": file_path,
-                    "resolved_path": str(resolved_path)
-                },
-                next_steps="Check file permissions and retry."
+                context={"file_path": file_path, "resolved_path": str(resolved_path)},
+                next_steps="Check file permissions and retry.",
             )
         except Exception as e:
             error_info = categorize_uc_merge_error(e)
@@ -255,11 +235,11 @@ async def read_lza_config_file(
                 context={
                     "file_path": file_path,
                     "resolved_path": str(resolved_path),
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
                 },
-                next_steps="Check the error details and retry the operation."
+                next_steps="Check the error details and retry the operation.",
             )
-            
+
     except Exception as e:
         logger.error(f"Unexpected error reading LZA config file: {str(e)}")
         return create_error_response(
@@ -270,11 +250,8 @@ async def read_lza_config_file(
                 "Check system logs for more details",
                 "Verify the configuration directory is accessible",
                 "Ensure sufficient system resources",
-                "Try calling getConfigurationFromS3() again"
+                "Try calling getConfigurationFromS3() again",
             ],
-            context={
-                "file_path": file_path,
-                "error_type": type(e).__name__
-            },
-            next_steps="Review the error and retry the operation."
+            context={"file_path": file_path, "error_type": type(e).__name__},
+            next_steps="Review the error and retry the operation.",
         )

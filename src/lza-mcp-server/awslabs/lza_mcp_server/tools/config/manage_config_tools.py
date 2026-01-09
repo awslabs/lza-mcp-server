@@ -102,7 +102,7 @@ def register_config_tools(mcp):
         1. Run checkAwsConnectivity() first to verify AWS credentials (recommended)
         2. Call getConfigurationFromS3() to download and extract configuration
         3. Use the 'host_path' from the response to inspect configuration files
-        
+
         NOTE: Automatic cleanup will occur on next retrieval to keep the file system clean
 
         Args:

@@ -198,7 +198,7 @@ async def tool_get_pipeline_status(
                     "Provide a valid execution ID",
                 ],
             )
-        
+
         is_valid, validation_error = validate_execution_id_local(execution_id)
         if not is_valid:
             return format_error_response(
@@ -456,7 +456,9 @@ async def tool_get_pipeline_status(
                         f"🔍   Stage {i + 1} ({stage_name}): no latestExecution"
                     )
 
-            logger.info(f"🔍 Found {len(in_progress_stages)} in-progress stages and {completed_stages} completed stages")
+            logger.info(
+                f"🔍 Found {len(in_progress_stages)} in-progress stages and {completed_stages} completed stages"
+            )
 
             # Determine current stage based on in-progress stages (ignore execution status)
             if in_progress_stages:

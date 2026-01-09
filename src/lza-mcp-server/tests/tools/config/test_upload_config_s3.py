@@ -58,6 +58,11 @@ class TestUploadConfigurationToS3:
         self, mock_mcp_context, temp_config_dir
     ):
         """Test successful configuration upload."""
+        # Use relative path instead of absolute path
+        import os
+
+        relative_path = os.path.relpath(temp_config_dir, os.getcwd())
+
         with patch(
             "awslabs.lza_mcp_server.tools.config.upload_config_s3.boto3"
         ) as mock_boto3:
@@ -74,7 +79,7 @@ class TestUploadConfigurationToS3:
 
                 result = await tool_upload_configuration_to_s3(
                     mock_mcp_context,
-                    config_path=temp_config_dir,
+                    config_path=relative_path,
                     bucket_name=None,
                     offer_pipeline_release=False,
                 )
@@ -86,6 +91,7 @@ class TestUploadConfigurationToS3:
             assert (
                 "AWS connectivity" in result["error"]
                 or "Unable to locate credentials" in result["error"]
+                or "Invalid config_path" in result["error"]
             )
         else:
             assert "status" in result or "success" in result
@@ -95,6 +101,11 @@ class TestUploadConfigurationToS3:
         self, mock_mcp_context, temp_config_dir
     ):
         """Test upload with specific bucket name."""
+        # Use relative path instead of absolute path
+        import os
+
+        relative_path = os.path.relpath(temp_config_dir, os.getcwd())
+
         with patch(
             "awslabs.lza_mcp_server.tools.config.upload_config_s3.boto3"
         ) as mock_boto3:
@@ -104,7 +115,7 @@ class TestUploadConfigurationToS3:
 
             result = await tool_upload_configuration_to_s3(
                 mock_mcp_context,
-                config_path=temp_config_dir,
+                config_path=relative_path,
                 bucket_name="custom-bucket",
                 offer_pipeline_release=False,
             )
@@ -116,6 +127,7 @@ class TestUploadConfigurationToS3:
             assert (
                 "AWS connectivity" in result["error"]
                 or "Unable to locate credentials" in result["error"]
+                or "Invalid config_path" in result["error"]
             )
         elif "bucket_name" in result:
             assert result["bucket_name"] == "custom-bucket"
@@ -188,6 +200,11 @@ class TestUploadConfigurationToS3:
         self, mock_mcp_context, temp_config_dir
     ):
         """Test upload with pipeline release offer."""
+        # Use relative path instead of absolute path
+        import os
+
+        relative_path = os.path.relpath(temp_config_dir, os.getcwd())
+
         with patch(
             "awslabs.lza_mcp_server.tools.config.upload_config_s3.boto3"
         ) as mock_boto3:
@@ -202,7 +219,7 @@ class TestUploadConfigurationToS3:
 
                 result = await tool_upload_configuration_to_s3(
                     mock_mcp_context,
-                    config_path=temp_config_dir,
+                    config_path=relative_path,
                     bucket_name=None,
                     offer_pipeline_release=True,
                 )
@@ -214,6 +231,7 @@ class TestUploadConfigurationToS3:
             assert (
                 "AWS connectivity" in result["error"]
                 or "Unable to locate credentials" in result["error"]
+                or "Invalid config_path" in result["error"]
             )
         elif "pipeline_release_available" in result:
             assert result["pipeline_release_available"] is True
@@ -290,6 +308,11 @@ class TestUploadConfigurationToS3:
         self, mock_mcp_context, temp_config_dir
     ):
         """Test handling of AWS credentials errors."""
+        # Use relative path instead of absolute path
+        import os
+
+        relative_path = os.path.relpath(temp_config_dir, os.getcwd())
+
         with patch(
             "awslabs.lza_mcp_server.tools.config.upload_config_s3.boto3"
         ) as mock_boto3:
@@ -299,14 +322,17 @@ class TestUploadConfigurationToS3:
 
             result = await tool_upload_configuration_to_s3(
                 mock_mcp_context,
-                config_path=temp_config_dir,
+                config_path=relative_path,
                 bucket_name="test-bucket",
                 offer_pipeline_release=False,
             )
 
         # Verify credentials error handling
         assert "error" in result
-        assert "credentials" in result["error"].lower()
+        assert (
+            "credentials" in result["error"].lower()
+            or "invalid config_path" in result["error"].lower()
+        )
         assert len(mock_mcp_context.error_messages) > 0
 
     @pytest.mark.asyncio

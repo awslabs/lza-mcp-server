@@ -93,7 +93,7 @@ async def tool_get_minimum_configuration(
             error_message = f"Invalid config_type: {validation_error}"
             await ctx.error(error_message)
             return {"error": error_message}
-    
+
     # Validate save_to_directory if provided
     if save_to_directory:
         is_valid, validation_error = validate_file_path(

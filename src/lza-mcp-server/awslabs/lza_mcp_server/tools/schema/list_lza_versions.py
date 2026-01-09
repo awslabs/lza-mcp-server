@@ -31,7 +31,7 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
         await ctx.info("Listing available LZA versions")
 
         schemas_base = "/app/json-schemas"
-        
+
         if not os.path.exists(schemas_base):
             return {
                 "success": False,
@@ -44,7 +44,8 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
         try:
             all_items = os.listdir(schemas_base)
             version_dirs = [
-                item for item in all_items 
+                item
+                for item in all_items
                 if os.path.isdir(os.path.join(schemas_base, item))
                 and not os.path.islink(os.path.join(schemas_base, item))
             ]
@@ -72,7 +73,7 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
 
             # Check if combined.json exists
             has_combined_json = os.path.exists(combined_json_path)
-            
+
             # Get file size if it exists
             file_size_mb = None
             if has_combined_json:
@@ -99,7 +100,7 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
                 "has_schemas": has_combined_json,
                 "status": "ready" if has_combined_json else "incomplete",
             }
-            
+
             if file_size_mb is not None:
                 version_info["schema_size_mb"] = file_size_mb
 

@@ -252,7 +252,9 @@ class TestListLzaSupportedVersions:
 
         with (
             patch("os.path.exists", return_value=True),
-            patch("os.listdir", return_value=["v1.12.0", "v1.13.0", "latest", "v1.11.0"]),
+            patch(
+                "os.listdir", return_value=["v1.12.0", "v1.13.0", "latest", "v1.11.0"]
+            ),
             patch("os.path.isdir", return_value=True),
             patch("os.path.islink", side_effect=mock_islink),
             patch("os.readlink", return_value="v1.13.0"),

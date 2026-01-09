@@ -28,7 +28,11 @@ log_level = os.environ.get("FASTMCP_LOG_LEVEL", "INFO")
 logging.getLogger().setLevel(log_level)
 
 # Check if UC Merge tools should be enabled
-_enable_uc_merge = os.environ.get("ENABLE_UC_MERGE", "false").lower() in ("true", "1", "yes")
+_enable_uc_merge = os.environ.get("ENABLE_UC_MERGE", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 # Build instructions based on enabled features
 _base_instructions = """# AWS Landing Zone Accelerator (LZA) MCP Server
@@ -118,10 +122,15 @@ def register_all_components():
     register_schema_tools(mcp)
 
     # Conditionally register UC Merge tools based on environment variable
-    enable_uc_merge = os.environ.get("ENABLE_UC_MERGE", "false").lower() in ("true", "1", "yes")
-    
+    enable_uc_merge = os.environ.get("ENABLE_UC_MERGE", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     if enable_uc_merge:
         from .tools.uc_merge import register_uc_merge_tools
+
         register_uc_merge_tools(mcp)
         logger.info("UC Merge tools enabled and registered")
     else:
@@ -136,24 +145,27 @@ def main():
 
     # Validate schema integrity on startup (T-015)
     schema_dir = Path(os.environ.get("LZA_SCHEMA_DIR", "/app/json-schemas"))
-    skip_validation = os.environ.get("SKIP_SCHEMA_VALIDATION", "false").lower() in ("true", "1", "yes")
-    
+    skip_validation = os.environ.get("SKIP_SCHEMA_VALIDATION", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     if not skip_validation:
         try:
             from .utils.integrity import validate_schemas_on_startup
-            
+
             # Validate schemas - fail fast if tampering detected
-            validate_schemas_on_startup(
-                schema_dir=schema_dir,
-                fail_on_error=True
-            )
+            validate_schemas_on_startup(schema_dir=schema_dir, fail_on_error=True)
         except ImportError:
             logger.warning("Schema integrity validation module not available")
         except Exception as e:
             logger.error(f"Schema integrity validation failed: {e}")
             raise
     else:
-        logger.warning("Schema integrity validation SKIPPED (SKIP_SCHEMA_VALIDATION=true)")
+        logger.warning(
+            "Schema integrity validation SKIPPED (SKIP_SCHEMA_VALIDATION=true)"
+        )
 
     # Register all components
     register_all_components()

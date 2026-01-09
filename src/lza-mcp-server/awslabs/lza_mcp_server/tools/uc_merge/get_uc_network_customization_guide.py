@@ -25,19 +25,16 @@ from awslabs.lza_mcp_server.tools.uc_merge.common import (
 from awslabs.lza_mcp_server.tools.uc_merge.session_manager import SessionManager
 
 
-
-
-
 def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
     """Get network customization guidance and file list for the session's network model.
-    
+
     This tool provides metadata about the UC session and lists available configuration files.
-    The LLM/Agent should read replacements-config.yaml to understand what settings are 
+    The LLM/Agent should read replacements-config.yaml to understand what settings are
     customizable and make intelligent decisions about what to update based on user needs.
-    
+
     Args:
         session_id: Session identifier from start_uc_merge_session()
-        
+
     Returns:
         Dictionary containing:
         - session_id: Session identifier
@@ -46,7 +43,7 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
         - next_steps: Guidance for next actions
     """
     session_manager = SessionManager()
-    
+
     # Validate session exists
     is_valid, error_msg = session_manager.validate_session(session_id)
     if not is_valid:
@@ -62,7 +59,7 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
             context={"session_id": session_id},
             next_steps="Call start_uc_merge_session() to create a new session",
         )
-    
+
     # Load session metadata to get network model
     metadata = session_manager.load_session_metadata(session_id)
     if not metadata or "network_model" not in metadata:
@@ -77,13 +74,13 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
             context={"session_id": session_id},
             next_steps="Call start_uc_merge_session() to create a new session",
         )
-    
+
     network_model = metadata["network_model"]
     session_path = session_manager.get_session_path(session_id)
-    
+
     # Scan session directory for configuration files
     configuration_files = _scan_configuration_files(session_path)
-    
+
     # Build next steps guidance
     next_steps = (
         f"Read the UC configuration files to understand what needs to be customized:\n"
@@ -99,7 +96,7 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
         f"5. Focus on mandatory updates (account emails, homeRegion) and ask user about "
         "optional network customizations only if needed"
     )
-    
+
     return create_success_response(
         data={
             "session_id": session_id,
@@ -112,10 +109,10 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
 
 def _scan_configuration_files(session_path: Path) -> Dict[str, list[str]]:
     """Scan session directory and organize files by type.
-    
+
     Args:
         session_path: Path to session directory
-        
+
     Returns:
         Dictionary with files organized by type:
         - config_files: YAML configuration files
@@ -125,37 +122,37 @@ def _scan_configuration_files(session_path: Path) -> Dict[str, list[str]]:
     config_files = []
     policy_directories = []
     supporting_directories = []
-    
+
     if not session_path.exists():
         return {
             "config_files": config_files,
             "policy_directories": policy_directories,
             "supporting_directories": supporting_directories,
         }
-    
+
     # Scan for YAML config files in root
     for item in session_path.iterdir():
         if item.is_file() and item.suffix in [".yaml", ".yml"]:
             config_files.append(item.name)
-    
+
     # Scan for directories and classify them dynamically
     for item in session_path.iterdir():
         if item.is_dir():
             # Skip hidden directories (like .session_metadata.json parent)
             if item.name.startswith("."):
                 continue
-            
+
             # Classify directory based on name patterns
             if _is_policy_directory(item.name):
                 policy_directories.append(item.name)
             else:
                 supporting_directories.append(item.name)
-    
+
     # Sort for consistent ordering
     config_files.sort()
     policy_directories.sort()
     supporting_directories.sort()
-    
+
     return {
         "config_files": config_files,
         "policy_directories": policy_directories,
@@ -165,12 +162,12 @@ def _scan_configuration_files(session_path: Path) -> Dict[str, list[str]]:
 
 def _is_policy_directory(dir_name: str) -> bool:
     """Determine if a directory name indicates it contains policies.
-    
+
     Uses heuristics to identify policy directories based on naming patterns.
-    
+
     Args:
         dir_name: Directory name to check
-        
+
     Returns:
         True if directory appears to contain policies, False otherwise
     """
@@ -182,6 +179,6 @@ def _is_policy_directory(dir_name: str) -> bool:
         "rules",
         "rcp",
     ]
-    
+
     dir_name_lower = dir_name.lower()
     return any(keyword in dir_name_lower for keyword in policy_keywords)

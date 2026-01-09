@@ -240,8 +240,9 @@ class TestSchemaTools:
         search_func = registered_tools["searchJsonSchema"]
 
         with patch("os.path.exists", return_value=False):
-            result = await search_func(mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["accounts"])
+            result = await search_func(
+                mock_mcp_context, lza_version="v1.13.0", search_terms=["accounts"]
+            )
 
         assert result["success"] is False
         assert "error" in result
@@ -269,7 +270,7 @@ class TestSchemaTools:
         # Since version checking happens first, we need to mock os.path.exists to pass version check
         # then fail on import
         import_error = ImportError("No module named 'schema_search'")
-        
+
         def mock_exists(path):
             # Make version directory exist but combined.json doesn't
             if "v1.13.0" in path and not path.endswith("combined.json"):
@@ -277,13 +278,19 @@ class TestSchemaTools:
             if path.endswith("combined.json"):
                 return True  # Let it pass to trigger import
             return False
-        
+
         with patch("os.path.exists", side_effect=mock_exists):
             with patch("os.path.getsize", return_value=1024):  # Small file
-                with patch("awslabs.lza_mcp_server.tools.schema.search_json_schema.sys.path", []):
+                with patch(
+                    "awslabs.lza_mcp_server.tools.schema.search_json_schema.sys.path",
+                    [],
+                ):
                     with patch("builtins.__import__", side_effect=import_error):
-                        result = await search_func(mock_mcp_context,
-                        lza_version="v1.13.0", search_terms=["accounts"])
+                        result = await search_func(
+                            mock_mcp_context,
+                            lza_version="v1.13.0",
+                            search_terms=["accounts"],
+                        )
 
         assert result["success"] is False
         assert "error" in result
@@ -310,8 +317,9 @@ class TestSchemaTools:
 
         # Test file not found case
         with patch("os.path.exists", return_value=False):
-            result = await search_func(mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["accounts"])
+            result = await search_func(
+                mock_mcp_context, lza_version="v1.13.0", search_terms=["accounts"]
+            )
 
         assert result["success"] is False
         assert "error" in result
@@ -339,7 +347,9 @@ class TestSchemaTools:
         with patch("os.path.exists", return_value=False):
             result = await search_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["test"], search_type="general"
+                lza_version="v1.13.0",
+                search_terms=["test"],
+                search_type="general",
             )
 
         assert result["success"] is False
@@ -511,7 +521,8 @@ class TestSchemaTools:
         with patch("os.path.exists", return_value=False):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="accounts-config.json"
+                lza_version="v1.13.0",
+                schema_path="accounts-config.json",
             )
 
         assert result["success"] is False
@@ -542,7 +553,8 @@ class TestSchemaTools:
         ):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="accounts-config.json"
+                lza_version="v1.13.0",
+                schema_path="accounts-config.json",
             )
 
         assert result["success"] is False
@@ -575,7 +587,8 @@ class TestSchemaTools:
         ):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="nonexistent-schema.json"
+                lza_version="v1.13.0",
+                schema_path="nonexistent-schema.json",
             )
 
         assert result["success"] is False
@@ -639,8 +652,7 @@ class TestSchemaTools:
         # Test with invalid version to verify parameter handling
         with patch("os.path.exists", return_value=False):
             result = await search_func(
-                mock_mcp_context,
-                lza_version="v99.99.99", search_terms=["test"]
+                mock_mcp_context, lza_version="v99.99.99", search_terms=["test"]
             )
 
         assert result["success"] is False
@@ -671,7 +683,9 @@ class TestSchemaTools:
             with patch("os.path.exists", return_value=False):
                 result = await search_func(
                     mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["test"], format_level=format_level
+                    lza_version="v1.13.0",
+                    search_terms=["test"],
+                    format_level=format_level,
                 )
 
             assert result["success"] is False
@@ -697,8 +711,9 @@ class TestSchemaTools:
 
         # Test with file not found to verify parameter handling
         with patch("os.path.exists", return_value=False):
-            result = await search_func(mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["nonexistent"])
+            result = await search_func(
+                mock_mcp_context, lza_version="v1.13.0", search_terms=["nonexistent"]
+            )
 
         assert result["success"] is False
         assert "error" in result
@@ -782,8 +797,9 @@ class TestSchemaTools:
 
         # Test unexpected error in search function
         with patch("os.path.exists", side_effect=Exception("Unexpected error")):
-            result = await search_func(mock_mcp_context,
-                lza_version="v1.13.0", search_terms=["test"])
+            result = await search_func(
+                mock_mcp_context, lza_version="v1.13.0", search_terms=["test"]
+            )
 
         assert result["success"] is False
         assert "error" in result
@@ -795,8 +811,7 @@ class TestSchemaTools:
         # Test unexpected error in get schema function
         with patch("os.path.exists", side_effect=Exception("Unexpected error")):
             result = await get_schema_func(
-                mock_mcp_context,
-                lza_version="v1.13.0", schema_path="test-schema.json"
+                mock_mcp_context, lza_version="v1.13.0", schema_path="test-schema.json"
             )
 
         assert result["success"] is False
@@ -1296,7 +1311,8 @@ class TestSchemaTools:
         ):
             result = await get_schema_func(
                 mock_mcp_context,
-                lza_version="v1.13.0", schema_path="invalid-schema.json"
+                lza_version="v1.13.0",
+                schema_path="invalid-schema.json",
             )
 
         assert result["success"] is False

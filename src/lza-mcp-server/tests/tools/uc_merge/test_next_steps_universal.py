@@ -24,17 +24,26 @@ workflow guidance for agents using these tools.
 
 import pytest
 import os
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from awslabs.lza_mcp_server.tools.uc_merge.get_uc_releases import tool_get_uc_releases
-from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models import tool_get_uc_network_models
-from awslabs.lza_mcp_server.tools.uc_merge.start_uc_merge_session import tool_start_uc_merge_session
-from awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file import read_lza_config_file
+from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models import (
+    tool_get_uc_network_models,
+)
+from awslabs.lza_mcp_server.tools.uc_merge.start_uc_merge_session import (
+    tool_start_uc_merge_session,
+)
+from awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file import (
+    read_lza_config_file,
+)
 from awslabs.lza_mcp_server.tools.uc_merge.read_uc_file import read_uc_file
 from awslabs.lza_mcp_server.tools.uc_merge.update_uc_file import update_uc_file
-from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_customization_guide import get_uc_network_customization_guide
-from awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config import copy_uc_to_lza_config
+from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_customization_guide import (
+    get_uc_network_customization_guide,
+)
+from awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config import (
+    copy_uc_to_lza_config,
+)
 
 
 @pytest.fixture
@@ -51,22 +60,22 @@ def temp_uc_structure(tmp_path):
     """Create a temporary UC repository structure."""
     uc_base = tmp_path / "lza-uc"
     uc_base.mkdir()
-    
+
     # Create a release directory
     release_dir = uc_base / "v1.0.0"
     release_dir.mkdir()
-    
+
     # Create network model directories
     hub_spoke = release_dir / "hub-and-spoke"
     hub_spoke.mkdir()
-    
+
     shared_vpc = release_dir / "shared-vpc"
     shared_vpc.mkdir()
-    
+
     # Create some config files
     (hub_spoke / "accounts-config.yaml").write_text("test: config")
     (hub_spoke / "replacements-config.yaml").write_text("test: replacements")
-    
+
     return uc_base
 
 
@@ -80,7 +89,7 @@ async def test_get_uc_releases_success_includes_next_steps(mock_ctx, temp_uc_str
     """Verify get_uc_releases includes next_steps on success."""
     original_env = os.environ.get("LZA_UC_BASE_PATH")
     os.environ["LZA_UC_BASE_PATH"] = str(temp_uc_structure)
-    
+
     try:
         result = await tool_get_uc_releases(mock_ctx)
         assert "next_steps" in result
@@ -95,11 +104,13 @@ async def test_get_uc_releases_success_includes_next_steps(mock_ctx, temp_uc_str
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_get_uc_network_models_success_includes_next_steps(mock_ctx, temp_uc_structure):
+async def test_get_uc_network_models_success_includes_next_steps(
+    mock_ctx, temp_uc_structure
+):
     """Verify get_uc_network_models includes next_steps on success."""
     original_env = os.environ.get("LZA_UC_BASE_PATH")
     os.environ["LZA_UC_BASE_PATH"] = str(temp_uc_structure)
-    
+
     try:
         result = await tool_get_uc_network_models(mock_ctx, "v1.0.0")
         assert "next_steps" in result
@@ -158,7 +169,12 @@ async def test_update_uc_file_error_includes_next_steps(tmp_path):
     """Verify update_uc_file includes next_steps on error (missing session_id)."""
     # Mock SessionManager to use tmp_path
     from awslabs.lza_mcp_server.tools.uc_merge.session_manager import SessionManager
-    with patch.object(SessionManager, '__init__', lambda self: setattr(self, 'base_session_dir', tmp_path) or None):
+
+    with patch.object(
+        SessionManager,
+        "__init__",
+        lambda self: setattr(self, "base_session_dir", tmp_path) or None,
+    ):
         result = await update_uc_file("", "replacements-config.yaml", {"test": "value"})
         assert "next_steps" in result
         assert isinstance(result["next_steps"], str)
@@ -171,7 +187,12 @@ async def test_get_uc_network_customization_guide_error_includes_next_steps(tmp_
     """Verify get_uc_network_customization_guide includes next_steps on error (missing session_id)."""
     # Mock SessionManager to use tmp_path
     from awslabs.lza_mcp_server.tools.uc_merge.session_manager import SessionManager
-    with patch.object(SessionManager, '__init__', lambda self: setattr(self, 'base_session_dir', tmp_path) or None):
+
+    with patch.object(
+        SessionManager,
+        "__init__",
+        lambda self: setattr(self, "base_session_dir", tmp_path) or None,
+    ):
         result = get_uc_network_customization_guide("")
         assert "next_steps" in result
         assert isinstance(result["next_steps"], str)
@@ -194,17 +215,19 @@ async def test_next_steps_contains_actionable_guidance(mock_ctx, temp_uc_structu
     """Verify that next_steps contains actionable guidance, not just placeholder text."""
     original_env = os.environ.get("LZA_UC_BASE_PATH")
     os.environ["LZA_UC_BASE_PATH"] = str(temp_uc_structure)
-    
+
     try:
         result = await tool_get_uc_releases(mock_ctx)
         next_steps = result["next_steps"]
-        
+
         # Check for meaningful content
         assert len(next_steps) > 20, "next_steps should contain substantial guidance"
-        
+
         # Should mention what to do next
-        assert any(word in next_steps.lower() for word in ["call", "present", "select", "retry", "contact"]), \
-            "next_steps should contain actionable verbs"
+        assert any(
+            word in next_steps.lower()
+            for word in ["call", "present", "select", "retry", "contact"]
+        ), "next_steps should contain actionable verbs"
     finally:
         if original_env is not None:
             os.environ["LZA_UC_BASE_PATH"] = original_env
