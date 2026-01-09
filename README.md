@@ -202,7 +202,16 @@ The configuration uses these important environment variables:
   - Reduces context size by ~56% when disabled (default)
   - Only needed when performing UC merge operations
 
-Schema integrity validation runs automatically at startup using SHA-256 checksums to detect tampering.
+#### Schema Integrity Validation
+
+The MCP server automatically validates schema integrity at startup using SHA-256 checksums to detect tampering or corruption of embedded LZA JSON schemas. This protects against malicious modification of schema files that could bypass validation and allow malicious configurations.
+
+**How it works:**
+
+- Checksums are generated during Docker image build for all schema files
+- On startup, the server verifies each schema file matches its expected checksum
+- If tampering is detected, the server refuses to start with a clear error message
+- Validation is always enabled and cannot be disabled for security reasons
 
 #### Auto-Approved Tools
 
