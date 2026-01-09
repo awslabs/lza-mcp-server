@@ -58,7 +58,7 @@ async def tool_get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
     try:
         # Get AWS session
         session = get_aws_session()
-        
+
         # First verify connectivity
         try:
             sts_client = session.client("sts")
@@ -78,7 +78,7 @@ async def tool_get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
         # Retrieve the LZA version parameter
         try:
             response = ssm_client.get_parameter(Name=LZA_VERSION_SSM_PARAMETER)
-            
+
             raw_version = response["Parameter"]["Value"]
             parameter_type = response["Parameter"]["Type"]
             last_modified = response["Parameter"]["LastModifiedDate"]
@@ -86,9 +86,13 @@ async def tool_get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
 
             # Normalize version format: ensure it has 'v' prefix for schema compatibility
             # SSM parameter may return "1.13.0" but schemas use "v1.13.0"
-            normalized_version = raw_version if raw_version.startswith("v") else f"v{raw_version}"
+            normalized_version = (
+                raw_version if raw_version.startswith("v") else f"v{raw_version}"
+            )
 
-            await ctx.info(f"Successfully retrieved LZA version: {raw_version} (normalized: {normalized_version})")
+            await ctx.info(
+                f"Successfully retrieved LZA version: {raw_version} (normalized: {normalized_version})"
+            )
 
             return {
                 "success": True,
@@ -106,9 +110,11 @@ async def tool_get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")
-            
+
             if error_code == "ParameterNotFound":
-                await ctx.error(f"LZA version parameter not found: {LZA_VERSION_SSM_PARAMETER}")
+                await ctx.error(
+                    f"LZA version parameter not found: {LZA_VERSION_SSM_PARAMETER}"
+                )
                 return {
                     "success": False,
                     "error": "ParameterNotFound",

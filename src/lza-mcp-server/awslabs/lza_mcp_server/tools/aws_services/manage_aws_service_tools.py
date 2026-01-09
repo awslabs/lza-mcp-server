@@ -27,6 +27,7 @@ from awslabs.lza_mcp_server.tools.aws_services.get_deployed_lza_version import (
 
 logger = logging.getLogger(__name__)
 
+
 def register_aws_tools(mcp):
     """Register AWS-related MCP tools."""
 

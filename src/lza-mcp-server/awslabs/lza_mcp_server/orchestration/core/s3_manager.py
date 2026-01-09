@@ -128,19 +128,19 @@ class S3Manager:
         """
         try:
             s3_client = self._get_s3_client()
-            
+
             # Wrap S3 operation with timeout protection (T-005, T-012)
             async def _check_bucket():
                 return await asyncio.get_event_loop().run_in_executor(
                     None, lambda: s3_client.head_bucket(Bucket=bucket_name)
                 )
-            
+
             await with_timeout(
                 _check_bucket(),
                 timeout=AWS_OPERATION_TIMEOUT,
-                operation_name=f"S3 bucket verification for '{bucket_name}'"
+                operation_name=f"S3 bucket verification for '{bucket_name}'",
             )
-            
+
             self.logger.info(f"Bucket exists and is accessible: {bucket_name}")
             return True
 
@@ -179,10 +179,12 @@ class S3Manager:
                         "operation": "bucket_verification",
                     },
                 )
-        
+
         except TimeoutError as e:
             # Handle timeout errors specifically (T-005, T-012)
-            self.logger.error(f"Bucket verification timed out for {bucket_name}: {str(e)}")
+            self.logger.error(
+                f"Bucket verification timed out for {bucket_name}: {str(e)}"
+            )
             raise S3UploadError(
                 message=f"Bucket verification timed out after {AWS_OPERATION_TIMEOUT} seconds for '{bucket_name}'",
                 category=ErrorCategory.S3,
@@ -199,7 +201,7 @@ class S3Manager:
                     "timeout_seconds": AWS_OPERATION_TIMEOUT,
                 },
             )
-        
+
         except Exception as e:
             self.logger.error(
                 f"Unexpected error checking bucket {bucket_name}: {str(e)}"
@@ -413,13 +415,15 @@ class S3Manager:
             async def _upload_file():
                 return await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: s3_client.upload_file(zip_path, bucket_name, key, ExtraArgs=extra_args)
+                    lambda: s3_client.upload_file(
+                        zip_path, bucket_name, key, ExtraArgs=extra_args
+                    ),
                 )
-            
+
             await with_timeout(
                 _upload_file(),
                 timeout=AWS_OPERATION_TIMEOUT,
-                operation_name=f"S3 upload to s3://{bucket_name}/{key}"
+                operation_name=f"S3 upload to s3://{bucket_name}/{key}",
             )
 
             upload_time = time.time() - start_time
@@ -437,11 +441,11 @@ class S3Manager:
                     return await asyncio.get_event_loop().run_in_executor(
                         None, lambda: s3_client.head_object(Bucket=bucket_name, Key=key)
                     )
-                
+
                 response = await with_timeout(
                     _verify_upload(),
                     timeout=AWS_OPERATION_TIMEOUT,
-                    operation_name=f"S3 upload verification for s3://{bucket_name}/{key}"
+                    operation_name=f"S3 upload verification for s3://{bucket_name}/{key}",
                 )
                 uploaded_size = response["ContentLength"]
                 uploaded_etag = response["ETag"].strip('"')
@@ -480,7 +484,9 @@ class S3Manager:
 
         except TimeoutError as e:
             # Handle timeout errors specifically (T-005, T-012)
-            error_message = f"S3 upload timed out after {AWS_OPERATION_TIMEOUT} seconds: {str(e)}"
+            error_message = (
+                f"S3 upload timed out after {AWS_OPERATION_TIMEOUT} seconds: {str(e)}"
+            )
             self.logger.error(error_message)
 
             error_response = create_structured_error_response(
@@ -609,15 +615,19 @@ class S3Manager:
 
             # Verify source object exists with timeout protection
             try:
+
                 async def _verify_source():
                     return await asyncio.get_event_loop().run_in_executor(
-                        None, lambda: s3_client.head_object(Bucket=source_bucket, Key=source_key)
+                        None,
+                        lambda: s3_client.head_object(
+                            Bucket=source_bucket, Key=source_key
+                        ),
                     )
-                
+
                 source_response = await with_timeout(
                     _verify_source(),
                     timeout=AWS_OPERATION_TIMEOUT,
-                    operation_name=f"S3 source verification for s3://{source_bucket}/{source_key}"
+                    operation_name=f"S3 source verification for s3://{source_bucket}/{source_key}",
                 )
                 source_size = source_response["ContentLength"]
                 self.logger.info(f"Source object verified: {source_size} bytes")
@@ -655,26 +665,30 @@ class S3Manager:
                     None,
                     lambda: s3_client.copy_object(
                         CopySource=copy_source, Bucket=target_bucket, Key=target_key
-                    )
+                    ),
                 )
-            
+
             await with_timeout(
                 _copy_object(),
                 timeout=AWS_OPERATION_TIMEOUT,
-                operation_name=f"S3 copy from s3://{source_bucket}/{source_key} to s3://{target_bucket}/{target_key}"
+                operation_name=f"S3 copy from s3://{source_bucket}/{source_key} to s3://{target_bucket}/{target_key}",
             )
 
             # Verify the copy was successful with timeout protection
             try:
+
                 async def _verify_target():
                     return await asyncio.get_event_loop().run_in_executor(
-                        None, lambda: s3_client.head_object(Bucket=target_bucket, Key=target_key)
+                        None,
+                        lambda: s3_client.head_object(
+                            Bucket=target_bucket, Key=target_key
+                        ),
                     )
-                
+
                 target_response = await with_timeout(
                     _verify_target(),
                     timeout=AWS_OPERATION_TIMEOUT,
-                    operation_name=f"S3 copy verification for s3://{target_bucket}/{target_key}"
+                    operation_name=f"S3 copy verification for s3://{target_bucket}/{target_key}",
                 )
                 target_size = target_response["ContentLength"]
 

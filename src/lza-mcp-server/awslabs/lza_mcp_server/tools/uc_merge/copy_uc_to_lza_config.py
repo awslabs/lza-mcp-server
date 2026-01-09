@@ -16,7 +16,6 @@
 
 import logging
 import shutil
-from pathlib import Path
 from typing import Dict, Any
 
 from mcp.server.fastmcp import Context
@@ -33,23 +32,20 @@ from .session_manager import SessionManager
 logger = logging.getLogger(__name__)
 
 
-async def copy_uc_to_lza_config(
-    ctx: Context,
-    session_id: str
-) -> Dict[str, Any]:
+async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]:
     """Copy UC configuration from session directory to extracted LZA configuration directory.
-    
+
     This tool merges UC files with the existing LZA configuration by copying all
     files from the session directory to the LZA configuration directory. Files are
     overwritten as needed, and directory structure is preserved.
-    
+
     After this operation completes, call uploadConfigurationToS3() WITHOUT any path
     parameter to upload the merged configuration.
-    
+
     Args:
         ctx: MCP context for logging
         session_id: Session identifier from start_uc_merge_session()
-        
+
     Returns:
         Dictionary with copy operation results:
         {
@@ -63,8 +59,10 @@ async def copy_uc_to_lza_config(
         }
     """
     try:
-        await ctx.info(f"Copying UC configuration from session {session_id} to LZA config")
-        
+        await ctx.info(
+            f"Copying UC configuration from session {session_id} to LZA config"
+        )
+
         # Validate session_id is provided
         if not session_id:
             return create_error_response(
@@ -74,15 +72,15 @@ async def copy_uc_to_lza_config(
                 troubleshooting=[
                     "Provide a session_id parameter",
                     "Start a new session with start_uc_merge_session()",
-                    "Ensure you have the session_id from the session creation response"
+                    "Ensure you have the session_id from the session creation response",
                 ],
-                next_steps="Call start_uc_merge_session() to create a session first."
+                next_steps="Call start_uc_merge_session() to create a session first.",
             )
-        
+
         # Validate session exists
         session_manager = SessionManager()
         is_valid, error_message = session_manager.validate_session(session_id)
-        
+
         if not is_valid:
             return create_error_response(
                 error_message=error_message,
@@ -92,18 +90,18 @@ async def copy_uc_to_lza_config(
                     "Verify the session_id is correct",
                     "Start a new session with start_uc_merge_session()",
                     "Check that the session has not been cleaned up",
-                    "Ensure the session was created successfully"
+                    "Ensure the session was created successfully",
                 ],
                 context={"session_id": session_id},
-                next_steps="Start a new session with start_uc_merge_session() and use the returned session_id."
+                next_steps="Start a new session with start_uc_merge_session() and use the returned session_id.",
             )
-        
+
         # Get session directory
         session_path = session_manager.get_session_path(session_id)
-        
+
         # Get extracted LZA config path
         lza_config_path = get_extracted_lza_config_path()
-        
+
         if lza_config_path is None:
             return create_error_response(
                 error_message="LZA configuration directory not found",
@@ -112,12 +110,12 @@ async def copy_uc_to_lza_config(
                 troubleshooting=[
                     "Call getConfigurationFromS3() first to retrieve the LZA configuration",
                     "Ensure getConfigurationFromS3() completed successfully",
-                    "Verify the extracted configuration path was set correctly"
+                    "Verify the extracted configuration path was set correctly",
                 ],
                 context={"session_id": session_id},
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration first."
+                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration first.",
             )
-        
+
         # Verify LZA config directory exists
         if not lza_config_path.exists():
             return create_error_response(
@@ -127,15 +125,15 @@ async def copy_uc_to_lza_config(
                 troubleshooting=[
                     "Call getConfigurationFromS3() to retrieve the LZA configuration",
                     "Verify the configuration was extracted successfully",
-                    "Check that the directory was not deleted"
+                    "Check that the directory was not deleted",
                 ],
                 context={
                     "session_id": session_id,
-                    "lza_config_path": str(lza_config_path)
+                    "lza_config_path": str(lza_config_path),
                 },
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration."
+                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration.",
             )
-        
+
         # Verify session directory exists and has files
         if not session_path.exists():
             return create_error_response(
@@ -145,32 +143,29 @@ async def copy_uc_to_lza_config(
                 troubleshooting=[
                     "Verify the session_id is correct",
                     "Check that the session has not been cleaned up",
-                    "Start a new session with start_uc_merge_session()"
+                    "Start a new session with start_uc_merge_session()",
                 ],
-                context={
-                    "session_id": session_id,
-                    "session_path": str(session_path)
-                },
-                next_steps="Start a new session with start_uc_merge_session()."
+                context={"session_id": session_id, "session_path": str(session_path)},
+                next_steps="Start a new session with start_uc_merge_session().",
             )
-        
+
         # Count files and directories before copying
         files_copied = 0
         directories_created = 0
-        
+
         await ctx.info(f"Copying files from {session_path} to {lza_config_path}")
-        
+
         # Copy all files from session to LZA config, preserving structure
         try:
             for item in session_path.rglob("*"):
                 # Skip metadata files
                 if item.name == ".session_metadata.json":
                     continue
-                
+
                 # Calculate relative path
                 relative_path = item.relative_to(session_path)
                 dest_path = lza_config_path / relative_path
-                
+
                 if item.is_dir():
                     # Create directory if it doesn't exist
                     if not dest_path.exists():
@@ -180,19 +175,19 @@ async def copy_uc_to_lza_config(
                 elif item.is_file():
                     # Ensure parent directory exists
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    
+
                     # Copy file (overwrite if exists)
                     shutil.copy2(item, dest_path)
                     files_copied += 1
-                    
+
                     if files_copied % 10 == 0:
                         await ctx.info(f"Copied {files_copied} files...")
-            
+
             await ctx.info(
                 f"Successfully copied {files_copied} files and created "
                 f"{directories_created} directories from session {session_id}"
             )
-            
+
             # Clean up session directory after successful merge
             # The UC configuration has been merged into LZA config, so session is no longer needed
             try:
@@ -202,9 +197,13 @@ async def copy_uc_to_lza_config(
                 await ctx.info(f"Session directory removed: {session_id}")
             except Exception as cleanup_error:
                 # Log warning but don't fail the operation
-                logger.warning(f"Failed to clean up session directory {session_id}: {str(cleanup_error)}")
-                await ctx.warning(f"Could not remove session directory (non-critical): {str(cleanup_error)}")
-            
+                logger.warning(
+                    f"Failed to clean up session directory {session_id}: {str(cleanup_error)}"
+                )
+                await ctx.warning(
+                    f"Could not remove session directory (non-critical): {str(cleanup_error)}"
+                )
+
             return create_success_response(
                 data={
                     "session_id": session_id,
@@ -218,9 +217,9 @@ async def copy_uc_to_lza_config(
                     "UC configuration merged successfully. Session directory has been cleaned up. "
                     "Call uploadConfigurationToS3() WITHOUT any path parameter "
                     "to upload the merged configuration."
-                )
+                ),
             )
-            
+
         except PermissionError as e:
             return create_error_response(
                 error_message=f"Permission denied during copy operation: {str(e)}",
@@ -230,16 +229,16 @@ async def copy_uc_to_lza_config(
                     "Check file system permissions",
                     "Ensure the user has write access to the LZA configuration directory",
                     "Verify no files are locked by another process",
-                    "Check container permissions and volume mounts"
+                    "Check container permissions and volume mounts",
                 ],
                 context={
                     "session_id": session_id,
                     "source": str(session_path),
                     "destination": str(lza_config_path),
                     "files_copied": files_copied,
-                    "directories_created": directories_created
+                    "directories_created": directories_created,
                 },
-                next_steps="Check file permissions and retry the operation."
+                next_steps="Check file permissions and retry the operation.",
             )
         except OSError as e:
             return create_error_response(
@@ -250,7 +249,7 @@ async def copy_uc_to_lza_config(
                     "Check available disk space",
                     "Verify file system is not read-only",
                     "Ensure no files are corrupted",
-                    "Check system logs for more details"
+                    "Check system logs for more details",
                 ],
                 context={
                     "session_id": session_id,
@@ -258,9 +257,9 @@ async def copy_uc_to_lza_config(
                     "destination": str(lza_config_path),
                     "files_copied": files_copied,
                     "directories_created": directories_created,
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
                 },
-                next_steps="Check the error details and retry the operation."
+                next_steps="Check the error details and retry the operation.",
             )
         except Exception as e:
             error_info = categorize_uc_merge_error(e)
@@ -275,11 +274,11 @@ async def copy_uc_to_lza_config(
                     "destination": str(lza_config_path),
                     "files_copied": files_copied,
                     "directories_created": directories_created,
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
                 },
-                next_steps="Check the error details and retry the operation."
+                next_steps="Check the error details and retry the operation.",
             )
-            
+
     except Exception as e:
         logger.error(f"Unexpected error copying UC to LZA config: {str(e)}")
         return create_error_response(
@@ -290,11 +289,8 @@ async def copy_uc_to_lza_config(
                 "Check system logs for more details",
                 "Verify both session and LZA config directories are accessible",
                 "Ensure sufficient system resources",
-                "Try creating a new session"
+                "Try creating a new session",
             ],
-            context={
-                "session_id": session_id,
-                "error_type": type(e).__name__
-            },
-            next_steps="Review the error and retry the operation."
+            context={"session_id": session_id, "error_type": type(e).__name__},
+            next_steps="Review the error and retry the operation.",
         )

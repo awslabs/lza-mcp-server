@@ -31,7 +31,6 @@ from awslabs.lza_mcp_server.tools.config.common import (
 )
 from awslabs.lza_mcp_server.utils.error_handling import create_structured_error_response
 from awslabs.lza_mcp_server.utils.input_validation import (
-    validate_string_input,
     validate_file_path,
     validate_s3_bucket_name,
 )
@@ -79,8 +78,12 @@ async def _handle_share_to_s3_upload(
         zip_location_type = None
 
         # Get host path from environment variable (configured in Docker/MCP settings)
-        host_config_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
-        container_config_path = os.environ.get("LZA_CONFIG_CONTAINER_PATH", "/app/lza-config")
+        host_config_path = os.environ.get(
+            "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
+        )
+        container_config_path = os.environ.get(
+            "LZA_CONFIG_CONTAINER_PATH", "/app/lza-config"
+        )
 
         possible_zip_paths = [
             ("host", os.path.join(os.path.expanduser(host_config_path), "config.zip")),
@@ -140,9 +143,7 @@ async def _handle_share_to_s3_upload(
 
         # Offer pipeline release
         if offer_pipeline_release:
-            await ctx.info(
-                "🚀 Use 'releasePipeline' to deploy the configuration"
-            )
+            await ctx.info("🚀 Use 'releasePipeline' to deploy the configuration")
 
         return {
             "success": True,
@@ -248,9 +249,7 @@ async def _handle_s3_to_s3_copy(
 
         # Offer pipeline release
         if offer_pipeline_release:
-            await ctx.info(
-                "🚀 Use 'releasePipeline' to deploy the configuration"
-            )
+            await ctx.info("🚀 Use 'releasePipeline' to deploy the configuration")
 
         return {
             "success": True,
@@ -296,9 +295,13 @@ async def _detect_share_validation_context(ctx: Context) -> Dict[str, Any]:
     """
     try:
         # Get paths from environment variables (configured in Docker/MCP settings)
-        host_config_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
-        container_config_path = os.environ.get("LZA_CONFIG_CONTAINER_PATH", "/app/lza-config")
-        
+        host_config_path = os.environ.get(
+            "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
+        )
+        container_config_path = os.environ.get(
+            "LZA_CONFIG_CONTAINER_PATH", "/app/lza-config"
+        )
+
         share_paths = [
             os.path.join(os.path.expanduser(host_config_path), "config.zip"),
             os.path.join(container_config_path, "config.zip"),
@@ -320,8 +323,12 @@ async def _detect_share_validation_context(ctx: Context) -> Dict[str, Any]:
         # Use the most recent file if it's within 2 hours
         if most_recent_path and most_recent_age < 7200:  # 2 hours
             # Determine location type by checking if path matches container path
-            location_type = "container" if most_recent_path.startswith(container_config_path) else "host"
-            
+            location_type = (
+                "container"
+                if most_recent_path.startswith(container_config_path)
+                else "host"
+            )
+
             return {
                 "detected": True,
                 "zip_path": most_recent_path,
@@ -481,7 +488,7 @@ async def tool_upload_configuration_to_s3(
 
     Args:
         config_path: Optional path to configuration folder WITHIN the container workspace.
-                    IMPORTANT: Leave this EMPTY if you used getConfigurationFromS3() - 
+                    IMPORTANT: Leave this EMPTY if you used getConfigurationFromS3() -
                     the tool will automatically detect and use the retrieved config.
                     Only provide a path if you have a custom container-relative path.
                     DO NOT use the host_path from getConfigurationFromS3()!
@@ -537,7 +544,7 @@ async def tool_upload_configuration_to_s3(
                     ],
                     context={"config_path": config_path},
                 )
-        
+
         # Validate bucket_name if provided
         if bucket_name:
             is_valid, validation_error = validate_s3_bucket_name(bucket_name)
@@ -557,7 +564,9 @@ async def tool_upload_configuration_to_s3(
                 )
 
         # Check if user provided a host path (common mistake)
-        if config_path and (config_path.startswith("/Users/") or config_path.startswith("~/")):
+        if config_path and (
+            config_path.startswith("/Users/") or config_path.startswith("~/")
+        ):
             error_message = (
                 f"The provided path '{config_path}' appears to be a host filesystem path. "
                 "This MCP server runs in a Docker container and cannot access host paths directly. "
@@ -566,7 +575,7 @@ async def tool_upload_configuration_to_s3(
                 "the retrieved configuration."
             )
             await ctx.error(error_message)
-            
+
             return create_structured_error_response(
                 error=error_message,
                 category=ErrorCategory.CONFIGURATION,
@@ -645,8 +654,10 @@ async def tool_upload_configuration_to_s3(
             await ctx.error(error_message)
 
             # Get configured host path for error message
-            host_config_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
-            
+            host_config_path = os.environ.get(
+                "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
+            )
+
             return create_structured_error_response(
                 error=error_message,
                 category=ErrorCategory.INTEGRATION,

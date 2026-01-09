@@ -254,15 +254,22 @@ class TestSchemaVersionSupport:
 
         with patch("os.path.exists", side_effect=mock_exists):
             with patch("os.path.getsize", return_value=1024):
-                with patch("builtins.open", mock_open(read_data=json.dumps(mock_schema_data))):
-                    with patch("awslabs.lza_mcp_server.tools.schema.search_json_schema.sys.path", ["/app/json-schema/src"]):
+                with patch(
+                    "builtins.open", mock_open(read_data=json.dumps(mock_schema_data))
+                ):
+                    with patch(
+                        "awslabs.lza_mcp_server.tools.schema.search_json_schema.sys.path",
+                        ["/app/json-schema/src"],
+                    ):
                         # Mock the schema_search module
                         mock_search_module = Mock()
                         mock_search_module.search_schemas.return_value = {
                             "results": [],
                             "total_matches": 0,
                         }
-                        with patch.dict("sys.modules", {"schema_search": mock_search_module}):
+                        with patch.dict(
+                            "sys.modules", {"schema_search": mock_search_module}
+                        ):
                             result = await search_func(
                                 mock_context,
                                 lza_version="v1.13.0",
@@ -305,7 +312,9 @@ class TestSchemaVersionSupport:
             return "v1.13.0" in path
 
         with patch("os.path.exists", side_effect=mock_exists):
-            with patch("builtins.open", mock_open(read_data=json.dumps(mock_schema_data))):
+            with patch(
+                "builtins.open", mock_open(read_data=json.dumps(mock_schema_data))
+            ):
                 result = await get_schema_func(
                     mock_context,
                     lza_version="v1.13.0",

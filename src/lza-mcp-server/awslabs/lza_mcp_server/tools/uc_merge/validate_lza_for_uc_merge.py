@@ -15,7 +15,6 @@
 """Validate LZA installation is fresh and compatible with UC merge."""
 
 import logging
-from pathlib import Path
 from typing import Dict, Any
 import yaml
 
@@ -38,16 +37,16 @@ logger = logging.getLogger(__name__)
 
 async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
     """Validate that the LZA installation is fresh and compatible with UC merge.
-    
+
     This tool validates that the current LZA installation meets the requirements
     for UC merge by checking:
     - accounts-config.yaml has only 3 mandatory accounts (no workload accounts)
     - network-config.yaml has minimal configuration (empty arrays)
     - iam-config.yaml has minimal configuration (empty arrays)
-    
+
     Call this after getConfigurationFromS3() to ensure the installation is
     compatible with UC merge before proceeding.
-    
+
     Returns:
         Dictionary with validation results:
         {
@@ -63,10 +62,10 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
     """
     try:
         await ctx.info("Validating LZA installation for UC merge compatibility")
-        
+
         # Check if configuration has been retrieved
         base_directory = LZA_CONFIG_BASE_PATH / "retrieved-config"
-        
+
         if not base_directory.exists():
             return create_error_response(
                 error_message=(
@@ -78,18 +77,18 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 troubleshooting=[
                     "Call getConfigurationFromS3() to retrieve the LZA configuration",
                     "Verify the configuration was extracted successfully",
-                    "Ensure getConfigurationFromS3() completed without errors"
+                    "Ensure getConfigurationFromS3() completed without errors",
                 ],
                 context={"expected_directory": str(base_directory)},
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration."
+                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration.",
             )
-        
+
         validation_results = {
             "accounts": {"passed": False, "message": ""},
             "network": {"passed": False, "message": ""},
-            "iam": {"passed": False, "message": ""}
+            "iam": {"passed": False, "message": ""},
         }
-        
+
         # Validate accounts-config.yaml
         accounts_path = base_directory / "accounts-config.yaml"
         if not accounts_path.exists():
@@ -100,12 +99,12 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 troubleshooting=[
                     "Verify getConfigurationFromS3() extracted all files",
                     "Check that accounts-config.yaml exists in the S3 configuration",
-                    "Ensure the LZA installation is complete"
+                    "Ensure the LZA installation is complete",
                 ],
                 context={"file": "accounts-config.yaml"},
-                next_steps="Verify the LZA configuration is complete and retry."
+                next_steps="Verify the LZA configuration is complete and retry.",
             )
-        
+
         try:
             accounts_content = accounts_path.read_text(encoding="utf-8")
             accounts_config = yaml.safe_load(accounts_content)
@@ -116,7 +115,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
             )
         except Exception as e:
             validation_results["accounts"]["message"] = f"Failed to parse: {str(e)}"
-        
+
         # Validate network-config.yaml
         network_path = base_directory / "network-config.yaml"
         if not network_path.exists():
@@ -127,12 +126,12 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 troubleshooting=[
                     "Verify getConfigurationFromS3() extracted all files",
                     "Check that network-config.yaml exists in the S3 configuration",
-                    "Ensure the LZA installation is complete"
+                    "Ensure the LZA installation is complete",
                 ],
                 context={"file": "network-config.yaml"},
-                next_steps="Verify the LZA configuration is complete and retry."
+                next_steps="Verify the LZA configuration is complete and retry.",
             )
-        
+
         try:
             network_content = network_path.read_text(encoding="utf-8")
             network_config = yaml.safe_load(network_content)
@@ -143,7 +142,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
             )
         except Exception as e:
             validation_results["network"]["message"] = f"Failed to parse: {str(e)}"
-        
+
         # Validate iam-config.yaml
         iam_path = base_directory / "iam-config.yaml"
         if not iam_path.exists():
@@ -154,12 +153,12 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 troubleshooting=[
                     "Verify getConfigurationFromS3() extracted all files",
                     "Check that iam-config.yaml exists in the S3 configuration",
-                    "Ensure the LZA installation is complete"
+                    "Ensure the LZA installation is complete",
                 ],
                 context={"file": "iam-config.yaml"},
-                next_steps="Verify the LZA configuration is complete and retry."
+                next_steps="Verify the LZA configuration is complete and retry.",
             )
-        
+
         try:
             iam_content = iam_path.read_text(encoding="utf-8")
             iam_config = yaml.safe_load(iam_content)
@@ -170,23 +169,20 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
             )
         except Exception as e:
             validation_results["iam"]["message"] = f"Failed to parse: {str(e)}"
-        
+
         # Check if all validations passed
-        all_passed = all(
-            check["passed"] for check in validation_results.values()
-        )
-        
+        all_passed = all(check["passed"] for check in validation_results.values())
+
         if not all_passed:
             # Find which checks failed
             failed_checks = [
-                name for name, check in validation_results.items()
+                name
+                for name, check in validation_results.items()
                 if not check["passed"]
             ]
-            
-            await ctx.error(
-                f"LZA validation failed for: {', '.join(failed_checks)}"
-            )
-            
+
+            await ctx.error(f"LZA validation failed for: {', '.join(failed_checks)}")
+
             return create_error_response(
                 error_message=(
                     "LZA installation is not compatible with UC merge. "
@@ -198,31 +194,28 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                     "UC merge requires a fresh LZA installation with only 3 mandatory accounts",
                     "The current installation has additional workload accounts or custom configurations",
                     "Consider manual configuration instead of UC merge for existing deployments",
-                    "Review the validation results for specific issues"
+                    "Review the validation results for specific issues",
                 ],
                 context={
                     "validation_results": validation_results,
-                    "failed_checks": failed_checks
+                    "failed_checks": failed_checks,
                 },
                 next_steps=(
                     "UC merge cannot proceed with this installation. "
                     "Use manual configuration approach for existing deployments."
-                )
+                ),
             )
-        
+
         await ctx.info("LZA installation validation passed - compatible with UC merge")
-        
+
         return create_success_response(
-            data={
-                "validation_passed": True,
-                "checks": validation_results
-            },
+            data={"validation_passed": True, "checks": validation_results},
             next_steps=(
                 "Validation passed! The LZA installation is compatible with UC merge. "
                 "Next, call get_uc_releases() to discover available UC versions."
-            )
+            ),
         )
-        
+
     except Exception as e:
         logger.error(f"Unexpected error validating LZA installation: {str(e)}")
         return create_error_response(
@@ -233,8 +226,8 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 "Check system logs for more details",
                 "Verify the configuration directory is accessible",
                 "Ensure configuration files are valid YAML",
-                "Try calling getConfigurationFromS3() again"
+                "Try calling getConfigurationFromS3() again",
             ],
             context={"error_type": type(e).__name__},
-            next_steps="Review the error and retry the operation."
+            next_steps="Review the error and retry the operation.",
         )

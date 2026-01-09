@@ -67,7 +67,7 @@ class TestMCPToolRegistration:
         upload_config = registered_tools["uploadConfigurationToS3"]
         assert callable(upload_config["function"])
         assert "Upload LZA configuration" in upload_config["description"]
-        
+
         get_config = registered_tools["getConfigurationFromS3"]
         assert callable(get_config["function"])
         assert "Retrieve current LZA configuration" in get_config["description"]

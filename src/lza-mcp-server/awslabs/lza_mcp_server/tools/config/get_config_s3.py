@@ -119,13 +119,13 @@ class S3ConfigRetrieval:
             Dictionary with validation result and LLM-friendly error message if invalid
         """
         is_valid, error_message = validate_s3_bucket_name(bucket_name)
-        
+
         if not is_valid:
             return {
                 "valid": False,
                 "error": f"The bucket name '{bucket_name}' is invalid. {error_message}",
             }
-        
+
         return {"valid": True}
 
     async def get_configuration(
@@ -277,22 +277,26 @@ class S3ConfigRetrieval:
             # The user maps their local directory to /app/lza-config in the container
             docker_share_path = "/app/lza-config"
             os.makedirs(docker_share_path, exist_ok=True)
-            
+
             # Get the host path from environment variable (configured in MCP server settings)
             # This tells the LLM where to access files on the host system
-            host_share_path = os.environ.get("LZA_CONFIG_HOST_PATH", "~/Documents/lza-config")
-            
+            host_share_path = os.environ.get(
+                "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
+            )
+
             # Create a subdirectory for this retrieval
             # IMPORTANT: Remove existing directory completely to avoid stale files from previous configs
             temp_extract_path = os.path.join(docker_share_path, "retrieved-config")
             if os.path.exists(temp_extract_path):
-                self.logger.info(f"Removing existing configuration directory: {temp_extract_path}")
+                self.logger.info(
+                    f"Removing existing configuration directory: {temp_extract_path}"
+                )
                 shutil.rmtree(temp_extract_path)
             os.makedirs(temp_extract_path, exist_ok=True)
-            
+
             # Calculate the host path where LLM can access the files
             host_extract_path = os.path.join(host_share_path, "retrieved-config")
-            
+
             self.logger.info(f"Extracting configuration to {temp_extract_path}")
             await ctx.info(f"Extracting configuration to {temp_extract_path}")
             await ctx.info(f"LLM can access files at: {host_extract_path}")
@@ -326,7 +330,7 @@ class S3ConfigRetrieval:
                 "object_key": S3_OBJECT_KEY,
             }
             self._last_temp_directory = temp_extract_path
-            
+
             # Set the extracted path for UC merge tools to use
             set_extracted_lza_config_path(Path(temp_extract_path))
 
@@ -364,13 +368,17 @@ class S3ConfigRetrieval:
             }
 
             await ctx.info("✅ Configuration retrieved successfully")
-            await ctx.info(f"Extracted {metadata['file_count']} files to {temp_extract_path}")
+            await ctx.info(
+                f"Extracted {metadata['file_count']} files to {temp_extract_path}"
+            )
             await ctx.info(f"📁 Access files on host system at: {host_extract_path}")
 
             return response
 
         except Exception as e:
-            self.logger.error(f"Unexpected error during configuration retrieval: {str(e)}")
+            self.logger.error(
+                f"Unexpected error during configuration retrieval: {str(e)}"
+            )
             return create_structured_error_response(
                 error=f"Unexpected error during configuration retrieval: {str(e)}",
                 category=ErrorCategory.S3,
@@ -394,7 +402,9 @@ class S3ConfigRetrieval:
                     os.remove(temp_zip_path)
                     self.logger.info(f"Cleaned up temporary ZIP file: {temp_zip_path}")
                 except Exception as e:
-                    self.logger.warning(f"Failed to clean up temporary ZIP file: {str(e)}")
+                    self.logger.warning(
+                        f"Failed to clean up temporary ZIP file: {str(e)}"
+                    )
 
     def _extract_zip_metadata(self, zip_path: str, extract_path: str) -> Dict[str, Any]:
         """

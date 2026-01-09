@@ -15,7 +15,6 @@
 """Unit tests for AWS tools module - simplified version."""
 
 import pytest
-import os
 from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError, NoCredentialsError
 
@@ -153,9 +152,7 @@ class TestRegisterAwsTools:
         register_aws_tools(mock_mcp)
 
         # Verify that tool registration was called
-        assert (
-            mock_mcp.tool.call_count == 2
-        )
+        assert mock_mcp.tool.call_count == 2
 
         # Verify the tools were registered with correct names
         tool_calls = mock_mcp.tool.call_args_list

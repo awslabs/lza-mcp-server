@@ -15,7 +15,6 @@
 """Read UC configuration files from session directory."""
 
 import logging
-from pathlib import Path
 from typing import Dict, Any
 
 from mcp.server.fastmcp import Context
@@ -35,15 +34,15 @@ logger = logging.getLogger(__name__)
 
 def get_next_steps_for_uc_file(file_name: str) -> str:
     """Get context-aware next steps based on UC filename.
-    
+
     Args:
         file_name: Name of the file that was read
-        
+
     Returns:
         Context-aware next steps guidance
     """
     file_name_lower = file_name.lower()
-    
+
     if "accounts-config" in file_name_lower:
         return (
             "Parse the YAML and identify which account emails need updating. "
@@ -78,26 +77,22 @@ def get_next_steps_for_uc_file(file_name: str) -> str:
         )
 
 
-async def read_uc_file(
-    ctx: Context,
-    session_id: str,
-    file_path: str
-) -> Dict[str, Any]:
+async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[str, Any]:
     """Read a file from the UC session directory.
-    
+
     This tool reads files from the UC session directory created by
     start_uc_merge_session(). It validates paths for security and provides
     context-aware guidance based on the file being read.
-    
+
     For UC merge workflow, review at minimum:
     - accounts-config.yaml: Account structure and emails
     - replacements-config.yaml: Network settings and global replacements
-    
+
     Args:
         ctx: MCP context for logging
         session_id: Session identifier from start_uc_merge_session()
         file_path: Relative path within UC session (e.g., "accounts-config.yaml")
-        
+
     Returns:
         Dictionary with file content and metadata:
         {
@@ -112,7 +107,7 @@ async def read_uc_file(
     """
     try:
         await ctx.info(f"Reading UC file from session {session_id}: {file_path}")
-        
+
         # Validate session_id is provided
         if not session_id:
             return create_error_response(
@@ -122,16 +117,16 @@ async def read_uc_file(
                 troubleshooting=[
                     "Provide a session_id parameter",
                     "Start a new session with start_uc_merge_session()",
-                    "Ensure you have the session_id from the session creation response"
+                    "Ensure you have the session_id from the session creation response",
                 ],
                 context={"file_path": file_path},
-                next_steps="Call start_uc_merge_session() to create a session first."
+                next_steps="Call start_uc_merge_session() to create a session first.",
             )
-        
+
         # Validate session exists
         session_manager = SessionManager()
         is_valid, error_message = session_manager.validate_session(session_id)
-        
+
         if not is_valid:
             return create_error_response(
                 error_message=error_message,
@@ -141,25 +136,20 @@ async def read_uc_file(
                     "Verify the session_id is correct",
                     "Start a new session with start_uc_merge_session()",
                     "Check that the session has not been cleaned up",
-                    "Ensure the session was created successfully"
+                    "Ensure the session was created successfully",
                 ],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path
-                },
-                next_steps="Start a new session with start_uc_merge_session() and use the returned session_id."
+                context={"session_id": session_id, "file_path": file_path},
+                next_steps="Start a new session with start_uc_merge_session() and use the returned session_id.",
             )
-        
+
         # Get session directory
         session_path = session_manager.get_session_path(session_id)
-        
+
         # Validate path security
         is_valid, error_message, resolved_path = validate_path_security(
-            file_path,
-            session_path,
-            operation="read"
+            file_path, session_path, operation="read"
         )
-        
+
         if not is_valid:
             error_info = categorize_uc_merge_error(Exception(error_message))
             return create_error_response(
@@ -170,11 +160,11 @@ async def read_uc_file(
                 context={
                     "session_id": session_id,
                     "file_path": file_path,
-                    "session_path": str(session_path)
+                    "session_path": str(session_path),
                 },
-                next_steps="Provide a valid relative path within the session directory."
+                next_steps="Provide a valid relative path within the session directory.",
             )
-        
+
         # Check if file exists
         if not resolved_path.exists():
             return create_error_response(
@@ -185,17 +175,17 @@ async def read_uc_file(
                     f"Verify the file path is correct: {file_path}",
                     "Check that the file exists in the UC session directory",
                     "Use get_uc_network_customization_guide() to see available files",
-                    "Ensure the session was created successfully with all files copied"
+                    "Ensure the session was created successfully with all files copied",
                 ],
                 context={
                     "session_id": session_id,
                     "file_path": file_path,
                     "resolved_path": str(resolved_path),
-                    "session_path": str(session_path)
+                    "session_path": str(session_path),
                 },
-                next_steps="Verify the file path and retry the operation."
+                next_steps="Verify the file path and retry the operation.",
             )
-        
+
         # Check if it's a file (not a directory)
         if not resolved_path.is_file():
             return create_error_response(
@@ -205,29 +195,29 @@ async def read_uc_file(
                 troubleshooting=[
                     f"The path points to a directory, not a file: {file_path}",
                     "Provide a path to a specific file",
-                    "Use a file path like 'accounts-config.yaml' instead of a directory"
+                    "Use a file path like 'accounts-config.yaml' instead of a directory",
                 ],
                 context={
                     "session_id": session_id,
                     "file_path": file_path,
-                    "resolved_path": str(resolved_path)
+                    "resolved_path": str(resolved_path),
                 },
-                next_steps="Provide a path to a file, not a directory."
+                next_steps="Provide a path to a file, not a directory.",
             )
-        
+
         # Read file content
         try:
             content = resolved_path.read_text(encoding="utf-8")
             size_bytes = resolved_path.stat().st_size
-            
+
             await ctx.info(
                 f"Successfully read {file_path} from session {session_id} "
                 f"({format_file_size(size_bytes)})"
             )
-            
+
             # Get context-aware next steps
             next_steps = get_next_steps_for_uc_file(resolved_path.name)
-            
+
             return create_success_response(
                 data={
                     "session_id": session_id,
@@ -236,9 +226,9 @@ async def read_uc_file(
                     "size_bytes": size_bytes,
                     "size_formatted": format_file_size(size_bytes),
                 },
-                next_steps=next_steps
+                next_steps=next_steps,
             )
-            
+
         except UnicodeDecodeError as e:
             return create_error_response(
                 error_message=f"Failed to decode file as UTF-8: {str(e)}",
@@ -248,14 +238,14 @@ async def read_uc_file(
                     "File may not be a text file or uses a different encoding",
                     "Verify the file is a valid YAML or text configuration file",
                     "Check if the file is corrupted",
-                    "Ensure the file was copied correctly to the session"
+                    "Ensure the file was copied correctly to the session",
                 ],
                 context={
                     "session_id": session_id,
                     "file_path": file_path,
-                    "error": str(e)
+                    "error": str(e),
                 },
-                next_steps="Verify the file is a valid text file and retry."
+                next_steps="Verify the file is a valid text file and retry.",
             )
         except PermissionError as e:
             return create_error_response(
@@ -266,14 +256,14 @@ async def read_uc_file(
                     "Check file system permissions",
                     "Ensure the user has read access to the file",
                     "Verify the file is not locked by another process",
-                    "Check container permissions and volume mounts"
+                    "Check container permissions and volume mounts",
                 ],
                 context={
                     "session_id": session_id,
                     "file_path": file_path,
-                    "resolved_path": str(resolved_path)
+                    "resolved_path": str(resolved_path),
                 },
-                next_steps="Check file permissions and retry."
+                next_steps="Check file permissions and retry.",
             )
         except Exception as e:
             error_info = categorize_uc_merge_error(e)
@@ -286,11 +276,11 @@ async def read_uc_file(
                     "session_id": session_id,
                     "file_path": file_path,
                     "resolved_path": str(resolved_path),
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
                 },
-                next_steps="Check the error details and retry the operation."
+                next_steps="Check the error details and retry the operation.",
             )
-            
+
     except Exception as e:
         logger.error(f"Unexpected error reading UC file: {str(e)}")
         return create_error_response(
@@ -301,12 +291,12 @@ async def read_uc_file(
                 "Check system logs for more details",
                 "Verify the session directory is accessible",
                 "Ensure sufficient system resources",
-                "Try creating a new session"
+                "Try creating a new session",
             ],
             context={
                 "session_id": session_id,
                 "file_path": file_path,
-                "error_type": type(e).__name__
+                "error_type": type(e).__name__,
             },
-            next_steps="Review the error and retry the operation."
+            next_steps="Review the error and retry the operation.",
         )

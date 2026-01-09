@@ -98,7 +98,9 @@ def timeout_decorator(
     return decorator
 
 
-async def run_with_file_timeout(coro: Any, operation_name: str = "file operation") -> Any:
+async def run_with_file_timeout(
+    coro: Any, operation_name: str = "file operation"
+) -> Any:
     """
     Execute a file I/O operation with appropriate timeout.
 

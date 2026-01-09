@@ -129,7 +129,9 @@ class TestGetDeployedLzaVersion:
         mock_sts_client = MockSTSClient()
 
         error = ClientError(
-            error_response={"Error": {"Code": "ParameterNotFound", "Message": "Parameter not found"}},
+            error_response={
+                "Error": {"Code": "ParameterNotFound", "Message": "Parameter not found"}
+            },
             operation_name="GetParameter",
         )
         mock_ssm_client = MockSSMClient(raise_error=error)
@@ -157,7 +159,9 @@ class TestGetDeployedLzaVersion:
         mock_sts_client = MockSTSClient()
 
         error = ClientError(
-            error_response={"Error": {"Code": "AccessDeniedException", "Message": "Access denied"}},
+            error_response={
+                "Error": {"Code": "AccessDeniedException", "Message": "Access denied"}
+            },
             operation_name="GetParameter",
         )
         mock_ssm_client = MockSSMClient(raise_error=error)
@@ -188,7 +192,9 @@ class TestGetDeployedLzaVersion:
         ) as mock_get_session:
             mock_session = Mock()
             mock_sts_client = Mock()
-            mock_sts_client.get_caller_identity.side_effect = Exception("Connection error")
+            mock_sts_client.get_caller_identity.side_effect = Exception(
+                "Connection error"
+            )
             mock_session.client.return_value = mock_sts_client
             mock_get_session.return_value = mock_session
 
@@ -204,7 +210,9 @@ class TestGetDeployedLzaVersion:
         mock_sts_client = MockSTSClient()
 
         error = ClientError(
-            error_response={"Error": {"Code": "InternalServerError", "Message": "Internal error"}},
+            error_response={
+                "Error": {"Code": "InternalServerError", "Message": "Internal error"}
+            },
             operation_name="GetParameter",
         )
         mock_ssm_client = MockSSMClient(raise_error=error)

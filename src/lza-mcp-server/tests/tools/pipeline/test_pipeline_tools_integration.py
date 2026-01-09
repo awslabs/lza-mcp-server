@@ -278,7 +278,9 @@ class TestPipelineToolsIntegration:
         result = await release_func(mock_context, pipeline_name=long_name)
 
         assert result["success"] is False, "Too long pipeline name should fail"
-        assert "exceeds maximum length" in result["error"].lower(), "Should mention length limit"
+        assert "exceeds maximum length" in result["error"].lower(), (
+            "Should mention length limit"
+        )
 
     @pytest.mark.asyncio
     async def test_error_diagnosis_validation(self, mock_context, registered_tools):

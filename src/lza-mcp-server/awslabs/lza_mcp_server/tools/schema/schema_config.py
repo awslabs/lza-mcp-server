@@ -60,16 +60,18 @@ class SchemaSearchConfig:
             return requested_max
 
     @classmethod
-    def get_schema_version_path(cls, version: str, base_dir: str = "/app/json-schemas") -> str:
+    def get_schema_version_path(
+        cls, version: str, base_dir: str = "/app/json-schemas"
+    ) -> str:
         """Get path to schema file for a specific LZA version.
-        
+
         Args:
             version: LZA version (e.g., "v1.12.0") - must be explicit
             base_dir: Base directory containing versioned schemas
-            
+
         Returns:
             Path to combined.json for the specified version
-            
+
         Raises:
             FileNotFoundError: If schema file doesn't exist for version
             ValueError: If version is "latest" (not supported)
@@ -78,16 +80,16 @@ class SchemaSearchConfig:
             raise ValueError(
                 'Version "latest" is not supported. '
                 'Please specify an explicit version (e.g., "v1.12.0"). '
-                'Use listLzaSupportedVersions() to see available versions.'
+                "Use listLzaSupportedVersions() to see available versions."
             )
-        
+
         schema_path = os.path.join(base_dir, version, "combined.json")
-        
+
         if not os.path.exists(schema_path):
             raise FileNotFoundError(
                 f"Schema file not found for version {version}: {schema_path}"
             )
-        
+
         return schema_path
 
 

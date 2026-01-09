@@ -27,10 +27,6 @@ from awslabs.lza_mcp_server.utils.timeout_utils import (
     TimeoutError,
     TimeoutContext,
 )
-from awslabs.lza_mcp_server.constants import (
-    ASYNC_OPERATION_TIMEOUT,
-    FILE_OPERATION_TIMEOUT,
-)
 
 
 @pytest.mark.unit
@@ -45,7 +41,9 @@ class TestTimeoutUtils:
             await asyncio.sleep(0.1)
             return "success"
 
-        result = await with_timeout(quick_operation(), timeout=1.0, operation_name="test")
+        result = await with_timeout(
+            quick_operation(), timeout=1.0, operation_name="test"
+        )
         assert result == "success"
 
     @pytest.mark.asyncio
@@ -57,7 +55,9 @@ class TestTimeoutUtils:
             return "should not reach"
 
         with pytest.raises(TimeoutError) as exc_info:
-            await with_timeout(slow_operation(), timeout=0.5, operation_name="slow test")
+            await with_timeout(
+                slow_operation(), timeout=0.5, operation_name="slow test"
+            )
 
         assert "slow test" in str(exc_info.value)
         assert "0.5 seconds" in str(exc_info.value)
@@ -122,7 +122,9 @@ class TestTimeoutUtils:
 
         with pytest.raises(TimeoutError) as exc_info:
             # Use shorter timeout for testing
-            await with_timeout(slow_file_operation(), timeout=0.5, operation_name="slow file op")
+            await with_timeout(
+                slow_file_operation(), timeout=0.5, operation_name="slow file op"
+            )
 
         assert "slow file op" in str(exc_info.value)
 
@@ -147,7 +149,9 @@ class TestTimeoutUtils:
 
         with pytest.raises(TimeoutError) as exc_info:
             # Use shorter timeout for testing
-            await with_timeout(slow_aws_operation(), timeout=0.5, operation_name="slow aws op")
+            await with_timeout(
+                slow_aws_operation(), timeout=0.5, operation_name="slow aws op"
+            )
 
         assert "slow aws op" in str(exc_info.value)
 
@@ -155,7 +159,7 @@ class TestTimeoutUtils:
     async def test_timeout_context_success(self):
         """Test timeout context manager with successful operation."""
 
-        async with TimeoutContext(1.0, "context test") as ctx:
+        async with TimeoutContext(1.0, "context test"):
             await asyncio.sleep(0.1)
             result = "context success"
 
@@ -164,17 +168,17 @@ class TestTimeoutUtils:
     @pytest.mark.asyncio
     async def test_timeout_context_exceeds(self):
         """Test timeout context manager with timeout - note: context manager doesn't enforce timeout."""
-        
+
         # TimeoutContext is a simple context manager that doesn't enforce timeouts
         # It only handles asyncio.TimeoutError if raised within the context
         # For actual timeout enforcement, use with_timeout() or timeout_decorator()
-        
+
         # This test verifies the context manager handles the timeout error correctly
         async def operation_with_timeout():
             async with TimeoutContext(0.5, "slow context"):
                 # Use asyncio.wait_for to actually enforce the timeout
                 await asyncio.wait_for(asyncio.sleep(2.0), timeout=0.5)
-        
+
         with pytest.raises(TimeoutError) as exc_info:
             await operation_with_timeout()
 
@@ -190,7 +194,9 @@ class TestTimeoutUtils:
             raise ValueError("Test error")
 
         with pytest.raises(ValueError) as exc_info:
-            await with_timeout(failing_operation(), timeout=1.0, operation_name="failing test")
+            await with_timeout(
+                failing_operation(), timeout=1.0, operation_name="failing test"
+            )
 
         assert "Test error" in str(exc_info.value)
 

@@ -38,10 +38,10 @@ async def tool_search_json_schema(
 ) -> Dict[str, Any]:
     """Search JSON schemas using different search strategies.
 
-    This tool searches ACROSS ALL SCHEMAS for the specified LZA version. To retrieve a 
+    This tool searches ACROSS ALL SCHEMAS for the specified LZA version. To retrieve a
     specific schema or property within a schema, use getFullSchema instead.
-    
-    RECOMMENDED WORKFLOW: Call getDeployedLzaVersion() first to get the correct lza_version 
+
+    RECOMMENDED WORKFLOW: Call getDeployedLzaVersion() first to get the correct lza_version
     parameter that matches your deployed environment.
 
     The tool supports multiple search strategies:
@@ -76,7 +76,7 @@ async def tool_search_json_schema(
 
     Returns:
         Dictionary containing search results with matching schemas, relevance scores, and match locations
-        
+
     Note:
         This tool does NOT support schema_path parameter. It always searches across all schemas
         for the specified LZA version. For schema-specific queries, use getFullSchema with the
@@ -95,7 +95,7 @@ async def tool_search_json_schema(
                 "message": "Invalid LZA version format",
                 "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
             }
-        
+
         if not lza_version:
             error_message = "lza_version parameter is required"
             await ctx.error(error_message)
@@ -105,7 +105,7 @@ async def tool_search_json_schema(
                 "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
                 "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
             }
-        
+
         # Validate search_terms
         if not search_terms or not isinstance(search_terms, list):
             error_message = "search_terms must be a non-empty list"
@@ -115,7 +115,7 @@ async def tool_search_json_schema(
                 "error": error_message,
                 "message": "Please provide search terms as a list of strings",
             }
-        
+
         for term in search_terms:
             is_valid, validation_error = validate_string_input(
                 term, "search_term", min_length=1, max_length=200
@@ -127,7 +127,7 @@ async def tool_search_json_schema(
                     "error": validation_error,
                     "message": "Invalid search term format",
                 }
-        
+
         # Validate max_results
         is_valid, validation_error = validate_integer_range(
             max_results, "max_results", min_value=1, max_value=100
@@ -139,9 +139,15 @@ async def tool_search_json_schema(
                 "error": validation_error,
                 "message": "max_results must be between 1 and 100",
             }
-        
+
         # Validate search_type
-        valid_search_types = ["general", "property", "pattern", "relationship", "complexity"]
+        valid_search_types = [
+            "general",
+            "property",
+            "pattern",
+            "relationship",
+            "complexity",
+        ]
         if search_type not in valid_search_types:
             error_message = f"Invalid search_type: {search_type}. Must be one of: {', '.join(valid_search_types)}"
             await ctx.error(error_message)
@@ -150,7 +156,7 @@ async def tool_search_json_schema(
                 "error": error_message,
                 "message": f"search_type must be one of: {', '.join(valid_search_types)}",
             }
-        
+
         # Validate format_level
         valid_format_levels = ["minimal", "standard", "detailed"]
         if format_level not in valid_format_levels:
@@ -161,7 +167,7 @@ async def tool_search_json_schema(
                 "error": error_message,
                 "message": f"format_level must be one of: {', '.join(valid_format_levels)}",
             }
-        
+
         # Reject "latest" to ensure version-specific searches
         if lza_version.lower() == "latest":
             error_message = "The 'latest' version is not allowed for schema searches"
@@ -188,16 +194,21 @@ async def tool_search_json_schema(
                 available_versions = []
                 schemas_base = "/app/json-schemas"
                 if os.path.exists(schemas_base):
-                    available_versions = [d for d in os.listdir(schemas_base) 
-                                        if os.path.isdir(os.path.join(schemas_base, d))]
-                
+                    available_versions = [
+                        d
+                        for d in os.listdir(schemas_base)
+                        if os.path.isdir(os.path.join(schemas_base, d))
+                    ]
+
                 error_message = f"LZA version '{lza_version}' not found"
                 await ctx.error(error_message)
                 return {
                     "success": False,
                     "error": error_message,
                     "message": f"The specified LZA version '{lza_version}' is not available.",
-                    "available_versions": available_versions if available_versions else ["No versions found"],
+                    "available_versions": available_versions
+                    if available_versions
+                    else ["No versions found"],
                     "hint": "Call getDeployedLzaVersion() to get the correct version, or use listLzaSupportedVersions() to see all available versions",
                 }
             else:
@@ -216,7 +227,7 @@ async def tool_search_json_schema(
         # Import schema_search module
         # Try multiple import strategies to handle different deployment scenarios
         search_json_schemas = None
-        
+
         # Strategy 1: Try direct import (works if schema_search is in PYTHONPATH)
         try:
             from schema_search import search_json_schemas
@@ -224,7 +235,7 @@ async def tool_search_json_schema(
             await ctx.info("Successfully imported schema_search module (direct import)")
         except ImportError:
             pass
-        
+
         # Strategy 2: Try relative to this file's location
         if search_json_schemas is None:
             try:
@@ -239,25 +250,31 @@ async def tool_search_json_schema(
                 await ctx.info(f"Imported schema_search from {json_schema_dir_abs}")
             except ImportError:
                 pass
-        
+
         # Strategy 3: Try relative to package root
         if search_json_schemas is None:
             try:
                 # Get package root (awslabs/lza_mcp_server)
-                package_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                package_root = os.path.dirname(
+                    os.path.dirname(os.path.dirname(__file__))
+                )
                 json_schema_dir = os.path.join(package_root, "../../json-schema/src")
                 json_schema_dir_abs = os.path.abspath(json_schema_dir)
                 if json_schema_dir_abs not in sys.path:
                     sys.path.insert(0, json_schema_dir_abs)
                 from schema_search import search_json_schemas
 
-                await ctx.info(f"Imported schema_search from package root: {json_schema_dir_abs}")
+                await ctx.info(
+                    f"Imported schema_search from package root: {json_schema_dir_abs}"
+                )
             except ImportError:
                 pass
-        
+
         # If all strategies failed, return error
         if search_json_schemas is None:
-            error_message = "Failed to import schema_search module after trying multiple strategies"
+            error_message = (
+                "Failed to import schema_search module after trying multiple strategies"
+            )
             await ctx.error(error_message)
             await ctx.error(f"Current sys.path: {sys.path}")
             await ctx.error(f"Current __file__: {__file__}")

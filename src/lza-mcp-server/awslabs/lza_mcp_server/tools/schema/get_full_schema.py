@@ -95,7 +95,10 @@ def _build_property_result(
 
 
 def _build_full_schema_result(
-    schema_path: str, target_schema: Dict[str, Any], include_metadata: bool, lza_version: str
+    schema_path: str,
+    target_schema: Dict[str, Any],
+    include_metadata: bool,
+    lza_version: str,
 ) -> Dict[str, Any]:
     """Build the result dictionary for a full schema."""
     result = {
@@ -125,8 +128,8 @@ async def tool_get_full_schema(
     This tool retrieves complete schema information for detailed analysis. It's typically
     used after finding schemas with searchJsonSchema when you need to examine the full
     structure or a specific property within a schema.
-    
-    RECOMMENDED WORKFLOW: Call getDeployedLzaVersion() first to get the correct lza_version 
+
+    RECOMMENDED WORKFLOW: Call getDeployedLzaVersion() first to get the correct lza_version
     parameter that matches your deployed environment.
 
     The tool can return:
@@ -163,7 +166,7 @@ async def tool_get_full_schema(
                 "message": "Invalid LZA version format",
                 "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
             }
-        
+
         if not lza_version:
             error_message = "lza_version parameter is required"
             await ctx.error(error_message)
@@ -173,7 +176,7 @@ async def tool_get_full_schema(
                 "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
                 "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
             }
-        
+
         # Validate schema_path parameter
         is_valid, validation_error = validate_json_schema_path(schema_path)
         if not is_valid:
@@ -183,7 +186,7 @@ async def tool_get_full_schema(
                 "error": validation_error,
                 "message": "Invalid schema path format",
             }
-        
+
         # Validate property_path if provided
         if property_path:
             is_valid, validation_error = validate_string_input(
@@ -196,7 +199,7 @@ async def tool_get_full_schema(
                     "error": validation_error,
                     "message": "Invalid property path format",
                 }
-        
+
         # Reject "latest" to ensure version-specific searches
         if lza_version.lower() == "latest":
             error_message = "The 'latest' version is not allowed for schema retrieval"
@@ -214,7 +217,9 @@ async def tool_get_full_schema(
             await ctx.info(f"Looking for specific property path: {property_path}")
 
         # Use version-specific path
-        combined_schema_path = os.path.join("/app/json-schemas", lza_version, "combined.json")
+        combined_schema_path = os.path.join(
+            "/app/json-schemas", lza_version, "combined.json"
+        )
 
         if not os.path.exists(combined_schema_path):
             # Check if version directory exists to provide better error message
@@ -223,16 +228,21 @@ async def tool_get_full_schema(
                 available_versions = []
                 schemas_base = "/app/json-schemas"
                 if os.path.exists(schemas_base):
-                    available_versions = [d for d in os.listdir(schemas_base) 
-                                        if os.path.isdir(os.path.join(schemas_base, d))]
-                
+                    available_versions = [
+                        d
+                        for d in os.listdir(schemas_base)
+                        if os.path.isdir(os.path.join(schemas_base, d))
+                    ]
+
                 error_message = f"LZA version '{lza_version}' not found"
                 await ctx.error(error_message)
                 return {
                     "success": False,
                     "error": error_message,
                     "message": f"The specified LZA version '{lza_version}' is not available.",
-                    "available_versions": available_versions if available_versions else ["No versions found"],
+                    "available_versions": available_versions
+                    if available_versions
+                    else ["No versions found"],
                     "hint": "Call getDeployedLzaVersion() to get the correct version, or use listLzaSupportedVersions() to see all available versions",
                 }
             else:
@@ -249,7 +259,9 @@ async def tool_get_full_schema(
             await ctx.info(f"Looking for specific property path: {property_path}")
 
         # Use version-specific path
-        combined_schema_path = os.path.join("/app/json-schemas", lza_version, "combined.json")
+        combined_schema_path = os.path.join(
+            "/app/json-schemas", lza_version, "combined.json"
+        )
 
         if not os.path.exists(combined_schema_path):
             # Check if version directory exists to provide better error message
@@ -258,16 +270,21 @@ async def tool_get_full_schema(
                 available_versions = []
                 schemas_base = "/app/json-schemas"
                 if os.path.exists(schemas_base):
-                    available_versions = [d for d in os.listdir(schemas_base) 
-                                        if os.path.isdir(os.path.join(schemas_base, d))]
-                
+                    available_versions = [
+                        d
+                        for d in os.listdir(schemas_base)
+                        if os.path.isdir(os.path.join(schemas_base, d))
+                    ]
+
                 error_message = f"LZA version '{lza_version}' not found"
                 await ctx.error(error_message)
                 return {
                     "success": False,
                     "error": error_message,
                     "message": f"The specified LZA version '{lza_version}' is not available.",
-                    "available_versions": available_versions if available_versions else ["No versions found"],
+                    "available_versions": available_versions
+                    if available_versions
+                    else ["No versions found"],
                     "hint": "Specify a version like 'v1.12.0'",
                 }
             else:
@@ -335,7 +352,9 @@ async def tool_get_full_schema(
                     "message": f"The property path '{property_path}' could not be processed.",
                 }
 
-        return _build_full_schema_result(schema_path, target_schema, include_metadata, lza_version)
+        return _build_full_schema_result(
+            schema_path, target_schema, include_metadata, lza_version
+        )
 
     except Exception as e:
         await ctx.error(f"Unexpected error: {str(e)}")
