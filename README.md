@@ -74,6 +74,31 @@ finch build -f Dockerfile.local -t lza-mcp-server:local .
 
 **Resource Limits**: The container is configured with 1 CPU and 1GB memory limit (512MB reserved) to prevent resource exhaustion and ensure stable operation.
 
+### Container Security Hardening
+
+For enhanced security against container escape vulnerabilities, add these flags:
+
+```bash
+finch run -d \
+  --name lza-mcp-server \
+  --security-opt=no-new-privileges:true \
+  --cap-drop=ALL \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=200m \
+  -p 8000:8000 \
+  -v ~/.aws:/home/lzauser/.aws:ro \
+  -v ~/Documents/lza-config:/app/lza-config \
+  lza-mcp-server:local
+```
+
+**Security flags:**
+- `--security-opt=no-new-privileges:true`: Prevents privilege escalation
+- `--cap-drop=ALL`: Removes all Linux capabilities
+- `--read-only`: Makes root filesystem read-only (except mounted volumes)
+- `--tmpfs /tmp`: Provides writable temp space with noexec
+
+**Note**: Keep Docker/Finch updated for the latest security patches.
+
 ### MCP Server Configuration
 
 The LZA MCP server can be configured for use with any MCP-compatible client (Amazon Q, Claude Desktop, Kiro IDE, etc.).
@@ -94,6 +119,11 @@ Add this configuration to your MCP settings file. Replace the placeholder paths 
       "args": [
         "docker",
         "run",
+        "--security-opt=no-new-privileges:true",
+        "--cap-drop=ALL",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=200m",
         "--rm",
         "-i",
         "-v",
@@ -194,6 +224,11 @@ Tools that modify AWS resources (like `releasePipeline` and `uploadConfiguration
       "args": [
         "docker",
         "run",
+        "--security-opt=no-new-privileges:true",
+        "--cap-drop=ALL",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=200m",
         "--rm",
         "-i",
         "-v",
