@@ -73,7 +73,7 @@ release: clean-cache py-compile format lint type-check security-check test-cover
 	@echo "  ✓ Type checking passed"
 	@echo "  ✓ Security analysis passed"
 	@echo "  ✓ Dependency vulnerabilities checked"
-	@echo "  ✓ All tests passed with coverage ≥38%"
+	@echo "  ✓ All tests passed with coverage ≥59%"
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
 
@@ -136,7 +136,7 @@ lint:
 # Type checking
 type-check:
 	@echo "🔬 Running type checks with mypy..."
-	@poetry run mypy awslabs/ --ignore-missing-imports --no-strict-optional || true
+	@poetry run mypy awslabs/ --ignore-missing-imports --no-strict-optional
 	@echo "✅ Type checking complete"
 
 # Security analysis
@@ -225,7 +225,7 @@ test-coverage:
 		--cov-report=term-missing \
 		--cov-report=xml \
 		--cov-branch \
-		--cov-fail-under=38 \
+		--cov-fail-under=59 \
 		-n auto \
 		--dist=worksteal \
 		--tb=short
