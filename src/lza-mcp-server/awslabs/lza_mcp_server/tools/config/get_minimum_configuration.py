@@ -152,7 +152,7 @@ async def tool_get_minimum_configuration(
             "message": "Configuration templates not found. Please contact the administrator.",
         }
 
-    result = {}
+    result: dict[str, Any] = {}
 
     # Return specific config type if requested
     if config_type:

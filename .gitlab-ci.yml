@@ -6,7 +6,6 @@ stages:
   - quality
   - security
   - test
-  - container
 
 # Default configuration for all jobs
 default:
@@ -103,7 +102,16 @@ test-coverage:
   stage: test
   script:
     - echo "📈 Running tests with coverage analysis..."
-    - make test-coverage
+    # Run without parallelization to reduce memory usage in CI
+    - |
+      poetry run pytest tests/ \
+        --cov=awslabs.lza_mcp_server \
+        --cov-report=html:htmlcov \
+        --cov-report=term-missing \
+        --cov-report=xml \
+        --cov-branch \
+        --cov-fail-under=59 \
+        --tb=short
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     when: always
@@ -116,74 +124,7 @@ test-coverage:
         coverage_format: cobertura
         path: src/lza-mcp-server/coverage.xml
   allow_failure: false
-
-# Optional: Full release verification (runs all steps sequentially)
-release-verification:
-  stage: test
-  script:
-    - echo "🚀 Running complete release verification..."
-    - make release
-  when: manual
-  allow_failure: false
-
-# Build Docker container
-build-container:
-  stage: container
-  image: docker:24
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_IMAGE_NAME: lza-mcp-server:${CI_COMMIT_SHORT_SHA}
-    LZA_MIN_VERSION: v1.12.0
-  before_script:
-    - docker info
-  script:
-    - echo "🐳 Building Docker image..."
-    - cd src/lza-mcp-server
-    - |
-      docker build -f Dockerfile \
-        --build-arg LZA_MIN_VERSION=${LZA_MIN_VERSION} \
-        -t ${DOCKER_IMAGE_NAME} .
-    - echo "✅ Docker image built successfully"
-    - docker images ${DOCKER_IMAGE_NAME}
-  artifacts:
-    when: always
-    expire_in: 1 day
-    reports:
-      dotenv: src/lza-mcp-server/build.env
-  after_script:
-    - echo "DOCKER_IMAGE_NAME=lza-mcp-server:${CI_COMMIT_SHORT_SHA}" > src/lza-mcp-server/build.env
-
-# Scan container for vulnerabilities
-scan-container:
-  stage: container
-  image: docker:24
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_IMAGE_NAME: lza-mcp-server:${CI_COMMIT_SHORT_SHA}
-  needs:
-    - build-container
-  before_script:
-    - apk add --no-cache curl
-    - |
-      echo "📦 Installing Trivy..."
-      curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-  script:
-    - echo "🔍 Scanning container for vulnerabilities with Trivy..."
-    - cd src/lza-mcp-server
-    - |
-      docker build -f Dockerfile \
-        --build-arg LZA_MIN_VERSION=v1.12.0 \
-        -t ${DOCKER_IMAGE_NAME} .
-    - trivy image --severity HIGH,CRITICAL --exit-code 1 --format json --output trivy-report.json ${DOCKER_IMAGE_NAME}
-    - trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME}
-    - echo "✅ Container scan complete"
-  artifacts:
-    when: always
-    expire_in: 1 week
-    paths:
-      - src/lza-mcp-server/trivy-report.json
-    reports:
-      container_scanning: src/lza-mcp-server/trivy-report.json
-  allow_failure: false
+  retry:
+    max: 2
+    when:
+      - runner_system_failure

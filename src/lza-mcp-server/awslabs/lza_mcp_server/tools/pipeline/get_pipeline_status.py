@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import os
+from datetime import datetime
 from typing import Dict, Any, Optional
 
 from botocore.exceptions import ClientError
@@ -32,8 +33,8 @@ logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 
 # Simple cache implementation
-_pipeline_cache = {}
-_cache_timestamps = {}
+_pipeline_cache: dict[str, dict] = {}
+_cache_timestamps: dict[str, datetime] = {}
 
 
 def get_cached_pipeline_metadata(pipeline_name: str):
