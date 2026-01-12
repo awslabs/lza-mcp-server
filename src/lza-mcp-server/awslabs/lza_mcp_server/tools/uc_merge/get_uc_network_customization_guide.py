@@ -119,9 +119,9 @@ def _scan_configuration_files(session_path: Path) -> Dict[str, list[str]]:
         - policy_directories: Directories containing policies
         - supporting_directories: Other supporting directories
     """
-    config_files = []
-    policy_directories = []
-    supporting_directories = []
+    config_files: list[str] = []
+    policy_directories: list[str] = []
+    supporting_directories: list[str] = []
 
     if not session_path.exists():
         return {

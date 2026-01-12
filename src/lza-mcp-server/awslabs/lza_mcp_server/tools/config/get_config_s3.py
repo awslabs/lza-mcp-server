@@ -417,7 +417,7 @@ class S3ConfigRetrieval:
         Returns:
             Dictionary with file counts, directory structure, etc.
         """
-        metadata = {
+        metadata: dict[str, Any] = {
             "file_count": 0,
             "directory_count": 0,
             "root_files": [],
@@ -441,7 +441,7 @@ class S3ConfigRetrieval:
                     metadata["root_folders"] = sorted(dirs)
 
             # Build hierarchical structure (max depth: 2 levels for performance)
-            root_structure = metadata["structure"]["root"]
+            root_structure: dict = metadata["structure"]["root"]
 
             # Add root files
             root_structure["files"] = metadata["root_files"]
@@ -449,7 +449,7 @@ class S3ConfigRetrieval:
             # Add first level directories and their contents
             for folder in metadata["root_folders"]:
                 folder_path = os.path.join(extract_path, folder)
-                folder_structure = {"files": [], "directories": {}}
+                folder_structure: dict[str, Any] = {"files": [], "directories": {}}
 
                 if os.path.isdir(folder_path):
                     try:

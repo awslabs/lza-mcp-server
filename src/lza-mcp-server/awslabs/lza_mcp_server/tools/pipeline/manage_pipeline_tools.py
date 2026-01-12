@@ -35,8 +35,8 @@ logger = logging.getLogger(__name__)
 
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 
-_pipeline_cache = {}
-_cache_timestamps = {}
+_pipeline_cache: dict[str, dict] = {}
+_cache_timestamps: dict[str, datetime] = {}
 
 
 def is_cache_valid(cache_key: str) -> bool:

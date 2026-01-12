@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "awslabs.lza-mcp-server"
+name = "awslabs-lza-mcp-server"
 version = "0.1.0"
 description = "An AWS Labs Model Context Protocol (MCP) server for AWS Landing Zone Accelerator"
 authors = ["Amazon Web Services"]
@@ -47,9 +47,10 @@ ruff = ">=0.1.0"
 mypy = ">=1.8.0"
 bandit = ">=1.7.0"
 pip-audit = ">=2.7.0"
+types-pyyaml = "^6.0.12.20250915"
 
 [tool.poetry.scripts]
-"awslabs.lza-mcp-server" = "awslabs.lza_mcp_server.server:main"
+"awslabs-lza-mcp-server" = "awslabs.lza_mcp_server.server:main"
 
 [build-system]
 requires = ["poetry-core"]
@@ -151,3 +152,21 @@ title = "LZA MCP Server Coverage Report"
 
 [tool.coverage.xml]
 output = "coverage.xml"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+no_strict_optional = true
+exclude = [
+    "tests/",
+    "build/",
+    "dist/",
+    ".venv/",
+    "venv/",
+]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "."

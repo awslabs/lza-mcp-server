@@ -257,7 +257,7 @@ async def tool_diagnose_pipeline_errors(
         )
         stage_states = state_response["stageStates"]
 
-        failed_actions = []
+        failed_actions: list[dict] = []
 
         # Iterate through stages to find failed actions - simplified approach using pipeline state
         for stage_state in stage_states:

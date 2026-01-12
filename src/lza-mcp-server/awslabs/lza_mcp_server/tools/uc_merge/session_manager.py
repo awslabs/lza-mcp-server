@@ -244,7 +244,7 @@ class SessionManager:
         Returns:
             List of session information dictionaries
         """
-        sessions = []
+        sessions: list[Dict[str, Any]] = []
 
         if not self.base_session_dir.exists():
             return sessions
