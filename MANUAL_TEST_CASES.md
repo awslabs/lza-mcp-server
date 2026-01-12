@@ -17,8 +17,8 @@ This document provides step-by-step instructions for manually testing the LZA MC
 cd ~/xdev/mte/lza-mcp-server/src/lza-mcp-server
 make release
 
-# Build using Dockerfile.local for local development
-finch build -f Dockerfile.local -t lza-mcp-server:local .
+# Build Docker image
+finch build -t lza-mcp-server:local .
 
 # Or use docker-compose (recommended)
 finch compose up --build
@@ -229,7 +229,7 @@ Get the complete LZA configuration schema for network-config.json with metadata 
 
 3. **Container build failures:**
    - Check Finch VM is running: `finch vm start`
-   - Use correct dockerfile: `finch build -f Dockerfile.local -t lza-mcp-server:local .`
+   - Build with: `finch build -t lza-mcp-server:local .`
    - Or use docker-compose: `finch compose up --build`
    - Check for network connectivity issues
 
