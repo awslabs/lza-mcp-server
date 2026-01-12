@@ -20,11 +20,14 @@ classifiers = [
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
 boto3 = ">=1.37.27"
-mcp = {extras = ["cli"], version = ">=1.6.0"}
+mcp = {extras = ["cli"], version = ">=1.23.0"}
 pydantic = ">=2.10.6"
 PyYAML = ">=6.0"
 loguru = ">=0.7.0"
 psutil = ">=5.9.0"
+starlette = ">=0.49.1"
+urllib3 = ">=2.6.3"
+werkzeug = ">=3.1.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
@@ -72,7 +75,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--cov-branch",
-    "--cov-fail-under=40"
+    "--cov-fail-under=59"
 ]
 markers = [
     "unit: Unit tests (no external dependencies)",
@@ -140,7 +143,7 @@ show_missing = true
 precision = 2
 skip_covered = false
 skip_empty = false
-fail_under = 40
+fail_under = 59
 
 [tool.coverage.html]
 directory = "htmlcov"
