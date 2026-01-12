@@ -11,14 +11,14 @@ LZA_MIN_VERSION ?= v1.12.0
 LZA_MAX_VERSION ?=
 DOCKER_IMAGE_NAME ?= lza-mcp-server:local
 
-.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache release lint format security-check type-check py-compile build-local run-local
+.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache release lint format security-check type-check py-compile build run
 
 # Default target
 help:
 	@echo "🚀 LZA MCP Server Test Performance Commands"
 	@echo ""
 	@echo "Configuration:"
-	@echo "  LZA_MIN_VERSION=$(LZA_MIN_VERSION)  (override with: make build-local LZA_MIN_VERSION=v1.10.0)"
+	@echo "  LZA_MIN_VERSION=$(LZA_MIN_VERSION)  (override with: make build LZA_MIN_VERSION=v1.10.0)"
 	@echo "  LZA_MAX_VERSION=$(LZA_MAX_VERSION)  (empty = latest)"
 	@echo "  DOCKER_IMAGE_NAME=$(DOCKER_IMAGE_NAME)"
 	@echo ""
@@ -36,8 +36,8 @@ help:
 	@echo "  scan-container     Scan Docker image for vulnerabilities with Trivy (optional)"
 	@echo ""
 	@echo "Docker Commands:"
-	@echo "  build-local        Build local development Docker image"
-	@echo "  run-local          Run local Docker container with validation support"
+	@echo "  build              Build Docker image"
+	@echo "  run                Run Docker container with validation support"
 	@echo ""
 	@echo "Comprehensive Testing:"
 	@echo "  test               Run all tests with standard configuration"
@@ -52,7 +52,7 @@ help:
 	@echo "  make test-fast     # Quick feedback during development"
 	@echo "  make test-parallel # Full test suite with parallelization"
 	@echo "  make test-coverage # Generate coverage report"
-	@echo "  make build-local LZA_MIN_VERSION=v1.10.0  # Build with custom version"
+	@echo "  make build LZA_MIN_VERSION=v1.10.0  # Build with custom version"
 
 # Python syntax validation
 py-compile:
@@ -77,13 +77,13 @@ release: clean-cache py-compile format lint type-check security-check test-cover
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
 
-# Build local development Docker image
-build-local:
-	@echo "🐳 Building local development Docker image..."
+# Build Docker image
+build:
+	@echo "🐳 Building Docker image..."
 	@echo "  LZA_MIN_VERSION: $(LZA_MIN_VERSION)"
 	@echo "  LZA_MAX_VERSION: $(LZA_MAX_VERSION)"
 	@echo "  This will clone LZA versions and generate schemas during build"
-	@docker build -f Dockerfile.local \
+	@docker build -f Dockerfile \
 		--build-arg LZA_MIN_VERSION=$(LZA_MIN_VERSION) \
 		$(if $(LZA_MAX_VERSION),--build-arg LZA_MAX_VERSION=$(LZA_MAX_VERSION),) \
 		-t $(DOCKER_IMAGE_NAME) .
@@ -96,12 +96,12 @@ build-local:
 	@echo "  Max Version: $(if $(LZA_MAX_VERSION),$(LZA_MAX_VERSION),latest)"
 	@echo ""
 	@echo "💡 Custom build examples:"
-	@echo "  make build-local LZA_MIN_VERSION=v1.10.0"
-	@echo "  make build-local LZA_MIN_VERSION=v1.10.0 LZA_MAX_VERSION=v1.13.0"
+	@echo "  make build LZA_MIN_VERSION=v1.10.0"
+	@echo "  make build LZA_MIN_VERSION=v1.10.0 LZA_MAX_VERSION=v1.13.0"
 
-# Run local Docker container with validation support
-run-local:
-	@echo "🚀 Starting local Docker container..."
+# Run Docker container with validation support
+run:
+	@echo "🚀 Starting Docker container..."
 	@echo "  Image: $(DOCKER_IMAGE_NAME)"
 	@echo "  Mounting AWS credentials and validation share directory"
 	@docker run -d \
@@ -118,6 +118,8 @@ run-local:
 	@echo "  AWS Creds: ~/.aws (read-only)"
 	@echo "  Validation Share: ~/Documents/lza-config"
 	@echo ""
+	@echo "🔍 View logs: docker logs -f lza-mcp-server"
+	@echo "🛑 Stop: docker stop lza-mcp-server && docker rm lza-mcp-server"
 	@echo "🔍 View logs: docker logs -f lza-mcp-server"
 	@echo "🛑 Stop: docker stop lza-mcp-server && docker rm lza-mcp-server"
 

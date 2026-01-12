@@ -53,13 +53,13 @@ finch build -t lza-mcp-server:lambda .
 #### For Local Development
 ```bash
 # Build local development image
-make build-local
+make build
 
 # Run locally
-make run-local
+make run
 
 # Or build/run manually
-finch build -f Dockerfile.local --build-arg LZA_MIN_VERSION=v1.12.0 -t lza-mcp-server:local .
+finch build --build-arg LZA_MIN_VERSION=v1.12.0 -t lza-mcp-server:local .
 finch run -d \
   --name lza-mcp-server \
   -p 8000:8000 \
@@ -73,11 +73,11 @@ finch run -d \
 # Start Finch VM if not running
 finch vm start
 
-# Build and run using docker-compose (uses Dockerfile.local)
+# Build and run using docker-compose
 finch compose up --build
 
-# Or build manually with local dockerfile
-finch build -f Dockerfile.local -t lza-mcp-server:local .
+# Or build manually
+finch build -t lza-mcp-server:local .
 ```
 
 **Resource Limits**: The container is configured with 1 CPU and 1GB memory limit (512MB reserved) to prevent resource exhaustion and ensure stable operation.
@@ -446,10 +446,10 @@ Schemas are automatically generated when building the Docker image:
 
 ```bash
 # Build local image (generates schemas automatically)
-make build-local
+make build
 
 # Or specify custom version range
-finch build -f Dockerfile.local \
+finch build \
   --build-arg LZA_MIN_VERSION=v1.10.0 \
   --build-arg LZA_MAX_VERSION=v1.14.0 \
   -t lza-mcp-server:local .
@@ -509,10 +509,10 @@ Control which release is downloaded:
 
 ```bash
 # Use latest release (default)
-make build-local
+make build
 
 # Specify a version
-finch build -f Dockerfile.local \
+finch build \
   --build-arg LZA_UC_RELEASE=v1.0.0 \
   -t lza-mcp-server:local .
 ```
@@ -652,7 +652,7 @@ getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
 ## Troubleshooting
 
 ### Schema Issues
-- **Schema file not found**: Rebuild Docker image with `make build-local`
+- **Schema file not found**: Rebuild Docker image with `make build`
 - **Search returns no results**: Verify Docker image was built successfully
 - **Outdated schemas**: Rebuild Docker image to get latest LZA schemas
 - **Network issues during build**: Check internet connectivity for GitHub access during Docker build
@@ -664,7 +664,6 @@ getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
 - **Finch VM not started**: Run `finch vm start` before using Finch commands
 - **Build context errors**: Ensure you're running commands from the correct directory with all required files
 - **AWS credentials warnings**: Set environment variables or use AWS credential files
-- **Local vs Lambda builds**: Use `Dockerfile.local` for local development, default `Dockerfile` for Lambda deployment
 - **Missing schema in container**: Schemas are generated during build - rebuild image if missing
 - **Build fails during LZA clone**: Check network connectivity and GitHub access
 
