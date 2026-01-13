@@ -1,9 +1,84 @@
-.DS_Store
-lza-mcp-server/src/lza-mcp-server/htmlcov
-lza-mcp-server/src/lza-mcp-server/.coverage
-lza-mcp-server/src/lza-mcp-server/coverage.xml.kiro/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-.kiro/
+# Virtual environments
+.venv
+env/
+venv/
+ENV/
+temp/
+
+# Testing
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+coverage_history.db
+htmlcov/
+coverage-dashboard/
+.pytest_cache/
+bandit-report.json
 
 # Hypothesis test artifacts
 .hypothesis/
+
+# Ruff
+.ruff_cache/
+
+# Mypy
+.mypy_cache/
+
+# Build
+*.manifest
+*.spec
+.pybuilder/
+target/
+
+# Environments
+.env
+.env.local
+.env.*.local
+
+# PyPI
+.pypirc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# AI Assistant directories
+.amazonq/
+.bedrock-engineer/
+.kiro/
+
+# macOS
+.DS_Store
+
+# Project specific
+json-output/
+src/lza-mcp-server/htmlcov/
+src/lza-mcp-server/.coverage
+src/lza-mcp-server/coverage.xml
