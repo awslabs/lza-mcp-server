@@ -16,10 +16,9 @@
 
 import logging
 import os
+import tempfile
+import zipfile
 from typing import Dict, Any, Optional
-
-# AWS SDK
-import boto3
 
 # MCP framework components
 from mcp.server.fastmcp import Context
@@ -34,6 +33,7 @@ from awslabs.lza_mcp_server.utils.input_validation import (
     validate_file_path,
     validate_s3_bucket_name,
 )
+from awslabs.lza_mcp_server.tools.uc_merge.common import get_extracted_lza_config_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,79 +42,100 @@ S3_OBJECT_KEY = "zipped/aws-accelerator-config.zip"
 BUCKET_NAME_PATTERN = "aws-accelerator-config-{account_id}-{region}"
 
 
-def detect_lza_bucket() -> Optional[str]:
-    """Detect LZA bucket name from AWS environment.
+async def _detect_retrieved_config_context(ctx: Context) -> Dict[str, Any]:
+    """
+    Detect if getConfigurationFromS3() was recently used by checking for extracted config.
 
-    This is a placeholder function for test compatibility.
-    In real implementation, this would detect the actual LZA bucket.
+    This checks for the extracted configuration directory created by getConfigurationFromS3().
+
+    Returns:
+        Dict with detection result and retrieved config context
     """
     try:
-        # This is a simplified implementation for test compatibility
-        # In practice, this would use AWS APIs to detect the actual bucket
-        session = boto3.Session()
-        sts = session.client("sts")
-        account_id = sts.get_caller_identity()["Account"]
-        region = session.region_name or "us-east-1"
-        return f"aws-accelerator-config-{account_id}-{region}"
-    except Exception:
-        return None
+        # Check if extracted config path is set
+        extracted_path = get_extracted_lza_config_path()
+
+        if (
+            extracted_path
+            and os.path.exists(extracted_path)
+            and os.path.isdir(extracted_path)
+        ):
+            import time
+
+            # Check directory age
+            dir_age = time.time() - os.path.getmtime(extracted_path)
+
+            # Check if directory has LZA config files
+            required_files = ["accounts-config.yaml", "global-config.yaml"]
+            has_config_files = all(
+                os.path.exists(os.path.join(extracted_path, f)) for f in required_files
+            )
+
+            if has_config_files:
+                await ctx.info(
+                    f"✅ Detected extracted config from getConfigurationFromS3(): {extracted_path}"
+                )
+                return {
+                    "detected": True,
+                    "config_path": str(extracted_path),
+                    "age_seconds": dir_age,
+                    "source": "getConfigurationFromS3",
+                }
+            else:
+                await ctx.info(
+                    f"Found directory at {extracted_path} but missing required config files"
+                )
+
+        return {"detected": False}
+
+    except Exception as e:
+        await ctx.error(f"Error detecting retrieved config context: {str(e)}")
+        return {"detected": False, "error": str(e)}
 
 
-async def _handle_share_to_s3_upload(
-    ctx: Context, bucket_name: Optional[str], offer_pipeline_release: bool
+async def _handle_retrieved_config_upload(
+    ctx: Context,
+    retrieved_config_context: Dict[str, Any],
+    bucket_name: Optional[str],
+    offer_pipeline_release: bool,
 ) -> Dict[str, Any]:
     """
-    Handle upload from share location to S3 for configurations validated via share workflow.
+    Handle upload from retrieved config directory (from getConfigurationFromS3).
 
-    This uploads the validated ZIP file from the Docker shared volume to S3.
+    This zips the extracted configuration directory and uploads it to S3.
+
+    Args:
+        ctx: MCP context for logging
+        retrieved_config_context: Context from retrieved config detection
+        bucket_name: Optional custom bucket name
+        offer_pipeline_release: Whether to offer pipeline release
+
+    Returns:
+        Dictionary with upload results
     """
+    temp_zip_path = None
+
     try:
-        await ctx.info(
-            "📤 Uploading validated configuration from share location to S3..."
+        config_path = retrieved_config_context["config_path"]
+        await ctx.info(f"📦 Creating ZIP from retrieved configuration: {config_path}")
+
+        # Create temporary ZIP file
+        temp_zip_fd, temp_zip_path = tempfile.mkstemp(
+            suffix=".zip", prefix="lza-config-upload-"
         )
+        os.close(temp_zip_fd)
 
-        # Find the validation ZIP file
-        zip_file_path = None
-        zip_location_type = None
+        # Create ZIP file from directory
+        with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(config_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, config_path)
+                    zipf.write(file_path, arcname)
+                    await ctx.info(f"  Added: {arcname}")
 
-        # Get host path from environment variable (configured in Docker/MCP settings)
-        host_config_path = os.environ.get(
-            "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
-        )
-        container_config_path = os.environ.get(
-            "LZA_CONFIG_CONTAINER_PATH", "/app/lza-config"
-        )
-
-        possible_zip_paths = [
-            ("host", os.path.join(os.path.expanduser(host_config_path), "config.zip")),
-            ("container", os.path.join(container_config_path, "config.zip")),
-        ]
-
-        for location_type, path in possible_zip_paths:
-            if os.path.exists(path):
-                zip_file_path = path
-                zip_location_type = location_type
-                await ctx.info(
-                    f"✅ Found validation ZIP at {location_type} path: {path}"
-                )
-                break
-
-        if not zip_file_path:
-            error_message = "Validation ZIP file not found in share locations"
-            await ctx.error(error_message)
-
-            return create_structured_error_response(
-                error=error_message,
-                category=ErrorCategory.CONFIGURATION,
-                error_code="VALIDATION_ZIP_NOT_FOUND",
-                troubleshooting=[
-                    "Create a ZIP file of your configuration first",
-                    f"Place the ZIP file in {os.path.join(host_config_path, 'config.zip')}",
-                    "Verify Docker volume mounts are correct",
-                    "Check that LZA_CONFIG_HOST_PATH environment variable is set correctly",
-                ],
-                context={"checked_paths": [path for _, path in possible_zip_paths]},
-            )
+        zip_size = os.path.getsize(temp_zip_path)
+        await ctx.info(f"✅ Created ZIP file ({zip_size} bytes)")
 
         # Verify AWS connectivity
         upload_tool = S3UploadUtils()
@@ -131,7 +152,7 @@ async def _handle_share_to_s3_upload(
         await ctx.info(f"⬆️ Uploading to S3 bucket: {bucket_name}")
         s3_manager = S3Manager()
         upload_result = await s3_manager.upload_zip_file(
-            zip_path=zip_file_path, bucket_name=bucket_name, key=S3_OBJECT_KEY
+            zip_path=temp_zip_path, bucket_name=bucket_name, key=S3_OBJECT_KEY
         )
 
         if not upload_result["success"]:
@@ -147,9 +168,10 @@ async def _handle_share_to_s3_upload(
 
         return {
             "success": True,
-            "message": "Configuration uploaded successfully from share validation workflow",
-            "source": f"share_validation_{zip_location_type}",
-            "zip_path": zip_file_path,
+            "message": "Configuration uploaded successfully from retrieved config",
+            "source": "retrieved_config",
+            "config_path": config_path,
+            "zip_size": zip_size,
             "bucket_name": bucket_name,
             "object_key": S3_OBJECT_KEY,
             "aws_context": aws_context,
@@ -157,295 +179,32 @@ async def _handle_share_to_s3_upload(
         }
 
     except Exception as e:
-        error_message = f"Share-to-S3 upload failed: {str(e)}"
+        error_message = f"Retrieved config upload failed: {str(e)}"
         await ctx.error(error_message)
 
         return create_structured_error_response(
             error=error_message,
             category=ErrorCategory.INTEGRATION,
-            error_code="SHARE_UPLOAD_ERROR",
+            error_code="RETRIEVED_CONFIG_UPLOAD_ERROR",
             troubleshooting=[
-                "Ensure the share location is accessible",
+                "Ensure the retrieved configuration directory is accessible",
                 "Verify AWS credentials and S3 permissions",
-                "Check that the ZIP file exists and is readable",
+                "Check that configuration files are valid",
                 "Ensure network connectivity to AWS services",
             ],
-            context={"bucket_name": bucket_name},
-        )
-
-
-async def _handle_s3_to_s3_copy(
-    ctx: Context,
-    s3_validation_context: Dict[str, Any],
-    target_bucket_name: Optional[str],
-    offer_pipeline_release: bool,
-) -> Dict[str, Any]:
-    """
-    Handle S3-to-S3 copy for configurations validated via S3 workflow.
-
-    This copies the validated ZIP file from the S3 validation location to the target config bucket.
-    """
-    try:
-        await ctx.info(
-            "📤 Copying validated configuration from S3 validation location to config bucket..."
-        )
-
-        source_s3_path = s3_validation_context["s3_path"]
-        await ctx.info(f"Source S3 path: {source_s3_path}")
-
-        # Parse source S3 path
-        if source_s3_path.startswith("s3://"):
-            source_s3_path = source_s3_path[5:]  # Remove 's3://' prefix
-
-        # Split bucket and key
-        path_parts = source_s3_path.split("/", 1)
-        if len(path_parts) != 2:
-            error_message = f"Invalid S3 path format: {source_s3_path}"
-            await ctx.error(error_message)
-            return create_structured_error_response(
-                error=error_message,
-                category=ErrorCategory.CONFIGURATION,
-                error_code="INVALID_S3_PATH",
-                troubleshooting=[
-                    "S3 path must be in format: bucket-name/path/to/file.zip",
-                    "Or s3://bucket-name/path/to/file.zip",
-                ],
-                context={"source_s3_path": source_s3_path},
-            )
-
-        source_bucket = path_parts[0]
-        source_key = path_parts[1]
-
-        # Verify AWS connectivity
-        upload_tool = S3UploadUtils()
-        aws_context = await upload_tool.ensure_aws_connectivity(ctx)
-
-        # Determine target bucket name
-        if not target_bucket_name:
-            account_id = aws_context["account_id"]
-            region = aws_context["region"]
-            target_bucket_name = f"aws-accelerator-config-{account_id}-{region}"
-            await ctx.info(f"Using auto-detected target bucket: {target_bucket_name}")
-
-        # Perform S3-to-S3 copy
-        await ctx.info(
-            f"⬆️ Copying from s3://{source_bucket}/{source_key} to s3://{target_bucket_name}/{S3_OBJECT_KEY}"
-        )
-
-        s3_manager = S3Manager()
-        copy_result = await s3_manager.copy_s3_object(
-            source_bucket=source_bucket,
-            source_key=source_key,
-            target_bucket=target_bucket_name,
-            target_key=S3_OBJECT_KEY,
-        )
-
-        if not copy_result["success"]:
-            return copy_result
-
-        await ctx.info("✅ Configuration copied successfully to config bucket!")
-        await ctx.info(f"Target bucket: {target_bucket_name}")
-        await ctx.info(f"Target key: {S3_OBJECT_KEY}")
-
-        # Offer pipeline release
-        if offer_pipeline_release:
-            await ctx.info("🚀 Use 'releasePipeline' to deploy the configuration")
-
-        return {
-            "success": True,
-            "operation": "s3_to_s3_copy",
-            "source_bucket": source_bucket,
-            "source_key": source_key,
-            "target_bucket": target_bucket_name,
-            "target_key": S3_OBJECT_KEY,
-            "aws_context": aws_context,
-            "validation_context": s3_validation_context,
-            "pipeline_release_offered": offer_pipeline_release,
-            "message": "Configuration copied successfully from S3 validation location to config bucket",
-        }
-
-    except Exception as e:
-        error_message = f"S3-to-S3 copy failed: {str(e)}"
-        await ctx.error(error_message)
-
-        return create_structured_error_response(
-            error=error_message,
-            category=ErrorCategory.S3,
-            error_code="S3_COPY_FAILED",
-            troubleshooting=[
-                "Verify source S3 bucket and key exist",
-                "Check permissions for both source and target buckets",
-                "Ensure AWS credentials have s3:GetObject and s3:PutObject permissions",
-                "Verify network connectivity to AWS S3",
-            ],
             context={
-                "source_s3_path": s3_validation_context.get("s3_path"),
-                "target_bucket": target_bucket_name,
-                "operation": "s3_to_s3_copy",
+                "config_path": retrieved_config_context.get("config_path"),
+                "bucket_name": bucket_name,
             },
         )
-
-
-async def _detect_share_validation_context(ctx: Context) -> Dict[str, Any]:
-    """
-    Detect if share validation was recently used by checking for ZIP files.
-
-    Returns:
-        Dict with detection result and share validation context
-    """
-    try:
-        # Get paths from environment variables (configured in Docker/MCP settings)
-        host_config_path = os.environ.get(
-            "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
-        )
-        container_config_path = os.environ.get(
-            "LZA_CONFIG_CONTAINER_PATH", "/app/lza-config"
-        )
-
-        share_paths = [
-            os.path.join(os.path.expanduser(host_config_path), "config.zip"),
-            os.path.join(container_config_path, "config.zip"),
-        ]
-
-        most_recent_path = None
-        most_recent_age = float("inf")
-
-        for path in share_paths:
-            if os.path.exists(path):
-                import time
-
-                file_age = time.time() - os.path.getmtime(path)
-
-                if file_age < most_recent_age:
-                    most_recent_path = path
-                    most_recent_age = file_age
-
-        # Use the most recent file if it's within 2 hours
-        if most_recent_path and most_recent_age < 7200:  # 2 hours
-            # Determine location type by checking if path matches container path
-            location_type = (
-                "container"
-                if most_recent_path.startswith(container_config_path)
-                else "host"
-            )
-
-            return {
-                "detected": True,
-                "zip_path": most_recent_path,
-                "age_seconds": most_recent_age,
-                "location_type": location_type,
-            }
-        elif most_recent_path:
-            await ctx.info(
-                f"Found old share validation ZIP: {most_recent_path} (age: {most_recent_age:.0f}s) - may be stale"
-            )
-
-        return {"detected": False}
-
-    except Exception as e:
-        await ctx.error(f"Error detecting share validation context: {str(e)}")
-        return {"detected": False, "error": str(e)}
-
-
-async def _detect_s3_validation_context(ctx: Context) -> Dict[str, Any]:
-    """
-    Detect if S3 validation was recently used by checking for S3 validation context.
-
-    This looks for indicators that S3 validation was recently performed, such as:
-    - Recent S3 validation results stored in temporary files
-    - Environment variables indicating S3 validation
-    - Recent S3 validation tool execution context
-
-    Returns:
-        Dict with detection result and S3 context information
-    """
-    try:
-        # Check for S3 validation context files or environment variables
-        # This could be enhanced to check for recent tool execution context
-
-        # For now, we'll check if there are any environment variables that indicate
-        # recent S3 validation (this can be enhanced based on how S3 validation stores context)
-        s3_validation_indicators = [
-            "LZA_LAST_S3_VALIDATION_PATH",
-            "LZA_S3_VALIDATION_BUCKET",
-            "LZA_S3_VALIDATION_KEY",
-        ]
-
-        for indicator in s3_validation_indicators:
-            if os.environ.get(indicator):
-                s3_path = os.environ.get(indicator)
-                await ctx.info(f"Found S3 validation indicator: {indicator}={s3_path}")
-
-                # Validate that this is a recent validation (within 2 hours)
-                timestamp_var = f"{indicator}_TIMESTAMP"
-                if os.environ.get(timestamp_var):
-                    try:
-                        import time
-
-                        validation_time = float(os.environ.get(timestamp_var))
-                        age = time.time() - validation_time
-
-                        if age < 7200:  # 2 hours
-                            return {
-                                "detected": True,
-                                "s3_path": s3_path,
-                                "age_seconds": age,
-                                "source": indicator,
-                            }
-                        else:
-                            await ctx.info(
-                                f"S3 validation context is stale (age: {age:.0f}s)"
-                            )
-                    except (ValueError, TypeError):
-                        await ctx.info(f"Invalid timestamp in {timestamp_var}")
-
-        # TODO: This can be enhanced to check for other S3 validation indicators
-        # such as recent tool execution results or temporary files
-
-        return {"detected": False}
-
-    except Exception as e:
-        await ctx.error(f"Error detecting S3 validation context: {str(e)}")
-        return {"detected": False, "error": str(e)}
-
-
-async def _detect_validation_type(ctx: Context) -> Dict[str, Any]:
-    """
-    Detect which validation workflow was recently used.
-
-    Returns:
-        Dict containing validation type and relevant context:
-        - type: "s3_validation", "share_validation", or "direct_upload"
-        - context: Additional information like S3 path or share path
-    """
-    try:
-        # Step 1: Check for recent S3 validation context
-        # Look for environment variables or context that indicates S3 validation was used
-        s3_validation_context = await _detect_s3_validation_context(ctx)
-        if s3_validation_context["detected"]:
-            await ctx.info(
-                f"🔍 Detected recent S3 validation: {s3_validation_context['s3_path']}"
-            )
-            return {"type": "s3_validation", "context": s3_validation_context}
-
-        # Step 2: Check for share validation ZIP files
-        share_validation_context = await _detect_share_validation_context(ctx)
-        if share_validation_context["detected"]:
-            await ctx.info(
-                f"🔍 Detected recent share validation: {share_validation_context['zip_path']}"
-            )
-            return {"type": "share_validation", "context": share_validation_context}
-
-        # Step 3: No recent validation detected
-        await ctx.info("🔍 No recent validation artifacts found, direct upload needed")
-        return {"type": "direct_upload", "context": {"reason": "no_recent_validation"}}
-
-    except Exception as e:
-        await ctx.error(f"Error detecting validation type: {str(e)}")
-        return {
-            "type": "direct_upload",
-            "context": {"reason": "detection_error", "error": str(e)},
-        }
+    finally:
+        # Clean up temporary ZIP file
+        if temp_zip_path and os.path.exists(temp_zip_path):
+            try:
+                os.remove(temp_zip_path)
+                logger.info(f"Cleaned up temporary ZIP file: {temp_zip_path}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary ZIP file: {str(e)}")
 
 
 async def tool_upload_configuration_to_s3(
@@ -455,11 +214,10 @@ async def tool_upload_configuration_to_s3(
     offer_pipeline_release: bool = True,
 ) -> Dict[str, Any]:
     """
-    Upload LZA configuration to S3 bucket with smart detection.
+    Upload LZA configuration to S3 bucket.
 
-    This tool enables uploading LZA configurations to S3 buckets for deployment through
-    the LZA pipeline. It intelligently detects the configuration source and handles
-    the upload accordingly.
+    This tool uploads LZA configurations to S3 buckets for deployment through
+    the LZA pipeline using direct upload workflow.
 
     IMPORTANT - Docker Container Context:
     This MCP server runs inside a Docker container. Paths work differently:
@@ -468,19 +226,10 @@ async def tool_upload_configuration_to_s3(
     - The tool will automatically find and use the retrieved configuration
     - DO NOT pass the host_path from getConfigurationFromS3() - it won't work!
 
-    Smart Detection Logic:
-    1. **S3 Detection**: Checks for recent S3 configurations and performs
-       efficient S3-to-S3 copy from source location to config bucket
-    2. **Share Location Detection**: Checks for ZIP files in share locations
-       (Docker volumes) and uploads from there
-    3. **Direct Upload Fallback**: If no recent configuration detected, discovers
-       configuration, creates new ZIP, and uploads
-
     The tool automatically:
-    - Detects configuration source from recent operations
-    - Performs S3-to-S3 copy for S3 validation (most efficient)
-    - Uploads from share location for share validation
-    - Falls back to configuration discovery and ZIP creation for direct uploads
+    - Discovers configuration files in the workspace
+    - Creates a ZIP file of the configuration
+    - Uploads to the specified S3 bucket
     - Verifies AWS connectivity using existing session management
     - Determines the appropriate S3 bucket name using AWS account and region
     - Provides comprehensive error handling with troubleshooting guidance
@@ -502,7 +251,7 @@ async def tool_upload_configuration_to_s3(
         Dictionary containing upload results with success status and details
 
     TYPICAL WORKFLOW:
-        1. checkAwsConnectivity - ensure permissions and account information is inserted into context
+        1. checkAwsConnectivity - ensure permissions and account information
         2. getConfigurationFromS3() - downloads config to container workspace
         3. User edits files using the host_path with bash/file tools
         4. uploadConfigurationToS3() - NO PATH NEEDED, auto-detects the retrieved config
@@ -517,10 +266,6 @@ async def tool_upload_configuration_to_s3(
 
         # Upload specific container-relative path (advanced use only)
         result = await upload_configuration_to_s3(ctx, config_path="./my-config")
-        :param offer_pipeline_release:
-        :param bucket_name:
-        :param config_path:
-        :param ctx:
     """
     try:
         await ctx.info("📤 Starting LZA configuration upload to S3...")
@@ -592,86 +337,34 @@ async def tool_upload_configuration_to_s3(
                 },
             )
 
-        # Step 1: Detect which validation workflow was used
-        validation_detection = await _detect_validation_type(ctx)
-        validation_type = validation_detection["type"]
-        validation_context = validation_detection["context"]
-
-        await ctx.info(f"🔍 Detected validation type: {validation_type}")
-
-        # Step 2: Handle upload based on validation type
-        if validation_type == "s3_validation":
-            # S3 validation was used - perform S3-to-S3 copy
-            await ctx.info("✅ Using validated configuration from recent S3 validation")
-            await ctx.info(
-                "📤 This will copy the validated ZIP from S3 validation location to config bucket"
-            )
-            return await _handle_s3_to_s3_copy(
-                ctx, validation_context, bucket_name, offer_pipeline_release
-            )
-
-        elif validation_type == "share_validation":
-            # Share validation was used - upload from share location
-            await ctx.info(
-                "✅ Using validated configuration from recent share validation"
-            )
-            await ctx.info("📤 This will upload the already-validated ZIP file to S3")
-            return await _handle_share_to_s3_upload(
-                ctx, bucket_name, offer_pipeline_release
-            )
-
-        elif validation_type == "direct_upload":
-            # No recent validation - use direct configuration upload
-            if config_path:
-                await ctx.info(
-                    f"📁 Using direct configuration upload from: {config_path}"
-                )
-                await ctx.info(
-                    "🔧 This will discover, validate, and create a new ZIP file"
-                )
-            else:
-                await ctx.info(
-                    "📁 No recent validation detected, using configuration discovery..."
-                )
-                await ctx.info(
-                    "🔍 This will find your LZA configuration and create a new ZIP file"
+        # Check for retrieved config from getConfigurationFromS3()
+        if not config_path:
+            retrieved_config_context = await _detect_retrieved_config_context(ctx)
+            if retrieved_config_context["detected"]:
+                await ctx.info("✅ Using configuration from getConfigurationFromS3()")
+                await ctx.info("📤 This will create a ZIP and upload to S3")
+                return await _handle_retrieved_config_upload(
+                    ctx, retrieved_config_context, bucket_name, offer_pipeline_release
                 )
 
-            # Use the original S3UploadTool workflow for direct uploads
-            upload_tool = S3UploadUtils()
-            result = await upload_tool.upload_configuration(
-                ctx=ctx,
-                config_path=config_path,
-                bucket_name=bucket_name,
-                offer_pipeline_release=offer_pipeline_release,
-            )
-
-            return result
-
+        # Use direct upload workflow
+        if config_path:
+            await ctx.info(f"📁 Uploading configuration from: {config_path}")
         else:
-            # Unknown validation type
-            error_message = f"Unknown validation type detected: {validation_type}"
-            await ctx.error(error_message)
+            await ctx.info("📁 Using configuration discovery to find LZA config...")
 
-            # Get configured host path for error message
-            host_config_path = os.environ.get(
-                "LZA_CONFIG_HOST_PATH", "~/Documents/lza-config"
-            )
+        await ctx.info("🔧 Will discover, ZIP, and upload configuration")
 
-            return create_structured_error_response(
-                error=error_message,
-                category=ErrorCategory.INTEGRATION,
-                error_code="UNKNOWN_VALIDATION_TYPE",
-                troubleshooting=[
-                    "Provide config_path parameter for direct upload",
-                    f"Or create a ZIP file and place it in {os.path.join(host_config_path, 'config.zip')}",
-                    "Ensure LZA_CONFIG_HOST_PATH environment variable is set correctly",
-                ],
-                context={
-                    "validation_type": validation_type,
-                    "validation_context": validation_context,
-                },
-            )
+        # Use S3UploadUtils for direct upload
+        upload_tool = S3UploadUtils()
+        result = await upload_tool.upload_configuration(
+            ctx=ctx,
+            config_path=config_path,
+            bucket_name=bucket_name,
+            offer_pipeline_release=offer_pipeline_release,
+        )
+
+        return result
 
     except Exception as e:
         error_message = f"Upload configuration to S3 failed: {str(e)}"
@@ -685,7 +378,6 @@ async def tool_upload_configuration_to_s3(
                 "Check AWS credentials and S3 permissions",
                 "Verify network connectivity to AWS services",
                 "Ensure config_path contains valid LZA configuration",
-                "Verify the ZIP file exists if using automatic detection",
             ],
             context={
                 "tool": "uploadConfigurationToS3",
