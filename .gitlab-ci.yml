@@ -9,7 +9,7 @@ stages:
 
 # Default configuration for all jobs
 default:
-  image: python:3.10
+  image: public.ecr.aws/docker/library/python:3.11
   before_script:
     - cd src/lza-mcp-server
     - pip install poetry

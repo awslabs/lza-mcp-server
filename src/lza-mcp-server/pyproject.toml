@@ -47,7 +47,7 @@ ruff = ">=0.1.0"
 mypy = ">=1.8.0"
 bandit = ">=1.7.0"
 pip-audit = ">=2.7.0"
-types-pyyaml = "^6.0.12.20250915"
+types-pyyaml = ">=6.0.12"
 
 [tool.poetry.scripts]
 "awslabs-lza-mcp-server" = "awslabs.lza_mcp_server.server:main"

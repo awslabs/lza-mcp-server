@@ -207,57 +207,26 @@ class TestConfigToolsComprehensive:
         """Test complete upload workflow with validation detection."""
         # Test all three validation detection scenarios
 
-        # Scenario 1: S3 validation detected
-        import time
+        # Test direct upload workflow
+        with patch(
+            "awslabs.lza_mcp_server.tools.config.upload_config_s3.S3UploadUtils"
+        ) as mock_s3_utils:
+            mock_utils_instance = Mock()
+            mock_s3_utils.return_value = mock_utils_instance
 
-        current_time = str(time.time())
+            async def mock_upload_config(*args, **kwargs):
+                return {"success": True, "operation": "direct_upload"}
 
-        with patch.dict(
-            os.environ,
-            {
-                "LZA_LAST_S3_VALIDATION_PATH": "s3://validation-bucket/config.zip",
-                "LZA_LAST_S3_VALIDATION_PATH_TIMESTAMP": current_time,
-            },
-        ):
-            with patch(
-                "awslabs.lza_mcp_server.tools.config.upload_config_s3._handle_s3_to_s3_copy"
-            ) as mock_s3_copy:
-                mock_s3_copy.return_value = {
-                    "success": True,
-                    "operation": "s3_to_s3_copy",
-                }
+            mock_utils_instance.upload_configuration = Mock(
+                side_effect=mock_upload_config
+            )
 
-                result = await tool_upload_configuration_to_s3(mock_mcp_context)
-                # The actual implementation may return different structure based on validation detection
-                assert isinstance(result, dict)
-                if "operation" in result:
-                    assert result["operation"] == "s3_to_s3_copy"
-
-        # Scenario 2: Share validation detected
-        temp_dir = tempfile.mkdtemp()
-        zip_path = os.path.join(temp_dir, "config.zip")
-
-        try:
-            with open(zip_path, "w") as f:
-                f.write("mock zip content")
-
-            # Clear S3 validation environment
-            with patch.dict(os.environ, {}, clear=True):
-                with patch("os.path.expanduser", return_value=zip_path):
-                    with patch(
-                        "awslabs.lza_mcp_server.tools.config.upload_config_s3._handle_share_to_s3_upload"
-                    ) as mock_share_upload:
-                        mock_share_upload.return_value = {
-                            "success": True,
-                            "source": "share_validation_host",
-                        }
-
-                        result = await tool_upload_configuration_to_s3(mock_mcp_context)
-                        assert isinstance(result, dict)
-                        # The actual implementation may return error due to AWS connectivity or other issues
-                        # Just verify we get a valid response structure
-        finally:
-            shutil.rmtree(temp_dir)
+            result = await tool_upload_configuration_to_s3(
+                mock_mcp_context, config_path="./config", bucket_name="test-bucket"
+            )
+            assert isinstance(result, dict)
+            if "operation" in result:
+                assert result["operation"] == "direct_upload"
 
         # Scenario 3: Direct upload (no validation detected)
         with patch.dict(os.environ, {}, clear=True):

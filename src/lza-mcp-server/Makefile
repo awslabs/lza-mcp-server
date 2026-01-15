@@ -11,7 +11,7 @@ LZA_MIN_VERSION ?= v1.12.0
 LZA_MAX_VERSION ?=
 DOCKER_IMAGE_NAME ?= lza-mcp-server:local
 
-.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache release lint format security-check type-check py-compile build run
+.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache release lint format security-check type-check py-compile build
 
 # Default target
 help:
@@ -24,7 +24,6 @@ help:
 	@echo ""
 	@echo "Fast Development Commands:"
 	@echo "  test-fast          Run fast feedback loop (unit tests only, stop on first failure)"
-	@echo "  test-incremental   Run only tests affected by code changes"
 	@echo "  test-unit          Run unit tests with parallel execution"
 	@echo ""
 	@echo "Pre-Commit Verification:"
@@ -37,7 +36,6 @@ help:
 	@echo ""
 	@echo "Docker Commands:"
 	@echo "  build              Build Docker image"
-	@echo "  run                Run Docker container with validation support"
 	@echo ""
 	@echo "Comprehensive Testing:"
 	@echo "  test               Run all tests with standard configuration"
@@ -47,6 +45,8 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  clean-cache        Clear all test caches and temporary files"
+	@echo "  clean-lock         Remove poetry.lock for fresh dependency resolution"
+	@echo "  update-deps        Update dependencies to latest compatible versions"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make test-fast     # Quick feedback during development"
@@ -61,12 +61,13 @@ py-compile:
 	@echo "✅ Python syntax validation complete"
 
 # Complete pre-commit verification pipeline
-release: clean-cache py-compile format lint type-check security-check test-coverage
+release: clean-cache clean-lock update-deps py-compile format lint type-check security-check test-coverage
 	@echo "🔒 Running dependency vulnerability scan..."
 	@poetry run pip-audit
 	@echo "✅ Release verification complete - ready for code review!"
 	@echo ""
 	@echo "📋 Verification Summary:"
+	@echo "  ✓ Dependencies updated to latest compatible versions"
 	@echo "  ✓ Python syntax validated"
 	@echo "  ✓ Code formatted with ruff"
 	@echo "  ✓ Code linted with ruff"
@@ -98,30 +99,6 @@ build:
 	@echo "💡 Custom build examples:"
 	@echo "  make build LZA_MIN_VERSION=v1.10.0"
 	@echo "  make build LZA_MIN_VERSION=v1.10.0 LZA_MAX_VERSION=v1.13.0"
-
-# Run Docker container with validation support
-run:
-	@echo "🚀 Starting Docker container..."
-	@echo "  Image: $(DOCKER_IMAGE_NAME)"
-	@echo "  Mounting AWS credentials and validation share directory"
-	@docker run -d \
-		--name lza-mcp-server \
-		-p 8000:8000 \
-		-v ~/.aws:/home/lzauser/.aws:ro \
-		-v ~/Documents/lza-config:/app/lza-config \
-		$(DOCKER_IMAGE_NAME)
-	@echo "✅ Container started successfully"
-	@echo ""
-	@echo "📋 Container Info:"
-	@echo "  Name: lza-mcp-server"
-	@echo "  Port: 8000"
-	@echo "  AWS Creds: ~/.aws (read-only)"
-	@echo "  Validation Share: ~/Documents/lza-config"
-	@echo ""
-	@echo "🔍 View logs: docker logs -f lza-mcp-server"
-	@echo "🛑 Stop: docker stop lza-mcp-server && docker rm lza-mcp-server"
-	@echo "🔍 View logs: docker logs -f lza-mcp-server"
-	@echo "🛑 Stop: docker stop lza-mcp-server && docker rm lza-mcp-server"
 
 # Code formatting
 format:
@@ -162,25 +139,6 @@ scan-container:
 
 # Fast feedback loop for development (< 30 seconds)
 test-fast:
-	@echo "⚡ Running fast feedback loop..."
-	@poetry run pytest tests/ \
-		-m "unit or (not integration and not slow)" \
-		--maxfail=5 \
-		-x \
-		--tb=short \
-		--disable-warnings
-
-# Incremental testing (only run tests affected by changes)
-test-incremental:
-	@echo "🎯 Running incremental tests..."
-	@echo "  (running all unit tests instead)"
-	@poetry run pytest tests/ \
-		-m "unit or (not integration and not slow)" \
-		--tb=short \
-		--maxfail=10
-
-# Unit tests with parallel execution
-test-unit:
 	@echo "🧪 Running unit tests in parallel..."
 	@poetry run pytest tests/ \
 		-m "unit or (not integration and not slow)" \
@@ -246,6 +204,22 @@ clean-cache:
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✅ Cache cleanup complete"
 
+# Clean lock file to ensure fresh dependency resolution
+clean-lock:
+	@echo "🔓 Removing poetry.lock for fresh dependency resolution..."
+	@rm -f poetry.lock
+	@echo "✅ Lock file removed"
+
+# Update dependencies to latest compatible versions
+update-deps: clean-lock
+	@echo "📦 Updating dependencies to latest compatible versions..."
+	@poetry lock
+	@poetry install
+	@echo "✅ Dependencies updated"
+	@echo ""
+	@echo "📋 Updated Dependencies:"
+	@poetry show --outdated || echo "  All dependencies are up to date!"
+
 # Development workflow commands
 dev-test: test-fast
 	@echo "🔄 Development test cycle complete"
@@ -279,16 +253,6 @@ stats:
 	@grep -r "@pytest.mark.unit" tests/ | wc -l | xargs echo "  Unit tests:"
 	@grep -r "@pytest.mark.integration" tests/ | wc -l | xargs echo "  Integration tests:"
 	@echo ""
-
-# Continuous testing (watch for changes)
-watch:
-	@echo "👀 Watching for changes (Ctrl+C to stop)..."
-	@while true; do \
-		echo "🔄 Running fast tests..."; \
-		make test-fast; \
-		echo "⏳ Waiting for changes (30s)..."; \
-		sleep 30; \
-	done
 
 # Quick smoke test (fastest possible feedback)
 smoke:

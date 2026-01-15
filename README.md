@@ -1,123 +1,72 @@
 # AWS Landing Zone Accelerator (LZA) MCP Server
 
-An AWS Labs Model Context Protocol (MCP) server for AWS Landing Zone Accelerator pipeline management.
+A Model Context Protocol (MCP) server that enables AI-assisted management of AWS Landing Zone Accelerator deployments through compatible development tools and IDEs.
 
-## Features
+## Table of Contents
 
-- **Pipeline Management**: Start, monitor, and diagnose LZA pipeline executions
-- **Schema Search**: Search and explore LZA JSON configuration schemas
-- **Cross-Account Support**: Works with LZA deployments in different AWS accounts
-- **Container Support**: Containerized deployment using Finch for local development and AWS Lambda deployment
-- **Amazon Q Integration**: Compatible with Amazon Q Developer for AI-assisted operations
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Build Process](#build-process)
+- [AWS Permissions](#aws-permissions)
+- [MCP Client Configuration](#mcp-client-configuration)
+- [Available Tools](#available-tools)
+- [Schema Management](#schema-management)
+- [Universal Configuration](#universal-configuration)
+- [Configuration Operations](#configuration-operations)
+- [Pipeline Management](#pipeline-management)
+- [Advanced Topics](#advanced-topics)
+- [Troubleshooting](#troubleshooting)
+
+## Overview
+
+The LZA MCP Server streamlines Landing Zone Accelerator operations by providing AI-powered assistance for configuration management, pipeline orchestration, and schema discovery. Organizations can reduce operational complexity and accelerate deployment cycles while maintaining security and compliance standards. The server includes specialized tools for merging [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) templates, enabling rapid deployment of enterprise-ready, compliance-focused baseline environments.
+
+**Key Benefits:**
+- **Accelerated Operations**: AI-assisted configuration reduces manual effort and deployment time
+- **Enhanced Accuracy**: Schema validation and intelligent search helping prevent configuration errors while providing a reliable tools to discover LZA capabilities
+- **Operational Visibility**: Real-time pipeline monitoring with automated diagnostics
+- **Security by Design**: Comprehensive input validation and least-privilege IAM policies
+- **Universal Configuration Integration**: Streamlined merging of enterprise-ready compliance templates
+
+**Architecture:**
+The server operates as a containerized MCP endpoint, invoked by compatible IDEs (Kiro, Claude Desktop) via stdio transport. All AWS operations use temporary credentials following [AWS security best practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html).
 
 ## Quick Start
 
-### Local Development
+### Prerequisites
 
-1. **Install dependencies:**
+- Docker or Finch container runtime
+- AWS credentials with [required IAM permissions](#aws-permissions)
+- MCP-compatible IDE (Kiro IDE, Claude Desktop)
+- Existing LZA deployment (for pipeline and configuration operations)
+
+> **📋 Supported LZA Deployments**  
+> This MCP server supports LZA deployments using **S3-based configuration storage**. The default LZA deployment stores configuration files in an S3 bucket (`aws-accelerator-config-*`), which this server accesses for configuration retrieval and upload operations.
+> 
+> **Note:** CodeCommit-based configuration repositories are not currently supported. If your LZA deployment uses CodeCommit for configuration storage, you'll need to migrate to S3-based storage to use this MCP server. See [LZA configuration file documentation](https://docs.aws.amazon.com/solutions/latest/landing-zone-accelerator-on-aws/using-configuration-files.html) for details on configuration storage options.
+
+### 1. Build Container Image
+
 ```bash
 cd src/lza-mcp-server
-pip install -e .
-```
-
-2. **Configure AWS credentials:**
-
-> **Security Best Practice:** We recommend using temporary credentials via AWS IAM Identity Center (SSO) or IAM roles instead of long-term access keys. See [AWS Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp) for more information.
-
-```bash
-# Option 1: AWS IAM Identity Center (SSO) - Recommended
-aws configure sso
-
-# Option 2: AWS CLI with named profile
-aws configure
-
-# Option 3: Environment variables (for local development only)
-export AWS_ACCESS_KEY_ID=your-key
-export AWS_SECRET_ACCESS_KEY=your-secret
-export AWS_REGION=us-east-1
-```
-
-3. **Run the server:**
-```bash
-python -m server
-```
-
-### Container Deployment
-
-#### For AWS Lambda Deployment
-```bash
-# Build Lambda-compatible image (schemas generated during build)
-finch build -t lza-mcp-server:lambda .
-```
-
-#### For Local Development
-```bash
-# Build local development image
 make build
-
-# Run locally
-make run
-
-# Or build/run manually
-finch build --build-arg LZA_MIN_VERSION=v1.12.0 -t lza-mcp-server:local .
-finch run -d \
-  --name lza-mcp-server \
-  -p 8000:8000 \
-  -v ~/.aws:/home/lzauser/.aws:ro \
-  -v ~/Documents/lza-config:/app/lza-config \
-  lza-mcp-server:local
 ```
 
-#### Using Finch Compose
-```bash
-# Start Finch VM if not running
-finch vm start
+This generates a container image with embedded LZA schemas for versions v1.12.0 and later (mutable).
 
-# Build and run using docker-compose
-finch compose up --build
+### 2. Configure AWS Permissions
 
-# Or build manually
-finch build -t lza-mcp-server:local .
-```
+Create an IAM role or user with the [recommended IAM policy](#aws-permissions). The policy follows least-privilege principles and supports standard LZA deployments.
 
-**Resource Limits**: The container is configured with 1 CPU and 1GB memory limit (512MB reserved) to prevent resource exhaustion and ensure stable operation.
+> **⚠️ Security Recommendation**  
+> Use [temporary credentials via AWS IAM Identity Center](https://docs.aws.amazon.com/wellarchitected/latest/framework/sec_identities_unique.html) instead of long-term access keys. Temporary credentials reduce risk of credential exposure and align with AWS security best practices.
 
-### Container Security Hardening
+### 3. Configure MCP Client
 
-For enhanced security against container escape vulnerabilities, add these flags:
+Add the server configuration to your IDE's MCP settings file:
 
-```bash
-finch run -d \
-  --name lza-mcp-server \
-  --security-opt=no-new-privileges:true \
-  --cap-drop=ALL \
-  --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,size=200m \
-  -p 8000:8000 \
-  -v ~/.aws:/home/lzauser/.aws:ro \
-  -v ~/Documents/lza-config:/app/lza-config \
-  lza-mcp-server:local
-```
-
-**Security flags:**
-- `--security-opt=no-new-privileges:true`: Prevents privilege escalation
-- `--cap-drop=ALL`: Removes all Linux capabilities
-- `--read-only`: Makes root filesystem read-only (except mounted volumes)
-- `--tmpfs /tmp`: Provides writable temp space with noexec
-
-**Note**: Keep Docker/Finch updated for the latest security patches.
-
-### MCP Server Configuration
-
-The LZA MCP server can be configured for use with any MCP-compatible client (Amazon Q, Claude Desktop, Kiro IDE, etc.).
-
-#### Minimum Required Configuration
-
-Add this configuration to your MCP settings file. Replace the placeholder paths with your actual system paths:
-
-**For Kiro IDE**: `.kiro/settings/mcp.json` (workspace) or `~/.kiro/settings/mcp.json` (global)
-**For Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-**For Amazon Q**: `~/.aws/amazonq/mcp.json`
+**Kiro IDE:** `.kiro/settings/mcp.json` (workspace) or `~/.kiro/settings/mcp.json` (global)  
+**Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 ```json
 {
@@ -125,285 +74,195 @@ Add this configuration to your MCP settings file. Replace the placeholder paths 
     "awslabs.lza-mcp-server": {
       "command": "<REPO_PATH>/scripts/extract-aws-credentials.sh",
       "args": [
-        "docker",
-        "run",
+        "docker", "run",
         "--security-opt=no-new-privileges:true",
         "--cap-drop=ALL",
         "--read-only",
-        "--tmpfs",
-        "/tmp:rw,noexec,nosuid,size=200m",
-        "--rm",
-        "-i",
-        "-v",
-        "<CONFIG_PATH>:/app/lza-config:rw",
-        "-e",
-        "LZA_CONFIG_HOST_PATH=<CONFIG_PATH>",
-        "-e",
-        "AWS_ACCESS_KEY_ID",
-        "-e",
-        "AWS_SECRET_ACCESS_KEY",
-        "-e",
-        "AWS_SESSION_TOKEN",
-        "-e",
-        "AWS_REGION",
-        "-e",
-        "FASTMCP_LOG_LEVEL=DEBUG",
-        "-e",
-        "ENABLE_UC_MERGE=false",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,size=200m",
+        "--rm", "-i",
+        "-v", "<CONFIG_PATH>:/app/lza-config:rw",
+        "-e", "LZA_CONFIG_HOST_PATH=<CONFIG_PATH>",
+        "-e", "AWS_ACCESS_KEY_ID",
+        "-e", "AWS_SECRET_ACCESS_KEY",
+        "-e", "AWS_SESSION_TOKEN",
+        "-e", "AWS_REGION",
         "lza-mcp-server:local"
       ],
       "env": {
         "AWS_PROFILE": "<YOUR_AWS_PROFILE>",
         "AWS_REGION": "<YOUR_AWS_REGION>"
-      },
-      "disabled": false,
-      "autoApprove": [
-        "getMinimumConfiguration",
-        "checkAwsConnectivity",
-        "listLzaSupportedVersions",
-        "searchJsonSchema",
-        "getFullSchema",
-        "getPipelineStatus",
-        "getConfigurationFromS3",
-        "diagnosePipelineErrors",
-        "releasePipeline",
-        "uploadConfigurationToS3"
-      ]
+      }
     }
   }
 }
 ```
 
-#### Configuration Placeholders
+**Configuration Parameters:**
+- `<REPO_PATH>`: Full path to cloned repository (e.g., `/Users/username/repos/lza-mcp-server`)
+- `<CONFIG_PATH>`: Local directory for configuration files (e.g., `/Users/username/Documents/lza-config`)
+  - **Recommendation:** Place within your IDE workspace for easier file access (e.g., `.kiro/lza-config` for Kiro IDE)
+- `<YOUR_AWS_PROFILE>`: AWS CLI profile name from `~/.aws/credentials`
+- `<YOUR_AWS_REGION>`: AWS region where LZA is deployed (e.g., `us-east-1`)
 
-Replace these placeholders with your actual values:
+### 4. Verify Installation
 
-- `<REPO_PATH>`: Full path to your cloned lza-mcp-server repository
-  - Example: `/Users/username/repos/lza-mcp-server`
-  - Windows: `C:/Users/username/repos/lza-mcp-server`
+Restart your IDE and test connectivity:
 
-- `<CONFIG_PATH>`: Full path where LZA configurations will be stored/retrieved
-  - Example: `/Users/username/Documents/lza-config`
-  - Windows: `C:/Users/username/Documents/lza-config`
-  - This directory will be created automatically if it doesn't exist
-
-- `<YOUR_AWS_PROFILE>`: Your AWS CLI profile name
-  - Example: `default`, `lza-admin`, `production`
-  - Must be configured in `~/.aws/credentials`
-
-- `<YOUR_AWS_REGION>`: Your AWS home region
-  - Example: `us-east-1`, `eu-west-1`, `ap-southeast-2`
-
-#### Environment Variables
-
-The configuration uses these important environment variables:
-
-- **LZA_CONFIG_HOST_PATH**: Path on your local system where configurations are stored
-  - Must match the volume mount path before `:/app/lza-config`
-  - Used by the MCP server to provide correct file paths in responses
-
-- **AWS_PROFILE**: AWS credentials profile to use
-- **AWS_REGION**: Default AWS region for operations
-- **FASTMCP_LOG_LEVEL**: Logging level (DEBUG, INFO, WARNING, ERROR)
-- **ENABLE_UC_MERGE**: Enable Universal Configuration merge tools (true/false, default: false)
-  - Set to `true` to enable 9 additional UC merge workflow tools
-  - Reduces context size by ~56% when disabled (default)
-  - Only needed when performing UC merge operations
-
-#### Schema Integrity Validation
-
-The MCP server automatically validates schema integrity at startup using SHA-256 checksums to detect tampering or corruption of embedded LZA JSON schemas. This protects against malicious modification of schema files that could bypass validation and allow malicious configurations.
-
-**How it works:**
-
-- Checksums are generated during Docker image build for all schema files
-- On startup, the server verifies each schema file matches its expected checksum
-- If tampering is detected, the server refuses to start with a clear error message
-- Validation is always enabled and cannot be disabled for security reasons
-
-#### Auto-Approved Tools
-
-The `autoApprove` list includes read-only and safe operations that don't modify your AWS environment:
-- Configuration retrieval and inspection
-- Schema searches
-- Pipeline status checks
-- AWS connectivity verification
-
-Tools that modify AWS resources (like `releasePipeline` and `uploadConfigurationToS3`) can be added to auto-approve if desired, but require explicit approval by default for safety.
-
-#### Example Configuration (macOS)
-
-```json
-{
-  "mcpServers": {
-    "awslabs.lza-mcp-server": {
-      "command": "/Users/jsmith/repos/lza-mcp-server/scripts/extract-aws-credentials.sh",
-      "args": [
-        "docker",
-        "run",
-        "--security-opt=no-new-privileges:true",
-        "--cap-drop=ALL",
-        "--read-only",
-        "--tmpfs",
-        "/tmp:rw,noexec,nosuid,size=200m",
-        "--rm",
-        "-i",
-        "-v",
-        "/Users/jsmith/Documents/lza-config:/app/lza-config:rw",
-        "-e",
-        "LZA_CONFIG_HOST_PATH=/Users/jsmith/Documents/lza-config",
-        "-e",
-        "AWS_ACCESS_KEY_ID",
-        "-e",
-        "AWS_SECRET_ACCESS_KEY",
-        "-e",
-        "AWS_SESSION_TOKEN",
-        "-e",
-        "AWS_REGION",
-        "-e",
-        "FASTMCP_LOG_LEVEL=DEBUG",
-        "-e",
-        "ENABLE_UC_MERGE=false",
-        "lza-mcp-server:local"
-      ],
-      "env": {
-        "AWS_PROFILE": "lza-admin",
-        "AWS_REGION": "us-east-1"
-      },
-      "disabled": false,
-      "autoApprove": [
-        "getMinimumConfiguration",
-        "checkAwsConnectivity",
-        "listLzaSupportedVersions",
-        "searchJsonSchema",
-        "getFullSchema",
-        "getPipelineStatus",
-        "getConfigurationFromS3",
-        "diagnosePipelineErrors"
-      ]
-    }
-  }
-}
+```
+Use your tools, check my AWS connectivity
 ```
 
-#### Restart Your MCP Client
+The server will verify credentials and report the authenticated identity.
 
-After updating the configuration:
-- **Kiro IDE**: Reload the MCP server from the MCP Server view
-- **Claude Desktop**: Restart the application
-- **Amazon Q**: Restart Amazon Q Developer
+## Build Process
+
+### Schema Generation
+
+The container build includes automated schema processing that powers the schema search and discovery tools. This process runs once during `make build` and takes approximately 30-60 seconds.
+
+**What happens during build:**
+
+1. **Fetch LZA Releases**: Queries GitHub API for available LZA versions
+2. **Clone Source**: Downloads LZA source code for each version
+3. **Extract Schemas**: Copies JSON schemas from `source/packages/@aws-accelerator/config/lib/schemas`
+4. **Process Schemas**: Resolves `$ref` references and generates search metadata
+5. **Embed in Image**: Creates version-specific directories at `/app/json-schemas/{version}/`
+
+**Schema enhancements:**
+- **Reference Resolution**: All `$ref` pointers resolved for self-contained schemas
+- **Search Metadata**: Pre-computed indexes for property names, types, patterns, and relationships
+- **Statistics**: Property counts, nesting depth, and complexity metrics
+
+This preprocessing enables sub-second schema searches without runtime analysis overhead.
+
+### Build Customization
+
+Control which LZA versions and UC releases are included in the container:
+
+```bash
+# Default build (v1.12.0 to latest LZA, latest UC)
+make build
+
+# Custom LZA version range
+docker build \
+  --build-arg LZA_MIN_VERSION=v1.10.0 \
+  --build-arg LZA_MAX_VERSION=v1.14.0 \
+  -t lza-mcp-server:local .
+# or with Finch
+finch build \
+  --build-arg LZA_MIN_VERSION=v1.10.0 \
+  --build-arg LZA_MAX_VERSION=v1.14.0 \
+  -t lza-mcp-server:local .
+
+# Specific UC release
+docker build \
+  --build-arg LZA_UC_RELEASE=v1.0.0 \
+  -t lza-mcp-server:local .
+# or with Finch
+finch build \
+  --build-arg LZA_UC_RELEASE=v1.0.0 \
+  -t lza-mcp-server:local .
+
+# Combined customization
+docker build \
+  --build-arg LZA_MIN_VERSION=v1.11.0 \
+  --build-arg LZA_MAX_VERSION=v1.13.0 \
+  --build-arg LZA_UC_RELEASE=v1.0.0 \
+  -t lza-mcp-server:local .
+# or with Finch
+finch build \
+  --build-arg LZA_MIN_VERSION=v1.11.0 \
+  --build-arg LZA_MAX_VERSION=v1.13.0 \
+  --build-arg LZA_UC_RELEASE=v1.0.0 \
+  -t lza-mcp-server:local .
+```
+
+**Build Arguments:**
+
+| Argument | Default | Purpose |
+|----------|---------|---------|
+| `LZA_MIN_VERSION` | `v1.12.0` | Earliest LZA version to include |
+| `LZA_MAX_VERSION` | `latest` | Latest LZA version to include |
+| `LZA_UC_RELEASE` | `latest` | Universal Configuration release version |
+
+**Note:** Including more versions increases build time and image size proportionally. Most users only need schemas matching their deployed LZA version.
 
 ## AWS Permissions
 
-The MCP server requires specific IAM permissions to interact with AWS services for LZA pipeline management, configuration operations, and schema access. Below is the recommended IAM policy:
+The MCP server requires specific IAM permissions for LZA operations. This policy follows AWS least-privilege principles.
+
+### Recommended IAM Policy
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "OrgStatement",
+      "Sid": "STSAccess",
       "Effect": "Allow",
-      "NotAction": [
-        "organizations:DescribeAccount",
-        "organizations:DescribeOrganization",
-        "organizations:DescribeOrganizationalUnit",
-        "organizations:ListAccounts",
-        "organizations:ListAccountsForParent",
-        "organizations:ListChildren",
-        "organizations:ListOrganizationalUnitsForParent",
-        "organizations:ListParents",
-        "organizations:ListRoots"
-      ],
+      "Action": "sts:GetCallerIdentity",
       "Resource": "*"
+    },
+    {
+      "Sid": "SSMAccess",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:${PARTITION}:ssm:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:parameter/accelerator/*"
+    },
+    {
+      "Sid": "S3WriteAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-config-*/zipped/*"
+      ]
+    },
+    {
+      "Sid": "S3ListBucket",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-config-*"
+    },
+    {
+      "Sid": "KMSEncryptionAccess",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:GenerateDataKey"
+      ],
+      "Resource": "arn:${PARTITION}:kms:*:${MANAGEMENT_ACCOUNT}:key/*",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "kms:ResourceAliases": "alias/accelerator/installer/kms/key"
+        }
+      }
     },
     {
       "Sid": "PipelineAccess",
       "Effect": "Allow",
       "Action": [
-        "codepipeline:GetPipelineExecution",
+        "codepipeline:GetPipeline",
         "codepipeline:GetPipelineState",
-        "codepipeline:ListActionExecutions",
-        "codepipeline:ListPipelineExecutions"
+        "codepipeline:GetPipelineExecution",
+        "codepipeline:ListPipelineExecutions",
+        "codepipeline:StartPipelineExecution"
       ],
-      "Resource": "arn:aws:codepipeline:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${ACCELERATOR_PREFIX}-Pipeline"
+      "Resource": "arn:${PARTITION}:codepipeline:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${ACCELERATOR_PREFIX}-Pipeline"
     },
     {
-      "Sid": "IAMStatement",
+      "Sid": "CodeBuildAccess",
       "Effect": "Allow",
-      "Action": [
-        "iam:GetRole",
-        "iam:GetRolePolicy",
-        "iam:ListAttachedRolePolicies",
-        "iam:ListPolicies",
-        "iam:ListRolePolicies"
-      ],
-      "Resource": [
-        "arn:${PARTITION}:iam::*:role/cdk-accel*",
-        "arn:${PARTITION}:iam::*:role/${MANAGEMENT_ACCOUNT_ACCESS_ROLE}",
-        "arn:aws:iam::*:role/${ACCELERATOR_PREFIX}-*"
-      ]
+      "Action": "codebuild:BatchGetBuilds",
+      "Resource": "arn:${PARTITION}:codebuild:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:project/${ACCELERATOR_PREFIX}-*"
     },
     {
-      "Sid": "KmsStatement",
+      "Sid": "CloudWatchLogsAccess",
       "Effect": "Allow",
-      "Action": [
-        "kms:DescribeKey",
-        "kms:ListAliases"
-      ],
-      "Resource": "arn:aws:kms:*:*:key/*",
-      "Condition": {
-        "ForAllValues:StringLike": {
-          "kms:ResourceAliases": [
-            "alias/accelerator*"
-          ]
-        }
-      }
-    },
-    {
-      "Sid": "S3ReadAccess",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetBucketEncryption",
-        "s3:GetBucketVersioning",
-        "s3:GetObject",
-        "s3:ListBuckets",
-        "s3:ListObject"
-      ],
-      "Resource": [
-        "arn:${PARTITION}:s3:::aws-accelerator*",
-        "arn:${PARTITION}:s3:::aws-accelerator*/*"
-      ]
-    },
-    {
-      "Sid": "S3ConfigUpload",
-      "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:PutBucketVersioning"
-      ],
-      "Resource": [
-        "arn:${PARTITION}:s3:::aws-accelerator-config-*",
-        "arn:${PARTITION}:s3:::aws-accelerator-config-*/zipped/*",
-        "arn:${PARTITION}:s3:::aws-accelerator-config-*/config/*"
-      ]
-    },
-    {
-      "Sid": "DenyBuildspecModification",
-      "Effect": "Deny",
-      "Action": "s3:PutObject",
-      "Resource": [
-        "arn:${PARTITION}:s3:::*/buildspec*.yml",
-        "arn:${PARTITION}:s3:::*/buildspec*.yaml"
-      ]
-    },
-    {
-      "Sid": "SSMStatement",
-      "Effect": "Allow",
-      "Action": [
-        "ssm:GetParameter"
-      ],
-      "Resource": "arn:aws:ssm:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:parameter/accelerator/*"
+      "Action": "logs:GetLogEvents",
+      "Resource": "arn:${PARTITION}:logs:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:log-group:/aws/codebuild/${ACCELERATOR_PREFIX}-*:*"
     }
   ]
 }
@@ -411,273 +270,400 @@ The MCP server requires specific IAM permissions to interact with AWS services f
 
 ### Policy Variables
 
-Replace the following placeholders with your specific values:
+Replace these placeholders with your deployment values:
 
-- `${HOME-REGION}`: Your AWS home region (e.g., `us-east-1`)
-- `${MANAGEMENT_ACCOUNT}`: Your AWS management account ID
-- `${ACCELERATOR_PREFIX}`: Your LZA accelerator prefix (default: `AWSAccelerator`)
-- `${PARTITION}`: AWS partition (typically `aws`, or `aws-us-gov` for GovCloud)
-- `${MANAGEMENT_ACCOUNT_ACCESS_ROLE}`: Role name for cross-account access (default: `OrganizationAccountAccessRole`)
+- `${HOME-REGION}`: AWS region where LZA is deployed (e.g., `us-east-1`)
+- `${MANAGEMENT_ACCOUNT}`: AWS management account ID (12-digit number)
+- `${ACCELERATOR_PREFIX}`: LZA resource prefix (default: `aws-accelerator`)
+- `${PARTITION}`: AWS partition (`aws`, `aws-us-gov`, or `aws-cn`)
 
-### Permission Breakdown
+### Permission Scope
 
-- **Organizations**: Read-only access to AWS Organizations for account and OU information
-- **CodePipeline**: Access to monitor and manage LZA pipeline executions
-- **IAM**: Read access to roles and policies used by LZA
-- **KMS**: Access to KMS keys with the accelerator alias for encryption operations
-- **S3**: Read/write access to LZA configuration buckets for configuration management
-- **SSM**: Read access to Systems Manager parameters to retrieve the deployed LZA version
+| Service | Purpose | Reference |
+|---------|---------|-----------|
+| **STS** | Identity verification for connectivity checks | [AWS STS Documentation](https://docs.aws.amazon.com/STS/latest/APIReference/welcome.html) |
+| **SSM** | Retrieve deployed LZA version from Parameter Store | [AWS Systems Manager Parameters](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) |
+| **S3** | Read/write LZA configuration files in config bucket | [S3 Bucket Policies](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-policies.html) |
+| **KMS** | Encrypt/decrypt configurations using LZA KMS key | [AWS KMS Key Policies](https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html) |
+| **CodePipeline** | Monitor and trigger LZA pipeline executions | [CodePipeline Monitoring](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) |
+| **CodeBuild** | Retrieve build project details for diagnostics | [CodeBuild Projects](https://docs.aws.amazon.com/codebuild/latest/userguide/builds-working.html) |
+| **CloudWatch Logs** | Access CodeBuild logs for error analysis | [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html) |
 
-## Schema Management
+**Note:** The KMS policy uses alias-based access control (`kms:ResourceAliases`) for maintainability. This approach allows key rotation without policy updates, following [AWS KMS best practices](https://docs.aws.amazon.com/kms/latest/developerguide/best-practices.html).
 
-The server includes automated LZA schema management that generates schemas for multiple LZA versions during Docker image build.
+## MCP Client Configuration
 
-### Multi-Version Schema Support
+### Configuration File Locations
 
-The MCP server supports multiple LZA versions simultaneously, allowing you to:
-- Search schemas for specific LZA versions
-- Compare configurations across different LZA releases
-- Work with schemas matching your deployed LZA version
-- Access the latest LZA schemas automatically
+| IDE | Configuration Path |
+|-----|-------------------|
+| **Kiro IDE** | `.kiro/settings/mcp.json` (workspace)<br>`~/.kiro/settings/mcp.json` (global) |
+| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) |
 
-### Schema Generation
+### Complete Configuration Example
 
-Schemas are automatically generated when building the Docker image:
-
-```bash
-# Build local image (generates schemas automatically)
-make build
-
-# Or specify custom version range
-finch build \
-  --build-arg LZA_MIN_VERSION=v1.10.0 \
-  --build-arg LZA_MAX_VERSION=v1.14.0 \
-  -t lza-mcp-server:local .
-```
-
-### How It Works
-
-1. **Fetch**: Queries GitHub API for all LZA releases
-2. **Filter**: Determines versions between min and max versions
-3. **Clone**: Clones each version from GitHub
-4. **Extract**: Extracts JSON schema files from `source/packages/@aws-accelerator/config/lib/schemas`
-5. **Process**: Resolves `$ref` references and generates metadata for each version
-6. **Organize**: Creates version-specific directories
-
-### Schema Files Location
-
-- **Container**: `/app/json-schemas/{version}/` (e.g., `/app/json-schemas/v1.12.0/`)
-
-### Using Schema Tools
-
-All schema search and retrieval tools require specifying an explicit LZA version:
-
-```bash
-# List available versions first
-listLzaSupportedVersions()
-
-# Search schemas for a specific version
-searchJsonSchema(
-  lza_version="v1.12.0",
-  search_terms=["vpc", "subnet"]
-)
-
-# Get full schema for a specific version
-getFullSchema(
-  lza_version="v1.13.0",
-  schema_path="network-config-schema.json"
-)
-```
-
-**Note**: The `lza_version` parameter must be an explicit version (e.g., "v1.12.0"). Use `listLzaSupportedVersions()` to see all available versions.
-
-For detailed API documentation, see [SCHEMA_TOOLS_API.md](SCHEMA_TOOLS_API.md).
-
-## Universal Configuration
-
-The local Docker image includes LZA Universal Configuration release artifacts for reference and deployment.
-
-### What's Included
-
-During build, the latest (or specified) Universal Configuration release is downloaded:
-- **Configuration packages**: All ZIP files from the release (hub-and-spoke, shared-vpc, etc.)
-- **Documentation**: Complete docs folder from the source repository
-
-### Build Arguments
-
-Control which release is downloaded:
-
-```bash
-# Use latest release (default)
-make build
-
-# Specify a version
-finch build \
-  --build-arg LZA_UC_RELEASE=v1.0.0 \
-  -t lza-mcp-server:local .
-```
-
-### File Structure
-
-Artifacts are organized by release version in `/app/lza-uc/{version}/`:
-
-```
-/app/lza-uc/
-└── v1.0.0/
-    ├── hub-and-spoke/              # Configuration files
-    ├── hub-and-spoke-for-govcloud-us/
-    ├── shared-vpc/
-    └── docs/                       # Documentation
-```
-
-### How It Works
-
-1. **Fetch Release**: Downloads release metadata from GitHub API
-2. **Download ZIPs**: Retrieves all configuration ZIP files from the release
-3. **Extract Configs**: Unpacks each ZIP to its own directory (removes intermediate `config/` folder)
-4. **Download Source**: Fetches source code archive for the release tag
-5. **Extract Docs**: Copies documentation folder to the release directory
-
-## Available Tools
-
-### AWS Services
-- **checkAwsConnectivity**: Verify AWS credentials and connectivity
-
-### Configuration Management
-- **getMinimumConfiguration**: Generate minimal LZA configuration templates
-- **uploadConfigurationToS3**: Upload configuration files to S3 bucket
-- **getConfigurationFromS3**: Retrieve and extract current LZA configuration from S3
-
-### Pipeline Management
-- **releasePipeline**: Start the LZA pipeline execution
-- **getPipelineStatus**: Get current pipeline status and progress
-- **diagnosePipelineErrors**: Retrieve logs for failed pipeline executions
-
-### Schema Search
-- **listLzaSupportedVersions**: List all supported LZA versions with schema information
-- **searchJsonSchema**: Search LZA configuration schemas by terms, properties, patterns, or complexity (requires lza_version parameter)
-- **getFullSchema**: Retrieve complete schema details or specific properties (requires lza_version parameter)
-
-### Universal Configuration Merge (Optional)
-Enable with `ENABLE_UC_MERGE=true` to access these tools:
-- **validateLzaForUcMerge**: Validate LZA installation compatibility
-- **get_uc_releases**: Discover available UC release versions
-- **get_uc_network_models**: Get network deployment model comparison
-- **start_uc_merge_session**: Initialize a UC merge session
-- **readLzaConfigFile**: Read LZA configuration files
-- **readUcFile**: Read UC files from session
-- **updateUcFile**: Update UC files in session
-- **getUcNetworkCustomizationGuide**: Get customization guidance
-- **copyUcToLzaConfig**: Copy UC configuration to LZA directory
-
-## Configuration Retrieval
-
-The server provides tools to retrieve and inspect deployed LZA configurations from S3.
-
-### Retrieving Current Configuration
-
-Retrieve the currently deployed LZA configuration from S3 for inspection or comparison:
-
-### Retrieval Workflow
-
-The `getConfigurationFromS3` tool:
-- Downloads the configuration ZIP from `zipped/aws-accelerator-config.zip` in the S3 bucket
-- Extracts all files to `/app/lza-config/retrieved-config` (Docker container path)
-- Returns both `container_path` and `host_path` for file access
-- **LLM uses `host_path`** to inspect and read configuration files on the local system
-- Returns comprehensive metadata including file counts, directory structure, and file listings
-- Automatically cleans up previous retrieved configurations to keep the file system clean
-- Users map their local directory (e.g., `~/Documents/lza-config`) to `/app/lza-config` in the container
-
-**Volume Mount Configuration**:
-The host path is determined by the `LZA_CONFIG_HOST_PATH` environment variable in your MCP configuration:
-
-1. **Set in MCP Configuration**: The `LZA_CONFIG_HOST_PATH` environment variable must match your volume mount path
-2. **Volume Mount**: Use `-v <CONFIG_PATH>:/app/lza-config:rw` to mount your local directory
-3. **Environment Variable**: Use `-e LZA_CONFIG_HOST_PATH=<CONFIG_PATH>` to tell the server where files are on your host
-
-**Important**: Both the volume mount path and the `LZA_CONFIG_HOST_PATH` environment variable must use the same path. This ensures the MCP server provides correct file paths that work on your local system.
-
-Example:
 ```json
 {
   "mcpServers": {
     "awslabs.lza-mcp-server": {
+      "command": "/Users/jsmith/repos/lza-mcp-server/scripts/extract-aws-credentials.sh",
       "args": [
-        "docker", "run", "--rm", "-i",
+        "docker", "run",
+        "--security-opt=no-new-privileges:true",
+        "--cap-drop=ALL",
+        "--read-only",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,size=200m",
+        "--rm", "-i",
         "-v", "/Users/jsmith/Documents/lza-config:/app/lza-config:rw",
         "-e", "LZA_CONFIG_HOST_PATH=/Users/jsmith/Documents/lza-config",
-        ...
+        "-e", "AWS_ACCESS_KEY_ID",
+        "-e", "AWS_SECRET_ACCESS_KEY",
+        "-e", "AWS_SESSION_TOKEN",
+        "-e", "AWS_REGION",
+        "-e", "FASTMCP_LOG_LEVEL=INFO",
+        "-e", "ENABLE_UC_MERGE=false",
+        "lza-mcp-server:local"
+      ],
+      "env": {
+        "AWS_PROFILE": "lza-role-mcp-policy-attached",
+        "AWS_REGION": "us-east-1"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "checkAwsConnectivity",
+        "listLzaSupportedVersions",
+        "searchJsonSchema",
+        "getFullSchema",
+        "getPipelineStatus",
+        "getConfigurationFromS3"
       ]
     }
   }
 }
 ```
 
-See the [MCP Server Configuration](#mcp-server-configuration) section for complete configuration examples.
+### Security Flags
 
-## Configuration Cleanup
+The configuration includes container security hardening:
 
-### Automatic Cleanup
+- `--security-opt=no-new-privileges:true`: Prevents privilege escalation
+- `--cap-drop=ALL`: Removes all Linux capabilities
+- `--read-only`: Makes root filesystem read-only
+- `--tmpfs /tmp`: Provides writable temp space with `noexec`
 
-The `getConfigurationFromS3` tool automatically cleans up the previous retrieved configuration before creating a new one. This ensures the file system stays clean without requiring manual intervention.
+These flags mitigate container escape vulnerabilities. Keep Docker/Finch updated for latest security patches.
 
-### Manual Cleanup
+### Environment Variables
 
-If you need to clean up a retrieved configuration directory immediately (before the next retrieval), you can manually remove it:
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `LZA_CONFIG_HOST_PATH` | Local path for configuration files (must match volume mount) | `/Users/jsmith/Documents/lza-config` |
+| `AWS_PROFILE` | AWS CLI profile name for role with LZA MCP policy attached | `lza-role-mcp-policy-attached` |
+| `AWS_REGION` | Default AWS region | `us-east-1` |
+| `FASTMCP_LOG_LEVEL` | Logging verbosity | `INFO`, `DEBUG` |
+| `ENABLE_UC_MERGE` | Enable Universal Configuration merge tools | `false` (default), `true` |
 
-```bash
-# From inside the Docker container
-rm -rf /app/lza-config/retrieved-config
+**Note:** Setting `ENABLE_UC_MERGE=true` enables 9 additional tools for UC merge workflows but increases context size by ~56%.
 
-# Or from your local system (if you have the volume mounted)
-rm -rf ~/Documents/lza-config/retrieved-config
+### Auto-Approved Tools
+
+The `autoApprove` list includes read-only operations that don't modify AWS resources:
+
+- Configuration retrieval and inspection
+- Schema searches and discovery
+- Pipeline status monitoring
+- AWS connectivity verification
+
+Tools that modify resources (`releasePipeline`, `uploadConfigurationToS3`) require explicit approval for safety.
+
+### Schema Integrity Validation
+
+The server validates schema integrity at startup using SHA-256 checksums. This protects against tampering or corruption of embedded LZA schemas. If validation fails, the server refuses to start with a clear error message.
+
+## Available Tools
+
+### AWS Services
+
+**checkAwsConnectivity**  
+Verifies AWS credentials and reports authenticated identity. Use this to confirm AWS connectivity with a IAM credentials before performing operations.
+
+**getDeployedLzaVersion**  
+Retrieves the currently deployed LZA version from SSM Parameter Store. Use this to identify the correct schema version for searches.
+
+### Configuration Management
+
+**getMinimumConfiguration**  
+Generates minimal LZA configuration templates for new deployments. Templates include required accounts and baseline settings.
+
+**uploadConfigurationToS3**  
+Uploads configuration files to the LZA S3 bucket.
+
+**getConfigurationFromS3**  
+Retrieves current LZA configuration from S3 for inspection or modification. Extracts files to shared Docker volume for IDE access.
+
+### Pipeline Management
+
+**releasePipeline**  
+Starts LZA pipeline execution to deploy configuration changes. See [CodePipeline execution documentation](https://docs.aws.amazon.com/codepipeline/latest/userguide/executions-view.html) for execution details.
+
+**getPipelineStatus**  
+Monitors pipeline execution progress with stage-level details. Returns real-time status for all pipeline stages.
+
+**diagnosePipelineErrors**  
+Retrieves detailed error logs from failed pipeline executions. Analyzes CodeBuild logs and provides troubleshooting guidance.
+
+### Schema Search
+
+**listLzaSupportedVersions**  
+Lists all LZA versions with embedded schemas. Use this to identify the correct version for schema searches.
+
+**searchJsonSchema**  
+Searches LZA configuration schemas by property names, patterns, or complexity. Requires explicit `lza_version` parameter.
+
+**getFullSchema**  
+Retrieves complete schema definitions or specific properties. Supports filtering by property path for targeted queries.
+
+### Universal Configuration Merge (Optional)
+
+Enable with `ENABLE_UC_MERGE=true` to access UC merge workflow tools:
+
+- **validateLzaForUcMerge**: Validate LZA installation compatibility
+- **get_uc_releases**: Discover available UC release versions
+- **get_uc_network_models**: Compare network deployment models
+- **start_uc_merge_session**: Initialize UC merge session
+- **readLzaConfigFile**: Read LZA configuration files
+- **readUcFile**: Read UC files from merge session
+- **updateUcFile**: Update UC files in merge session
+- **getUcNetworkCustomizationGuide**: Get customization guidance
+- **copyUcToLzaConfig**: Copy UC configuration to LZA directory
+
+## Schema Management
+
+Schemas are generated during container build. See [Build Process](#build-process) for build details and customization options.
+
+### Multi-Version Support
+
+The server supports multiple LZA versions simultaneously:
+- Search schemas for specific versions
+- Compare configurations across releases
+- Match schemas to deployed LZA version
+- Access latest LZA schemas automatically
+
+### File Structure
+
+```
+/app/json-schemas/
+├── v1.12.0/
+│   ├── accounts-config-schema.json
+│   ├── global-config-schema.json
+│   ├── iam-config-schema.json
+│   ├── network-config-schema.json
+│   ├── organization-config-schema.json
+│   ├── security-config-schema.json
+│   └── combined.json
+├── v1.13.0/
+│   └── ...
+└── v1.14.0/
+    └── ...
 ```
 
-## Pipeline Deployment
+### Using Schema Tools
 
-After validating and uploading your configuration, deploy changes using the pipeline tool:
+All schema tools require explicit version specification:
 
 ```bash
-# 1. Upload configuration
-uploadConfigurationToS3(config_path="/path/to/config", bucket_name="my-bucket")
+# List available versions
+listLzaSupportedVersions()
 
-# 2. Start pipeline execution
-releasePipeline(pipeline_name="AWSAccelerator-Pipeline")
+# Search schemas for specific version
+searchJsonSchema(
+  lza_version="v1.12.0",
+  search_terms=["vpc", "subnet"]
+)
 
-# 3. Check status
-getPipelineStatus(pipeline_name="AWSAccelerator-Pipeline")
+# Get full schema
+getFullSchema(
+  lza_version="v1.13.0",
+  schema_path="network-config-schema.json"
+)
+```
+
+## Universal Configuration
+
+The [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) provides enterprise-ready configuration templates that establish secure, scalable, and well-architected multi-account AWS environments. These templates enable rapid deployment of baseline environments supporting multiple global compliance frameworks.
+
+The MCP server includes UC release artifacts and specialized merge tools to streamline integration of these compliance-focused templates with existing LZA deployments.
+
+### What UC Provides
+
+- **Enterprise-Ready Templates**: Pre-configured security, governance, and organization settings
+- **Network Patterns**: Hub-and-spoke and shared VPC networking architectures
+- **Compliance Frameworks**: Support for multiple global regulatory requirements
+- **Best Practices**: Opinionated, well-architected approach to multi-account environments
+
+### Included Content
+
+During build, the latest UC release is downloaded:
+- Configuration packages (hub-and-spoke, shared-vpc, etc.)
+- Complete documentation from source repository
+
+### Build Arguments
+
+```bash
+# Use latest release (default)
+make build
+
+# Specify version
+docker build \
+  --build-arg LZA_UC_RELEASE=v1.0.0 \
+  -t lza-mcp-server:local .
+```
+
+### File Structure
+
+```
+/app/lza-uc/
+└── v1.0.0/
+    ├── hub-and-spoke/
+    ├── hub-and-spoke-for-govcloud-us/
+    ├── shared-vpc/
+    └── docs/
+```
+
+## Configuration Operations
+
+### Retrieving Configurations
+
+The `getConfigurationFromS3` tool downloads and extracts the current LZA configuration:
+
+1. Downloads ZIP from `zipped/aws-accelerator-config.zip`
+2. Extracts to `/app/lza-config/retrieved-config` (container path)
+3. Returns `host_path` for IDE file access
+4. Provides metadata (file counts, directory structure)
+5. Automatically cleans up previous retrievals
+
+> **💡 Recommendation**  
+> Place the configuration directory within your IDE workspace for easier file access. This allows seamless navigation and AI assisted editing of retrieved configurations.
+
+### Volume Mount Configuration
+
+The `LZA_CONFIG_HOST_PATH` environment variable must match the volume mount path:
+
+```json
+{
+  "args": [
+    "-v", "/Users/jsmith/Documents/lza-config:/app/lza-config:rw",
+    "-e", "LZA_CONFIG_HOST_PATH=/Users/jsmith/Documents/lza-config"
+  ]
+}
+```
+
+This ensures the server provides correct file paths for IDE access.
+
+## Pipeline Management
+
+### Deployment Workflow
+
+1. **Upload Configuration**
+   ```
+   Use your tools, upload my LZA configuration
+   ```
+
+2. **Start Pipeline**
+   ```
+   Start LZA pipeline execution
+   ```
+
+3. **Monitor Progress**
+   ```
+   Get LZA pipeline status
+   ```
+
+4. **Diagnose Errors** (if needed, it will auto-suggest)
+   ```
+   Diagnose pipeline errors
+   ```
+
+### Pipeline Monitoring
+
+The server provides real-time pipeline monitoring with stage-level details. See [AWS CodePipeline monitoring documentation](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) for execution state details.
+
+## Advanced Topics
+
+### Custom Schema Versions
+
+Build container with specific LZA version range:
+
+```bash
+docker build \
+  --build-arg LZA_MIN_VERSION=v1.8.0 \
+  --build-arg LZA_MAX_VERSION=v1.15.0 \
+  -t lza-mcp-server:custom .
+```
+
+### Logging Configuration
+
+Adjust logging verbosity for troubleshooting:
+
+```json
+{
+  "env": {
+    "FASTMCP_LOG_LEVEL": "DEBUG"
+  }
+}
+```
+
+Levels: `ERROR`, `WARNING`, `INFO`, `DEBUG`
+
+### Resource Limits
+
+Add resource constraints to prevent resource exhaustion:
+
+```json
+{
+  "args": [
+    "--memory=1g",
+    "--cpus=1.0"
+  ]
+}
 ```
 
 ## Troubleshooting
 
 ### Schema Issues
-- **Schema file not found**: Rebuild Docker image with `make build`
-- **Search returns no results**: Verify Docker image was built successfully
-- **Outdated schemas**: Rebuild Docker image to get latest LZA schemas
-- **Network issues during build**: Check internet connectivity for GitHub access during Docker build
-- **Version not found**: Use `listLzaSupportedVersions()` to see available versions, or rebuild with desired version range
-- **Missing lza_version parameter**: All schema tools require the `lza_version` parameter (e.g. "v1.12.0")
-- **Invalid version specified**: Check available versions with `listLzaSupportedVersions()` and use one from the list
+
+**Schema file not found**  
+Rebuild container image: `make build`
+
+**Search returns no results**  
+Verify version exists: `listLzaSupportedVersions()`
+
+**Missing lza_version parameter**  
+All schema tools require explicit version (e.g., `"v1.12.0"`)
 
 ### Container Issues
-- **Finch VM not started**: Run `finch vm start` before using Finch commands
-- **Build context errors**: Ensure you're running commands from the correct directory with all required files
-- **AWS credentials warnings**: Set environment variables or use AWS credential files
-- **Missing schema in container**: Schemas are generated during build - rebuild image if missing
-- **Build fails during LZA clone**: Check network connectivity and GitHub access
 
-### Configuration Retrieval Issues
-- **Bucket not found**: Verify LZA has been deployed and the configuration bucket exists
-- **Object not found**: Ensure configuration has been uploaded to `zipped/aws-accelerator-config.zip`
-- **Invalid bucket name**: Bucket names must be 3-63 characters, lowercase, following AWS S3 naming rules
-- **Permission denied**: Verify IAM permissions include `s3:GetObject` for the configuration bucket
-- **Invalid ZIP file**: The downloaded file may be corrupted - check the S3 object integrity
-- **S3 download failures**: Verify AWS credentials and S3 bucket permissions
+**Build fails during LZA clone**  
+Check network connectivity and GitHub access
 
-## Documentation
+**AWS credentials warnings**  
+Verify AWS CLI profile configuration in `~/.aws/credentials`
 
-See `deployment/README.md` for detailed deployment instructions and troubleshooting.
+### Configuration Issues
+
+**Bucket not found**  
+Verify LZA deployment and configuration bucket existence
+
+**Permission denied**  
+Confirm profile name in MCP configuration and ensure role has LZA MCP recommended policy attached
+
+### Pipeline Issues
+
+**Pipeline not found**  
+Verify pipeline name matches LZA deployment (default: `AWSAccelerator-Pipeline`) and MCP configuration JSON region specification
+
+**Execution fails immediately**  
+Check container logs, possibly increase logging level
 
 ## License
 
