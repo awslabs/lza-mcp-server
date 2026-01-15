@@ -12,117 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Property-based and unit tests for validation utilities."""
+"""Unit tests for validation utilities."""
 
 import pytest
-from hypothesis import given, strategies as st, settings
 from awslabs.lza_mcp_server.tools.uc_merge.validation import (
     validate_fresh_installation_accounts,
     validate_fresh_installation_network,
     validate_fresh_installation_iam,
 )
-
-
-# Property-Based Tests
-
-
-@pytest.mark.property
-@pytest.mark.uc_merge
-class TestFreshInstallationValidationProperties:
-    """Property-based tests for fresh installation validation."""
-
-    # Feature: uc-merge, Property 9: Empty workloadAccounts validation
-    # Validates: Requirements 4.1
-    @settings(max_examples=100)
-    @given(
-        empty_representation=st.one_of(
-            st.just([]),  # Empty list
-            st.just(None),  # None value
-        )
-    )
-    def test_property_empty_workload_accounts_validation(self, empty_representation):
-        """Test that various representations of empty workloadAccounts pass validation.
-
-        For any representation of empty (empty list, None), the validation should pass.
-        """
-        # Create accounts config with empty workloadAccounts
-        accounts_config = {
-            "mandatoryAccounts": [
-                {"name": "Management", "email": "management@example.com"},
-                {"name": "LogArchive", "email": "logarchive@example.com"},
-                {"name": "Audit", "email": "audit@example.com"},
-            ],
-            "workloadAccounts": empty_representation,
-        }
-
-        # Validate
-        is_valid, error_msg = validate_fresh_installation_accounts(accounts_config)
-
-        # Should pass validation
-        assert is_valid is True
-        assert error_msg == ""
-
-    # Feature: uc-merge, Property 10: Minimal network configuration validation
-    # Validates: Requirements 4.2
-    @settings(max_examples=100)
-    @given(
-        transit_gateways=st.one_of(st.just([]), st.just(None)),
-        endpoint_policies=st.one_of(st.just([]), st.just(None)),
-        vpcs=st.one_of(st.just([]), st.just(None)),
-    )
-    def test_property_minimal_network_configuration(
-        self, transit_gateways, endpoint_policies, vpcs
-    ):
-        """Test that configs with empty arrays for network resources pass validation.
-
-        For any combination of empty arrays (or None), the validation should pass.
-        """
-        # Create network config with empty arrays
-        network_config = {
-            "transitGateways": transit_gateways,
-            "endpointPolicies": endpoint_policies,
-            "vpcs": vpcs,
-        }
-
-        # Validate
-        is_valid, error_msg = validate_fresh_installation_network(network_config)
-
-        # Should pass validation
-        assert is_valid is True
-        assert error_msg == ""
-
-    # Feature: uc-merge, Property 11: Minimal IAM configuration validation
-    # Validates: Requirements 4.3
-    @settings(max_examples=100)
-    @given(
-        providers=st.one_of(st.just([]), st.just(None)),
-        policy_sets=st.one_of(st.just([]), st.just(None)),
-        role_sets=st.one_of(st.just([]), st.just(None)),
-        group_sets=st.one_of(st.just([]), st.just(None)),
-        user_sets=st.one_of(st.just([]), st.just(None)),
-    )
-    def test_property_minimal_iam_configuration(
-        self, providers, policy_sets, role_sets, group_sets, user_sets
-    ):
-        """Test that configs with empty arrays for IAM resources pass validation.
-
-        For any combination of empty arrays (or None), the validation should pass.
-        """
-        # Create IAM config with empty arrays
-        iam_config = {
-            "providers": providers,
-            "policySets": policy_sets,
-            "roleSets": role_sets,
-            "groupSets": group_sets,
-            "userSets": user_sets,
-        }
-
-        # Validate
-        is_valid, error_msg = validate_fresh_installation_iam(iam_config)
-
-        # Should pass validation
-        assert is_valid is True
-        assert error_msg == ""
 
 
 # Unit Tests

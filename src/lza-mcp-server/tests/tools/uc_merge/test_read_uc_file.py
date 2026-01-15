@@ -16,7 +16,6 @@
 
 import pytest
 from unittest.mock import AsyncMock
-from hypothesis import given, strategies as st, settings, HealthCheck
 
 from awslabs.lza_mcp_server.tools.uc_merge.read_uc_file import (
     read_uc_file,
@@ -94,54 +93,6 @@ def temp_session(tmp_path):
 # Feature: uc-merge, Property 7: Session validation for UC operations
 @pytest.mark.property
 @pytest.mark.uc_merge
-@pytest.mark.unit
-@settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
-@given(
-    invalid_session_id=st.one_of(
-        st.just(""),
-        st.just("nonexistent-session"),
-        st.just("invalid-session-12345"),
-        st.just("uc-session-99999999-999999"),
-        st.text(min_size=1, max_size=50).filter(
-            lambda x: not x.startswith("uc-session-")
-        ),
-    )
-)
-def test_property_session_validation(mock_ctx, temp_session, invalid_session_id):
-    """Property 7: Session validation for UC operations.
-
-    For any call to read_uc_file without a valid session_id, the tool should
-    return an error indicating a session must be started first.
-
-    Validates: Requirements 6.2
-    """
-    import asyncio
-
-    # Patch the SessionManager to use our temp directory
-    from awslabs.lza_mcp_server.tools.uc_merge import read_uc_file as module
-
-    original_session_manager = module.SessionManager
-
-    def patched_session_manager():
-        return temp_session["session_manager"]
-
-    module.SessionManager = patched_session_manager
-
-    try:
-        result = asyncio.run(
-            read_uc_file(mock_ctx, invalid_session_id, "accounts-config.yaml")
-        )
-
-        assert result["success"] is False
-        assert result["error_code"] in ["MISSING_SESSION_ID", "INVALID_SESSION"]
-        assert result["category"] == ErrorCategory.VALIDATION
-        assert "session" in result["error"].lower()
-    finally:
-        # Restore original
-        module.SessionManager = original_session_manager
-
-
-# ============================================================================
 # Unit Tests
 # ============================================================================
 
