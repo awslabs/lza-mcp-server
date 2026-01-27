@@ -15,16 +15,11 @@
 """Unit tests for get_pipeline_status edge cases and fallback logic."""
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 from datetime import datetime
-from botocore.exceptions import ClientError
 
 from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
     tool_get_pipeline_status,
-    get_stage_description,
-    get_action_description,
-    get_cached_pipeline_metadata,
-    cache_pipeline_metadata,
 )
 
 
@@ -35,9 +30,12 @@ class TestPipelineStatusEdgeCases:
     async def test_inprogress_execution_no_active_stages(self, mock_mcp_context):
         """Test INPROGRESS execution when no stages show InProgress status (fallback logic)."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {"stages": [{"name": "Source"}, {"name": "Build"}]}
         }
@@ -70,12 +68,20 @@ class TestPipelineStatusEdgeCases:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             call_sequence.append(kwargs)
-            
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
+
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
                 if name_calls == 1:
                     return mock_pipeline_response
                 else:
@@ -86,11 +92,14 @@ class TestPipelineStatusEdgeCases:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -110,9 +119,12 @@ class TestPipelineStatusEdgeCases:
     async def test_failed_pipeline_execution(self, mock_mcp_context):
         """Test FAILED pipeline execution status."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {"stages": [{"name": "Source"}, {"name": "Build"}]}
         }
@@ -157,12 +169,20 @@ class TestPipelineStatusEdgeCases:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             call_sequence.append(kwargs)
-            
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
+
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
                 if name_calls == 1:
                     return mock_pipeline_response
                 else:
@@ -173,11 +193,14 @@ class TestPipelineStatusEdgeCases:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -194,9 +217,12 @@ class TestPipelineStatusEdgeCases:
     async def test_stopped_pipeline_execution(self, mock_mcp_context):
         """Test STOPPED pipeline execution status."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {"stages": [{"name": "Source"}, {"name": "Build"}]}
         }
@@ -235,12 +261,20 @@ class TestPipelineStatusEdgeCases:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             call_sequence.append(kwargs)
-            
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
+
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
                 if name_calls == 1:
                     return mock_pipeline_response
                 else:
@@ -251,11 +285,14 @@ class TestPipelineStatusEdgeCases:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -271,11 +308,14 @@ class TestPipelineStatusEdgeCases:
     async def test_specific_execution_id_with_completed_status(self, mock_mcp_context):
         """Test providing specific execution ID for a completed execution."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         execution_id = "12345678-1234-1234-1234-123456789012"
-        
+
         mock_pipeline_response = {
             "pipeline": {"stages": [{"name": "Source"}, {"name": "Build"}]}
         }
@@ -320,12 +360,20 @@ class TestPipelineStatusEdgeCases:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             call_sequence.append(kwargs)
-            
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
+
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
                 if name_calls == 1:
                     return mock_pipeline_response
                 else:
@@ -336,16 +384,21 @@ class TestPipelineStatusEdgeCases:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
             result = await tool_get_pipeline_status(
-                mock_mcp_context, pipeline_name="test-pipeline", execution_id=execution_id
+                mock_mcp_context,
+                pipeline_name="test-pipeline",
+                execution_id=execution_id,
             )
 
             assert result["success"] is True
@@ -354,14 +407,16 @@ class TestPipelineStatusEdgeCases:
             assert "stage 2 of 2" in result["message"]
             assert result["current_stage"] == "Build"
 
-
     @pytest.mark.asyncio
     async def test_unknown_status_handling(self, mock_mcp_context):
         """Test handling of unknown/unexpected pipeline status."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {"stages": [{"name": "Source"}, {"name": "Build"}]}
         }
@@ -394,12 +449,20 @@ class TestPipelineStatusEdgeCases:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             call_sequence.append(kwargs)
-            
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
+
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
                 if name_calls == 1:
                     return mock_pipeline_response
                 else:
@@ -410,11 +473,14 @@ class TestPipelineStatusEdgeCases:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -436,9 +502,12 @@ class TestPipelineStatusEdgeCases:
     async def test_multiple_inprogress_stages(self, mock_mcp_context):
         """Test handling when multiple stages are in progress simultaneously."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {
                 "stages": [
@@ -516,12 +585,20 @@ class TestPipelineStatusEdgeCases:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             call_sequence.append(kwargs)
-            
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
+
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
                 if name_calls == 1:
                     return mock_pipeline_response
                 else:
@@ -532,11 +609,14 @@ class TestPipelineStatusEdgeCases:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 

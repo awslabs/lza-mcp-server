@@ -15,8 +15,6 @@
 """Unit tests for S3Manager file upload functionality."""
 
 import pytest
-import os
-import tempfile
 from unittest.mock import Mock, patch, mock_open
 from botocore.exceptions import ClientError
 
@@ -32,28 +30,28 @@ class TestUploadZipFile:
     @patch("builtins.open", new_callable=mock_open, read_data=b"test data")
     @patch("os.path.exists")
     @patch("os.path.getsize")
-    async def test_upload_success(self, mock_getsize, mock_exists, mock_file, mock_get_session):
+    async def test_upload_success(
+        self, mock_getsize, mock_exists, mock_file, mock_get_session
+    ):
         """Test successful file upload."""
         mock_exists.return_value = True
         mock_getsize.return_value = 1024
-        
+
         mock_s3_client = Mock()
         mock_s3_client.upload_file.return_value = None
         mock_s3_client.head_object.return_value = {
             "ContentLength": 1024,
-            "ETag": '"abc123"'
+            "ETag": '"abc123"',
         }
         mock_session = Mock()
         mock_session.client.return_value = mock_s3_client
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         result = await manager.upload_zip_file(
-            zip_path="/tmp/test.zip",
-            bucket_name="test-bucket",
-            key="test-key.zip"
+            zip_path="/tmp/test.zip", bucket_name="test-bucket", key="test-key.zip"
         )
-        
+
         assert result["success"] is True
         assert result["bucket_name"] == "test-bucket"
         assert result["object_key"] == "test-key.zip"
@@ -66,10 +64,9 @@ class TestUploadZipFile:
         """Test upload fails when file doesn't exist."""
         manager = S3Manager()
         result = await manager.upload_zip_file(
-            zip_path="/nonexistent/file.zip",
-            bucket_name="test-bucket"
+            zip_path="/nonexistent/file.zip", bucket_name="test-bucket"
         )
-        
+
         assert result["success"] is False
         assert result["error_code"] == "ZIP_FILE_NOT_FOUND"
         assert "not found" in result["error"].lower()
@@ -79,24 +76,27 @@ class TestUploadZipFile:
     @patch("builtins.open", new_callable=mock_open, read_data=b"test data")
     @patch("os.path.exists")
     @patch("os.path.getsize")
-    async def test_upload_client_error(self, mock_getsize, mock_exists, mock_file, mock_get_session):
+    async def test_upload_client_error(
+        self, mock_getsize, mock_exists, mock_file, mock_get_session
+    ):
         """Test upload handles ClientError."""
         mock_exists.return_value = True
         mock_getsize.return_value = 1024
-        
+
         mock_s3_client = Mock()
         error_response = {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}
-        mock_s3_client.upload_file.side_effect = ClientError(error_response, "PutObject")
+        mock_s3_client.upload_file.side_effect = ClientError(
+            error_response, "PutObject"
+        )
         mock_session = Mock()
         mock_session.client.return_value = mock_s3_client
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         result = await manager.upload_zip_file(
-            zip_path="/tmp/test.zip",
-            bucket_name="test-bucket"
+            zip_path="/tmp/test.zip", bucket_name="test-bucket"
         )
-        
+
         assert result["success"] is False
         assert "S3 upload failed" in result["error"]
 
@@ -106,21 +106,22 @@ class TestUploadZipFile:
     @patch("builtins.open", new_callable=mock_open, read_data=b"test data")
     @patch("os.path.exists")
     @patch("os.path.getsize")
-    async def test_upload_timeout(self, mock_getsize, mock_exists, mock_file, mock_with_timeout, mock_get_session):
+    async def test_upload_timeout(
+        self, mock_getsize, mock_exists, mock_file, mock_with_timeout, mock_get_session
+    ):
         """Test upload handles timeout."""
         mock_exists.return_value = True
         mock_getsize.return_value = 1024
         mock_with_timeout.side_effect = TimeoutError("Upload timed out")
-        
+
         mock_session = Mock()
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         result = await manager.upload_zip_file(
-            zip_path="/tmp/test.zip",
-            bucket_name="test-bucket"
+            zip_path="/tmp/test.zip", bucket_name="test-bucket"
         )
-        
+
         assert result["success"] is False
         assert result["error_code"] == "S3_UPLOAD_TIMEOUT"
         assert "timed out" in result["error"].lower()
@@ -130,23 +131,24 @@ class TestUploadZipFile:
     @patch("builtins.open", new_callable=mock_open, read_data=b"test data")
     @patch("os.path.exists")
     @patch("os.path.getsize")
-    async def test_upload_unexpected_error(self, mock_getsize, mock_exists, mock_file, mock_get_session):
+    async def test_upload_unexpected_error(
+        self, mock_getsize, mock_exists, mock_file, mock_get_session
+    ):
         """Test upload handles unexpected errors."""
         mock_exists.return_value = True
         mock_getsize.return_value = 1024
-        
+
         mock_s3_client = Mock()
         mock_s3_client.upload_file.side_effect = RuntimeError("Unexpected error")
         mock_session = Mock()
         mock_session.client.return_value = mock_s3_client
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         result = await manager.upload_zip_file(
-            zip_path="/tmp/test.zip",
-            bucket_name="test-bucket"
+            zip_path="/tmp/test.zip", bucket_name="test-bucket"
         )
-        
+
         assert result["success"] is False
         assert result["error_code"] == "UNEXPECTED_UPLOAD_ERROR"
         assert "Unexpected error" in result["error"]

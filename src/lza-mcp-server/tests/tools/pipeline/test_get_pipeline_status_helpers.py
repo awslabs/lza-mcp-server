@@ -14,13 +14,7 @@
 
 """Unit tests for get_pipeline_status helper functions."""
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime
-from botocore.exceptions import ClientError
-
 from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
-    tool_get_pipeline_status,
     get_stage_description,
     get_action_description,
     get_cached_pipeline_metadata,
@@ -72,7 +66,6 @@ class TestStageDescriptions:
         assert description == "Action: UnknownAction"
 
 
-
 class TestCacheFunctions:
     """Test pipeline metadata caching functions."""
 
@@ -96,4 +89,3 @@ class TestCacheFunctions:
         """Test retrieving non-existent cached metadata."""
         result = get_cached_pipeline_metadata("non-existent-pipeline-xyz")
         assert result is None
-

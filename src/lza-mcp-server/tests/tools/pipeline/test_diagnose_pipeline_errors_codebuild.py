@@ -121,15 +121,20 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
                 # CloudWatch get_log_events
                 return mock_log_response
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
-        ) as mock_logs_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+            ) as mock_logs_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -141,7 +146,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             assert failed_action["external_execution_id"] == build_id
             assert failed_action["codebuild_logs"] is not None
@@ -232,15 +237,20 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             else:
                 return mock_log_response
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
-        ) as mock_logs_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+            ) as mock_logs_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -252,7 +262,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             assert "CREATE_FAILED" in failed_action["specific_error"]
             assert "CREATE_FAILED" in failed_action["error_summary"]
@@ -328,13 +338,17 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             else:
                 return mock_build_response
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -345,7 +359,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             # Should still have basic error info even without logs
             assert failed_action["error_code"] == "JobFailed"
@@ -412,13 +426,17 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
                 # CodeBuild call fails
                 raise Exception("CodeBuild API error")
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -430,7 +448,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             # Should still succeed with basic error info even if CodeBuild retrieval fails
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             assert failed_action["error_code"] == "JobFailed"
             # No logs due to retrieval failure
@@ -511,15 +529,20 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
                 # CloudWatch logs call fails
                 raise Exception("CloudWatch Logs API error")
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
-        ) as mock_logs_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+            ) as mock_logs_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -532,7 +555,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             # Should still succeed even if CloudWatch logs retrieval fails
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             assert failed_action["error_code"] == "JobFailed"
 
@@ -613,15 +636,20 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             else:
                 return mock_log_response
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
-        ) as mock_logs_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+            ) as mock_logs_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -633,13 +661,15 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             # Should have basic error info even with empty logs
             assert failed_action["error_code"] == "JobFailed"
 
     @pytest.mark.asyncio
-    async def test_logs_with_general_error_pattern_no_create_failed(self, mock_mcp_context):
+    async def test_logs_with_general_error_pattern_no_create_failed(
+        self, mock_mcp_context
+    ):
         """Test when logs have general error pattern but no CREATE_FAILED (line 279, 477)."""
         execution_id = "12345678-1234-1234-1234-123456789012"
         build_id = "project:build-id"
@@ -721,15 +751,20 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             else:
                 return mock_log_response
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
-        ) as mock_logs_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+            ) as mock_logs_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -741,7 +776,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             # Should have general error pattern (line 279)
             assert failed_action["specific_error"] == "| error | Something went wrong"
@@ -833,15 +868,20 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             else:
                 return mock_log_response
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_cp_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
-        ) as mock_cb_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
-        ) as mock_logs_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_cp_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+            ) as mock_cb_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+            ) as mock_logs_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_cp_client.return_value = Mock()
             mock_cb_client.return_value = Mock()
@@ -853,7 +893,7 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
             assert result["success"] is True
             assert len(result["failed_actions"]) == 1
-            
+
             failed_action = result["failed_actions"][0]
             # Should have logs but no specific error (line 477)
             assert failed_action["specific_error"] is None

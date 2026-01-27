@@ -25,13 +25,17 @@ class TestUploadErrors:
     """Test error handling during upload."""
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    async def test_upload_fails_on_aws_connectivity_error(self, mock_check_connectivity):
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    async def test_upload_fails_on_aws_connectivity_error(
+        self, mock_check_connectivity
+    ):
         """Test upload fails when AWS connectivity cannot be established."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         # Mock connectivity check to raise exception
         mock_check_connectivity.side_effect = Exception("Unable to connect")
 
@@ -43,24 +47,27 @@ class TestUploadErrors:
         assert "Configuration upload failed" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    async def test_upload_fails_on_config_discovery_error(self, mock_check_connectivity):
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    async def test_upload_fails_on_config_discovery_error(
+        self, mock_check_connectivity
+    ):
         """Test upload fails when configuration discovery fails."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         aws_context = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-east-1"
+            "region": "us-east-1",
         }
         mock_check_connectivity.return_value = aws_context
-        
-        utils._discover_and_select_configuration = AsyncMock(return_value={
-            "success": False,
-            "error": "No configurations found"
-        })
+
+        utils._discover_and_select_configuration = AsyncMock(
+            return_value={"success": False, "error": "No configurations found"}
+        )
 
         # Act
         result = await utils.upload_configuration(mock_ctx)
@@ -71,10 +78,18 @@ class TestUploadErrors:
         assert result["aws_context"] == aws_context
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.cleanup_configuration_zip")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.create_configuration_zip")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tempfile.NamedTemporaryFile")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.cleanup_configuration_zip"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.create_configuration_zip"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tempfile.NamedTemporaryFile"
+    )
     async def test_upload_fails_on_zip_creation_error(
         self, mock_tempfile, mock_check_connectivity, mock_create_zip, mock_cleanup_zip
     ):
@@ -82,29 +97,28 @@ class TestUploadErrors:
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         aws_context = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-east-1"
+            "region": "us-east-1",
         }
         mock_check_connectivity.return_value = aws_context
-        
-        utils._discover_and_select_configuration = AsyncMock(return_value={
-            "success": True,
-            "selected_config": "/config"
-        })
-        
+
+        utils._discover_and_select_configuration = AsyncMock(
+            return_value={"success": True, "selected_config": "/config"}
+        )
+
         utils.s3_manager.determine_bucket_name = AsyncMock(return_value="test-bucket")
         utils.s3_manager.verify_bucket_exists = AsyncMock(return_value=True)
-        
+
         mock_temp = Mock()
         mock_temp.name = "/tmp/config.zip"
         mock_tempfile.return_value.__enter__.return_value = mock_temp
-        
+
         mock_create_zip.return_value = {
             "success": False,
-            "error": "Failed to create ZIP"
+            "error": "Failed to create ZIP",
         }
         mock_cleanup_zip.return_value = {"success": True}
 
@@ -117,10 +131,18 @@ class TestUploadErrors:
         assert "troubleshooting" in result
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.cleanup_configuration_zip")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.create_configuration_zip")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tempfile.NamedTemporaryFile")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.cleanup_configuration_zip"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.create_configuration_zip"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tempfile.NamedTemporaryFile"
+    )
     async def test_upload_fails_on_s3_upload_error(
         self, mock_tempfile, mock_check_connectivity, mock_create_zip, mock_cleanup_zip
     ):
@@ -128,34 +150,35 @@ class TestUploadErrors:
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         aws_context = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-east-1"
+            "region": "us-east-1",
         }
         mock_check_connectivity.return_value = aws_context
-        
-        utils._discover_and_select_configuration = AsyncMock(return_value={
-            "success": True,
-            "selected_config": "/config"
-        })
-        
+
+        utils._discover_and_select_configuration = AsyncMock(
+            return_value={"success": True, "selected_config": "/config"}
+        )
+
         utils.s3_manager.determine_bucket_name = AsyncMock(return_value="test-bucket")
         utils.s3_manager.verify_bucket_exists = AsyncMock(return_value=True)
-        
+
         mock_temp = Mock()
         mock_temp.name = "/tmp/config.zip"
         mock_tempfile.return_value.__enter__.return_value = mock_temp
-        
+
         mock_create_zip.return_value = {"success": True, "file_size": 1024}
-        
-        utils.s3_manager.upload_zip_file = AsyncMock(return_value={
-            "success": False,
-            "error": "Access denied",
-            "error_code": "AccessDenied",
-            "troubleshooting": ["Check IAM permissions"]
-        })
+
+        utils.s3_manager.upload_zip_file = AsyncMock(
+            return_value={
+                "success": False,
+                "error": "Access denied",
+                "error_code": "AccessDenied",
+                "troubleshooting": ["Check IAM permissions"],
+            }
+        )
         mock_cleanup_zip.return_value = {"success": True}
 
         # Act
@@ -169,24 +192,26 @@ class TestUploadErrors:
         assert "troubleshooting" in result
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    async def test_upload_handles_s3_upload_error_exception(self, mock_check_connectivity):
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    async def test_upload_handles_s3_upload_error_exception(
+        self, mock_check_connectivity
+    ):
         """Test upload handles S3UploadError exceptions."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         aws_context = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-east-1"
+            "region": "us-east-1",
         }
         mock_check_connectivity.return_value = aws_context
-        
+
         error = S3UploadError(
-            message="Upload error",
-            error_code="UPLOAD_FAILED",
-            category="INTEGRATION"
+            message="Upload error", error_code="UPLOAD_FAILED", category="INTEGRATION"
         )
         utils._discover_and_select_configuration = AsyncMock(side_effect=error)
 
@@ -199,13 +224,15 @@ class TestUploadErrors:
         mock_ctx.error.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
     async def test_upload_handles_unexpected_exception(self, mock_check_connectivity):
         """Test upload handles unexpected exceptions."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         mock_check_connectivity.side_effect = Exception("Unexpected error")
 
         # Act
@@ -219,10 +246,18 @@ class TestUploadErrors:
         mock_ctx.error.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.cleanup_configuration_zip")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.create_configuration_zip")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tempfile.NamedTemporaryFile")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.cleanup_configuration_zip"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.create_configuration_zip"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tempfile.NamedTemporaryFile"
+    )
     async def test_upload_logs_cleanup_failure(
         self, mock_tempfile, mock_check_connectivity, mock_create_zip, mock_cleanup_zip
     ):
@@ -230,37 +265,32 @@ class TestUploadErrors:
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         aws_context = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-east-1"
+            "region": "us-east-1",
         }
         mock_check_connectivity.return_value = aws_context
-        
-        utils._discover_and_select_configuration = AsyncMock(return_value={
-            "success": True,
-            "selected_config": "/config"
-        })
-        
+
+        utils._discover_and_select_configuration = AsyncMock(
+            return_value={"success": True, "selected_config": "/config"}
+        )
+
         utils.s3_manager.determine_bucket_name = AsyncMock(return_value="test-bucket")
         utils.s3_manager.verify_bucket_exists = AsyncMock(return_value=True)
-        
+
         mock_temp = Mock()
         mock_temp.name = "/tmp/config.zip"
         mock_tempfile.return_value.__enter__.return_value = mock_temp
-        
+
         mock_create_zip.return_value = {"success": True, "file_size": 1024}
-        utils.s3_manager.upload_zip_file = AsyncMock(return_value={
-            "success": True,
-            "file_size": 1024
-        })
-        
+        utils.s3_manager.upload_zip_file = AsyncMock(
+            return_value={"success": True, "file_size": 1024}
+        )
+
         # Cleanup fails
-        mock_cleanup_zip.return_value = {
-            "success": False,
-            "error": "Permission denied"
-        }
+        mock_cleanup_zip.return_value = {"success": False, "error": "Permission denied"}
 
         # Act
         result = await utils.upload_configuration(mock_ctx)

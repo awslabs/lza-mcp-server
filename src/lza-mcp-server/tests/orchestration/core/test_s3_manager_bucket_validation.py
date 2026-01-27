@@ -15,7 +15,7 @@
 """Unit tests for S3Manager bucket validation."""
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch
 
 from awslabs.lza_mcp_server.orchestration.core.s3_manager import S3Manager
 
@@ -28,10 +28,10 @@ class TestValidateCustomBucketName:
     async def test_validate_valid_bucket(self, mock_verify):
         """Test validation of a valid and accessible bucket."""
         mock_verify.return_value = True
-        
+
         manager = S3Manager()
         result = await manager.validate_custom_bucket_name("valid-bucket-name")
-        
+
         assert result["valid"] is True
         assert result["bucket_name"] == "valid-bucket-name"
         assert "valid and accessible" in result["message"]
@@ -41,7 +41,7 @@ class TestValidateCustomBucketName:
         """Test validation fails for empty bucket name."""
         manager = S3Manager()
         result = await manager.validate_custom_bucket_name("")
-        
+
         assert result["valid"] is False
         assert "cannot be empty" in result["error"]
         assert result["error_type"] == "validation"
@@ -51,7 +51,7 @@ class TestValidateCustomBucketName:
         """Test validation fails for bucket name too short."""
         manager = S3Manager()
         result = await manager.validate_custom_bucket_name("ab")
-        
+
         assert result["valid"] is False
         assert "between 3 and 63 characters" in result["error"]
         assert result["error_type"] == "validation"
@@ -62,7 +62,7 @@ class TestValidateCustomBucketName:
         manager = S3Manager()
         long_name = "a" * 64
         result = await manager.validate_custom_bucket_name(long_name)
-        
+
         assert result["valid"] is False
         assert "between 3 and 63 characters" in result["error"]
         assert result["error_type"] == "validation"
@@ -72,7 +72,7 @@ class TestValidateCustomBucketName:
         """Test validation fails for non-lowercase bucket name."""
         manager = S3Manager()
         result = await manager.validate_custom_bucket_name("MyBucket")
-        
+
         assert result["valid"] is False
         assert "must be lowercase" in result["error"]
         assert result["error_type"] == "validation"
@@ -82,10 +82,10 @@ class TestValidateCustomBucketName:
     async def test_validate_bucket_does_not_exist(self, mock_verify):
         """Test validation fails when bucket doesn't exist."""
         mock_verify.return_value = False
-        
+
         manager = S3Manager()
         result = await manager.validate_custom_bucket_name("nonexistent-bucket")
-        
+
         assert result["valid"] is False
         assert "does not exist" in result["error"]
         assert result["error_type"] == "access"
@@ -96,10 +96,10 @@ class TestValidateCustomBucketName:
     async def test_validate_bucket_verification_exception(self, mock_verify):
         """Test validation handles exceptions from verify_bucket_exists."""
         mock_verify.side_effect = Exception("Network error")
-        
+
         manager = S3Manager()
         result = await manager.validate_custom_bucket_name("error-bucket")
-        
+
         assert result["valid"] is False
         assert "Failed to validate" in result["error"]
         assert result["error_type"] == "unexpected"

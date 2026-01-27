@@ -33,7 +33,7 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "lza-config"
             config_dir.mkdir()
@@ -54,14 +54,14 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create first config
             config1 = Path(temp_dir) / "config1"
             config1.mkdir()
             (config1 / "accounts-config.yaml").write_text("test")
             (config1 / "organization-config.yaml").write_text("test")
-            
+
             # Create second config
             config2 = Path(temp_dir) / "config2"
             config2.mkdir()
@@ -82,7 +82,7 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create nested structure
             nested = Path(temp_dir) / "workspace" / "configs" / "lza"
@@ -103,7 +103,7 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create some files but not LZA configs
             (Path(temp_dir) / "random.txt").write_text("test")
@@ -121,7 +121,7 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create directory with only one required file
             incomplete = Path(temp_dir) / "incomplete"
@@ -141,7 +141,7 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -163,7 +163,7 @@ class TestDiscoverConfigurations:
         # Arrange
         manager = ConfigurationManager()
         mock_ctx = AsyncMock()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Act
             result = await manager.discover_configurations(mock_ctx, temp_dir)

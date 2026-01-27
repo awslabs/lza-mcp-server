@@ -30,18 +30,18 @@ class TestEnsureAwsConnectivity:
         mock_sts = Mock()
         mock_sts.get_caller_identity.return_value = {
             "Account": "123456789012",
-            "Arn": "arn:aws:iam::123456789012:user/test-user"
+            "Arn": "arn:aws:iam::123456789012:user/test-user",
         }
         mock_session = Mock()
         mock_session.client.return_value = mock_sts
         mock_session.region_name = "us-east-1"
         mock_get_session.return_value = mock_session
-        
+
         retrieval = S3ConfigRetrieval()
         mock_ctx = Mock()
-        
+
         result = await retrieval.ensure_aws_connectivity(mock_ctx)
-        
+
         assert result["success"] is True
         assert result["account_id"] == "123456789012"
         assert result["user_arn"] == "arn:aws:iam::123456789012:user/test-user"
@@ -52,10 +52,10 @@ class TestEnsureAwsConnectivity:
     async def test_ensure_aws_connectivity_failure(self, mock_get_session):
         """Test AWS connectivity check failure."""
         mock_get_session.side_effect = Exception("No credentials found")
-        
+
         retrieval = S3ConfigRetrieval()
         mock_ctx = Mock()
-        
+
         with pytest.raises(Exception, match="AWS connectivity check failed"):
             await retrieval.ensure_aws_connectivity(mock_ctx)
 
@@ -68,9 +68,9 @@ class TestEnsureAwsConnectivity:
         mock_session = Mock()
         mock_session.client.return_value = mock_sts
         mock_get_session.return_value = mock_session
-        
+
         retrieval = S3ConfigRetrieval()
         mock_ctx = Mock()
-        
+
         with pytest.raises(Exception, match="AWS connectivity check failed"):
             await retrieval.ensure_aws_connectivity(mock_ctx)

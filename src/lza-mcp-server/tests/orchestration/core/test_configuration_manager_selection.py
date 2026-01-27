@@ -45,7 +45,11 @@ class TestSelectConfiguration:
         """Test selection with multiple configurations returns first."""
         # Arrange
         mock_ctx = AsyncMock()
-        discovered_configs = ["/path/to/config1", "/path/to/config2", "/path/to/config3"]
+        discovered_configs = [
+            "/path/to/config1",
+            "/path/to/config2",
+            "/path/to/config3",
+        ]
 
         # Act
         result = await select_configuration(mock_ctx, discovered_configs)
@@ -65,7 +69,7 @@ class TestSelectConfiguration:
         # Act & Assert
         with pytest.raises(ValueError) as exc_info:
             await select_configuration(mock_ctx, discovered_configs)
-        
+
         assert "No LZA configurations available" in str(exc_info.value)
 
     @pytest.mark.asyncio

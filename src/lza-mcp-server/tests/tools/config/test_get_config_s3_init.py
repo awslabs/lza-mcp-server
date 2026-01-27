@@ -28,7 +28,7 @@ class TestS3ConfigRetrievalInitialization:
     def test_init_creates_instance(self):
         """Test S3ConfigRetrieval initialization."""
         retrieval = S3ConfigRetrieval()
-        
+
         assert retrieval is not None
         assert retrieval.logger is not None
         assert retrieval.s3_manager is not None
@@ -42,10 +42,10 @@ class TestS3ConfigRetrievalInitialization:
         mock_ctx = Mock()
         mock_ctx.info = AsyncMock()
         mock_ctx.warning = AsyncMock()
-        
+
         # Should not raise any errors
         await retrieval._cleanup_previous_temp_directory(mock_ctx)
-        
+
         # Should not call any context methods
         mock_ctx.info.assert_not_called()
         mock_ctx.warning.assert_not_called()
@@ -56,15 +56,15 @@ class TestS3ConfigRetrievalInitialization:
         retrieval = S3ConfigRetrieval()
         mock_ctx = Mock()
         mock_ctx.info = AsyncMock()
-        
+
         # Create a real temp directory
         temp_dir = tempfile.mkdtemp(prefix="test-cleanup-")
         retrieval._last_temp_directory = temp_dir
         retrieval._temp_directories[temp_dir] = {"test": "data"}
-        
+
         # Cleanup should remove it
         await retrieval._cleanup_previous_temp_directory(mock_ctx)
-        
+
         assert not os.path.exists(temp_dir)
         assert temp_dir not in retrieval._temp_directories
         mock_ctx.info.assert_called()
@@ -75,13 +75,13 @@ class TestS3ConfigRetrievalInitialization:
         retrieval = S3ConfigRetrieval()
         mock_ctx = Mock()
         mock_ctx.info = AsyncMock()
-        
+
         # Set a path that doesn't exist
         retrieval._last_temp_directory = "/nonexistent/path"
-        
+
         # Should not raise errors
         await retrieval._cleanup_previous_temp_directory(mock_ctx)
-        
+
         mock_ctx.info.assert_not_called()
 
     @pytest.mark.asyncio
@@ -89,22 +89,22 @@ class TestS3ConfigRetrievalInitialization:
     async def test_cleanup_previous_temp_directory_removal_fails(self, mock_rmtree):
         """Test cleanup handles removal failures gracefully."""
         mock_rmtree.side_effect = OSError("Permission denied")
-        
+
         retrieval = S3ConfigRetrieval()
         mock_ctx = Mock()
         mock_ctx.info = AsyncMock()
         mock_ctx.warning = AsyncMock()
-        
+
         # Create a real temp directory
         temp_dir = tempfile.mkdtemp(prefix="test-cleanup-fail-")
         retrieval._last_temp_directory = temp_dir
-        
+
         # Cleanup should handle the error
         await retrieval._cleanup_previous_temp_directory(mock_ctx)
-        
+
         mock_ctx.warning.assert_called()
         # Directory should still exist since removal failed
         assert os.path.exists(temp_dir)
-        
+
         # Clean up manually
         os.rmdir(temp_dir)

@@ -33,7 +33,7 @@ class TestValidateConfigurationPath:
         """Test validation of valid LZA configuration."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -56,7 +56,7 @@ class TestValidateConfigurationPath:
         # Act & Assert
         with pytest.raises(S3UploadError) as exc_info:
             await manager.validate_configuration_path(config_path)
-        
+
         assert exc_info.value.error_code == "CONFIG_PATH_NOT_FOUND"
         assert "does not exist" in exc_info.value.message
 
@@ -65,7 +65,7 @@ class TestValidateConfigurationPath:
         """Test validation when path is a file, not directory."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             config_path = temp_file.name
 
@@ -73,11 +73,12 @@ class TestValidateConfigurationPath:
             # Act & Assert
             with pytest.raises(S3UploadError) as exc_info:
                 await manager.validate_configuration_path(config_path)
-            
+
             assert exc_info.value.error_code == "CONFIG_PATH_NOT_DIRECTORY"
             assert "not a directory" in exc_info.value.message
         finally:
             import os
+
             os.unlink(config_path)
 
     @pytest.mark.asyncio
@@ -85,7 +86,7 @@ class TestValidateConfigurationPath:
         """Test validation with missing accounts-config.yaml."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -95,7 +96,7 @@ class TestValidateConfigurationPath:
             # Act & Assert
             with pytest.raises(S3UploadError) as exc_info:
                 await manager.validate_configuration_path(str(config_dir))
-            
+
             assert exc_info.value.error_code == "CONFIG_FILES_MISSING"
             assert "accounts-config.yaml" in exc_info.value.message
 
@@ -104,7 +105,7 @@ class TestValidateConfigurationPath:
         """Test validation with missing organization-config.yaml."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -114,7 +115,7 @@ class TestValidateConfigurationPath:
             # Act & Assert
             with pytest.raises(S3UploadError) as exc_info:
                 await manager.validate_configuration_path(str(config_dir))
-            
+
             assert exc_info.value.error_code == "CONFIG_FILES_MISSING"
             assert "organization-config.yaml" in exc_info.value.message
 
@@ -123,7 +124,7 @@ class TestValidateConfigurationPath:
         """Test validation with both required files missing."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -133,7 +134,7 @@ class TestValidateConfigurationPath:
             # Act & Assert
             with pytest.raises(S3UploadError) as exc_info:
                 await manager.validate_configuration_path(str(config_dir))
-            
+
             assert exc_info.value.error_code == "CONFIG_FILES_MISSING"
             assert "accounts-config.yaml" in exc_info.value.message
             assert "organization-config.yaml" in exc_info.value.message
@@ -143,7 +144,7 @@ class TestValidateConfigurationPath:
         """Test validation succeeds with extra files present."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -168,7 +169,7 @@ class TestValidateConfigurationPath:
         # Act & Assert
         with pytest.raises(S3UploadError) as exc_info:
             await manager.validate_configuration_path(config_path)
-        
+
         error = exc_info.value
         assert error.context is not None
         assert error.context["config_path"] == config_path
@@ -179,7 +180,7 @@ class TestValidateConfigurationPath:
         """Test validation error includes troubleshooting steps."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -187,7 +188,7 @@ class TestValidateConfigurationPath:
             # Act & Assert
             with pytest.raises(S3UploadError) as exc_info:
                 await manager.validate_configuration_path(str(config_dir))
-            
+
             error = exc_info.value
             assert error.troubleshooting is not None
             assert len(error.troubleshooting) > 0
@@ -204,7 +205,7 @@ class TestValidateConfigurationPath:
         # Act & Assert
         with pytest.raises(S3UploadError) as exc_info:
             await manager.validate_configuration_path(config_path)
-        
+
         error = exc_info.value
         assert "Unexpected error validating configuration" in error.message
 
@@ -213,7 +214,7 @@ class TestValidateConfigurationPath:
         """Test validation is case-sensitive for filenames."""
         # Arrange
         manager = ConfigurationManager()
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir) / "config"
             config_dir.mkdir()
@@ -224,5 +225,5 @@ class TestValidateConfigurationPath:
             # Act & Assert
             with pytest.raises(S3UploadError) as exc_info:
                 await manager.validate_configuration_path(str(config_dir))
-            
+
             assert exc_info.value.error_code == "CONFIG_FILES_MISSING"

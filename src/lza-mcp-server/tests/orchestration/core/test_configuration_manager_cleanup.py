@@ -17,7 +17,7 @@
 import pytest
 import os
 import tempfile
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch, AsyncMock
 
 from awslabs.lza_mcp_server.orchestration.core.configuration_manager import (
     cleanup_configuration_zip,
@@ -105,7 +105,7 @@ class TestCleanupConfigurationZip:
         mock_ctx = AsyncMock()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
             zip_path = temp_file.name
-        
+
         # Get relative path
         rel_path = os.path.relpath(zip_path)
 

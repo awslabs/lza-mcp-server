@@ -14,7 +14,6 @@
 
 """Unit tests for S3UploadUtils initialization."""
 
-import pytest
 from unittest.mock import Mock, patch
 
 from awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils import S3UploadUtils
@@ -57,7 +56,9 @@ class TestS3UploadUtilsInit:
         mock_s3_manager_class.assert_called_once()
         assert utils.s3_manager == mock_s3_manager
 
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.ConfigurationManager")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.ConfigurationManager"
+    )
     def test_init_creates_config_manager(self, mock_config_manager_class):
         """Test initialization creates ConfigurationManager instance."""
         # Arrange
@@ -78,4 +79,7 @@ class TestS3UploadUtilsInit:
 
         # Assert
         assert utils.logger is not None
-        assert utils.logger.name == "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils"
+        assert (
+            utils.logger.name
+            == "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils"
+        )

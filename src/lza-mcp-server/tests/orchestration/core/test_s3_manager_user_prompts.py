@@ -29,9 +29,9 @@ class TestPromptForCustomBucketName:
         result = await manager.prompt_for_custom_bucket_name(
             default_bucket_name="aws-accelerator-config-123456789012-us-east-1",
             account_id="123456789012",
-            region="us-east-1"
+            region="us-east-1",
         )
-        
+
         assert result["action_required"] == "user_input"
         assert result["input_type"] == "bucket_name"
         assert "prompt" in result
@@ -48,9 +48,9 @@ class TestPromptForCustomBucketName:
         result = await manager.prompt_for_custom_bucket_name(
             default_bucket_name=bucket_name,
             account_id="999888777666",
-            region="eu-west-1"
+            region="eu-west-1",
         )
-        
+
         assert bucket_name in result["prompt"]
         assert result["context"]["default_bucket"] == bucket_name
 
@@ -61,9 +61,9 @@ class TestPromptForCustomBucketName:
         result = await manager.prompt_for_custom_bucket_name(
             default_bucket_name="test-bucket",
             account_id="111222333444",
-            region="ap-southeast-2"
+            region="ap-southeast-2",
         )
-        
+
         assert result["context"]["account_id"] == "111222333444"
         assert result["context"]["region"] == "ap-southeast-2"
         assert "bucket_pattern" in result["context"]
@@ -75,9 +75,9 @@ class TestPromptForCustomBucketName:
         result = await manager.prompt_for_custom_bucket_name(
             default_bucket_name="test-bucket",
             account_id="123456789012",
-            region="us-west-2"
+            region="us-west-2",
         )
-        
+
         assert len(result["guidance"]) > 0
         assert any("not found" in g.lower() for g in result["guidance"])
 
@@ -88,9 +88,9 @@ class TestPromptForCustomBucketName:
         result = await manager.prompt_for_custom_bucket_name(
             default_bucket_name="test-bucket",
             account_id="123456789012",
-            region="us-west-2"
+            region="us-west-2",
         )
-        
+
         assert len(result["validation_requirements"]) > 0
         assert any("unique" in r.lower() for r in result["validation_requirements"])
         assert any("permission" in r.lower() for r in result["validation_requirements"])
@@ -103,9 +103,9 @@ class TestPromptForCustomBucketName:
         result = await manager.prompt_for_custom_bucket_name(
             default_bucket_name=bucket_name,
             account_id="123456789012",
-            region="us-east-1"
+            region="us-east-1",
         )
-        
+
         assert len(result["suggested_actions"]) > 0
         # Should contain AWS CLI command to create bucket
         assert any("aws s3 mb" in action for action in result["suggested_actions"])

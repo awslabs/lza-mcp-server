@@ -15,16 +15,9 @@
 """Unit tests for get_pipeline_status input validation."""
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime
-from botocore.exceptions import ClientError
 
 from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
     tool_get_pipeline_status,
-    get_stage_description,
-    get_action_description,
-    get_cached_pipeline_metadata,
-    cache_pipeline_metadata,
 )
 
 
@@ -44,7 +37,9 @@ class TestPipelineStatusValidation:
     async def test_invalid_pipeline_name_too_long(self, mock_mcp_context):
         """Test with pipeline name exceeding max length."""
         long_name = "a" * 101
-        result = await tool_get_pipeline_status(mock_mcp_context, pipeline_name=long_name)
+        result = await tool_get_pipeline_status(
+            mock_mcp_context, pipeline_name=long_name
+        )
 
         assert result["success"] is False
         assert "Invalid pipeline name" in result["error"]
@@ -80,4 +75,3 @@ class TestPipelineStatusValidation:
 
         assert result["success"] is False
         assert "Invalid execution ID" in result["error"]
-

@@ -15,16 +15,11 @@
 """Unit tests for get_pipeline_status success scenarios."""
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 from datetime import datetime
-from botocore.exceptions import ClientError
 
 from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
     tool_get_pipeline_status,
-    get_stage_description,
-    get_action_description,
-    get_cached_pipeline_metadata,
-    cache_pipeline_metadata,
 )
 
 
@@ -45,7 +40,7 @@ class TestPipelineStatusSuccess:
         async def mock_retry(func, **kwargs):
             # Track the call
             call_tracker["calls"].append((func, kwargs))
-            
+
             # Determine which API call based on kwargs
             if "name" in kwargs and "pipelineName" not in kwargs:
                 # get_pipeline call
@@ -55,11 +50,14 @@ class TestPipelineStatusSuccess:
                 return mock_executions_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -76,9 +74,12 @@ class TestPipelineStatusSuccess:
     async def test_get_pipeline_status_in_progress(self, mock_mcp_context):
         """Test getting status for pipeline in progress."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {
                 "stages": [
@@ -135,18 +136,26 @@ class TestPipelineStatusSuccess:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             # Track call sequence to distinguish between get_pipeline and get_pipeline_state
             call_sequence.append(kwargs)
-            
+
             # Determine which API call based on kwargs
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
                 # Both get_pipeline and get_pipeline_state use 'name' parameter
                 # get_pipeline is called first (Step 1), get_pipeline_state is called later (Step 5)
                 # Count how many times we've seen 'name' parameter
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
-                
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
+
                 if name_calls == 1:
                     # First call with 'name' is get_pipeline
                     return mock_pipeline_response
@@ -161,11 +170,14 @@ class TestPipelineStatusSuccess:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -185,9 +197,12 @@ class TestPipelineStatusSuccess:
     async def test_get_pipeline_status_succeeded(self, mock_mcp_context):
         """Test getting status for successfully completed pipeline."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import _pipeline_cache
+        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+            _pipeline_cache,
+        )
+
         _pipeline_cache.clear()
-        
+
         mock_pipeline_response = {
             "pipeline": {"stages": [{"name": "Source"}, {"name": "Build"}]}
         }
@@ -232,18 +247,26 @@ class TestPipelineStatusSuccess:
         }
 
         call_sequence = []
-        
+
         async def mock_retry(func, **kwargs):
             # Track call sequence to distinguish between get_pipeline and get_pipeline_state
             call_sequence.append(kwargs)
-            
+
             # Determine which API call based on kwargs
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
                 # Both get_pipeline and get_pipeline_state use 'name' parameter
                 # get_pipeline is called first (Step 1), get_pipeline_state is called later (Step 5)
                 # Count how many times we've seen 'name' parameter
-                name_calls = sum(1 for call in call_sequence if "name" in call and "pipelineName" not in call)
-                
+                name_calls = sum(
+                    1
+                    for call in call_sequence
+                    if "name" in call and "pipelineName" not in call
+                )
+
                 if name_calls == 1:
                     # First call with 'name' is get_pipeline
                     return mock_pipeline_response
@@ -258,11 +281,14 @@ class TestPipelineStatusSuccess:
                 return mock_execution_response
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -275,4 +301,3 @@ class TestPipelineStatusSuccess:
             assert "start_time" in result
             assert "end_time" in result
             assert result["stage_progress"]["completed_stages"] == 2
-

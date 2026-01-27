@@ -34,9 +34,7 @@ class TestDiagnosePipelineErrorsValidation:
     @pytest.mark.asyncio
     async def test_invalid_pipeline_name_empty(self, mock_mcp_context):
         """Test validation rejects empty pipeline name."""
-        result = await tool_diagnose_pipeline_errors(
-            mock_mcp_context, pipeline_name=""
-        )
+        result = await tool_diagnose_pipeline_errors(mock_mcp_context, pipeline_name="")
 
         assert result["success"] is False
         assert "Invalid pipeline name" in result["error"]

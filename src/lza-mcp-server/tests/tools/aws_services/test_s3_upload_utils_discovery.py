@@ -15,7 +15,7 @@
 """Unit tests for S3UploadUtils configuration discovery."""
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch, AsyncMock
 
 from awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils import S3UploadUtils
 from awslabs.lza_mcp_server.orchestration.core.s3_upload_error import S3UploadError
@@ -31,7 +31,7 @@ class TestDiscoverAndSelectConfiguration:
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
         config_path = "/path/to/config"
-        
+
         utils.config_manager.validate_configuration_path = AsyncMock(return_value=True)
 
         # Act
@@ -43,7 +43,9 @@ class TestDiscoverAndSelectConfiguration:
         assert result["success"] is True
         assert result["selected_config"] == config_path
         assert result["discovery_method"] == "provided_path"
-        utils.config_manager.validate_configuration_path.assert_called_once_with(config_path)
+        utils.config_manager.validate_configuration_path.assert_called_once_with(
+            config_path
+        )
 
     @pytest.mark.asyncio
     async def test_discovery_with_invalid_provided_path(self):
@@ -52,11 +54,11 @@ class TestDiscoverAndSelectConfiguration:
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
         config_path = "/invalid/path"
-        
+
         error = S3UploadError(
             message="Invalid configuration path",
             error_code="INVALID_PATH",
-            category="VALIDATION"
+            category="VALIDATION",
         )
         utils.config_manager.validate_configuration_path = AsyncMock(side_effect=error)
 
@@ -71,17 +73,19 @@ class TestDiscoverAndSelectConfiguration:
         assert result["error_code"] == "INVALID_PATH"
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.select_configuration")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.select_configuration"
+    )
     async def test_discovery_workspace_search_success(self, mock_select_config):
         """Test successful workspace configuration discovery."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
         workspace_path = "/workspace"
-        
+
         discovered_configs = ["/workspace/config1", "/workspace/config2"]
         selected_config = "/workspace/config1"
-        
+
         utils.config_manager.discover_configurations = AsyncMock(
             return_value=discovered_configs
         )
@@ -109,7 +113,7 @@ class TestDiscoverAndSelectConfiguration:
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
         workspace_path = "/empty/workspace"
-        
+
         utils.config_manager.discover_configurations = AsyncMock(return_value=[])
 
         # Act
@@ -129,11 +133,11 @@ class TestDiscoverAndSelectConfiguration:
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         error = S3UploadError(
             message="Discovery failed",
             error_code="DISCOVERY_ERROR",
-            category="VALIDATION"
+            category="VALIDATION",
         )
         utils.config_manager.discover_configurations = AsyncMock(side_effect=error)
 
@@ -151,7 +155,7 @@ class TestDiscoverAndSelectConfiguration:
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         utils.config_manager.discover_configurations = AsyncMock(
             side_effect=Exception("Unexpected error")
         )
@@ -172,7 +176,7 @@ class TestDiscoverAndSelectConfiguration:
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = AsyncMock()
-        
+
         utils.config_manager.discover_configurations = AsyncMock(return_value=[])
 
         # Act

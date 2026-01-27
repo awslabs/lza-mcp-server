@@ -14,7 +14,6 @@
 
 """Unit tests for S3Manager initialization and session management."""
 
-import pytest
 from unittest.mock import Mock, patch
 
 from awslabs.lza_mcp_server.orchestration.core.s3_manager import S3Manager
@@ -26,7 +25,7 @@ class TestS3ManagerInitialization:
     def test_init_creates_instance(self):
         """Test S3Manager initialization."""
         manager = S3Manager()
-        
+
         assert manager is not None
         assert manager._session is None
         assert manager._s3_client is None
@@ -37,10 +36,10 @@ class TestS3ManagerInitialization:
         """Test _get_session creates a new session when none exists."""
         mock_session = Mock()
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         session = manager._get_session()
-        
+
         assert session == mock_session
         assert manager._session == mock_session
         mock_get_session.assert_called_once()
@@ -50,11 +49,11 @@ class TestS3ManagerInitialization:
         """Test _get_session reuses existing session."""
         mock_session = Mock()
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         session1 = manager._get_session()
         session2 = manager._get_session()
-        
+
         assert session1 == session2
         assert session1 == mock_session
         mock_get_session.assert_called_once()  # Only called once
@@ -66,10 +65,10 @@ class TestS3ManagerInitialization:
         mock_s3_client = Mock()
         mock_session.client.return_value = mock_s3_client
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         client = manager._get_s3_client()
-        
+
         assert client == mock_s3_client
         assert manager._s3_client == mock_s3_client
         mock_session.client.assert_called_once_with("s3")
@@ -81,11 +80,11 @@ class TestS3ManagerInitialization:
         mock_s3_client = Mock()
         mock_session.client.return_value = mock_s3_client
         mock_get_session.return_value = mock_session
-        
+
         manager = S3Manager()
         client1 = manager._get_s3_client()
         client2 = manager._get_s3_client()
-        
+
         assert client1 == client2
         assert client1 == mock_s3_client
         mock_session.client.assert_called_once()  # Only called once

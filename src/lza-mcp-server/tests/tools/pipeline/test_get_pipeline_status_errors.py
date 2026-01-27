@@ -15,16 +15,12 @@
 """Unit tests for get_pipeline_status error handling."""
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 from datetime import datetime
 from botocore.exceptions import ClientError
 
 from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
     tool_get_pipeline_status,
-    get_stage_description,
-    get_action_description,
-    get_cached_pipeline_metadata,
-    cache_pipeline_metadata,
 )
 
 
@@ -37,11 +33,14 @@ class TestPipelineStatusErrors:
         error_response = {"Error": {"Code": "PipelineNotFoundException"}}
         client_error = ClientError(error_response, "get_pipeline")
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=client_error,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=client_error,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -77,7 +76,11 @@ class TestPipelineStatusErrors:
 
         async def mock_retry(func, **kwargs):
             # Determine which API call based on kwargs
-            if "name" in kwargs and "pipelineName" not in kwargs and "pipelineExecutionId" not in kwargs:
+            if (
+                "name" in kwargs
+                and "pipelineName" not in kwargs
+                and "pipelineExecutionId" not in kwargs
+            ):
                 # get_pipeline call
                 return mock_pipeline_response
             elif "pipelineName" in kwargs and "maxResults" in kwargs:
@@ -88,16 +91,21 @@ class TestPipelineStatusErrors:
                 raise client_error
             return {}
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             mock_client.return_value = Mock()
 
             result = await tool_get_pipeline_status(
-                mock_mcp_context, pipeline_name="test-pipeline", execution_id=execution_id
+                mock_mcp_context,
+                pipeline_name="test-pipeline",
+                execution_id=execution_id,
             )
 
             assert result["success"] is False
@@ -110,11 +118,14 @@ class TestPipelineStatusErrors:
         error_response = {"Error": {"Code": "AccessDeniedException"}}
         client_error = ClientError(error_response, "get_pipeline")
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
-            side_effect=client_error,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                side_effect=client_error,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -124,4 +135,3 @@ class TestPipelineStatusErrors:
 
             assert result["success"] is False
             assert "error" in result
-

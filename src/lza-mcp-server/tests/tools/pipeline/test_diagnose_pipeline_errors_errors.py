@@ -36,15 +36,23 @@ class TestDiagnosePipelineErrorsErrors:
     async def test_pipeline_not_found(self, mock_mcp_context):
         """Test handling when pipeline doesn't exist."""
         mock_error = ClientError(
-            {"Error": {"Code": "PipelineNotFoundException", "Message": "Pipeline not found"}},
+            {
+                "Error": {
+                    "Code": "PipelineNotFoundException",
+                    "Message": "Pipeline not found",
+                }
+            },
             "GetPipeline",
         )
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_error,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_error,
+            ),
         ):
             mock_client.return_value = Mock()
 
@@ -88,12 +96,15 @@ class TestDiagnosePipelineErrorsErrors:
         mock_codepipeline = Mock()
         mock_codepipeline.get_pipeline_execution.side_effect = mock_error
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client",
-            return_value=mock_codepipeline,
-        ), patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_retry,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client",
+                return_value=mock_codepipeline,
+            ),
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_retry,
+            ),
         ):
             result = await tool_diagnose_pipeline_errors(
                 mock_mcp_context,
@@ -113,11 +124,14 @@ class TestDiagnosePipelineErrorsErrors:
             "GetPipeline",
         )
 
-        with patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
-        ) as mock_client, patch(
-            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
-            side_effect=mock_error,
+        with (
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+            ) as mock_client,
+            patch(
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                side_effect=mock_error,
+            ),
         ):
             mock_client.return_value = Mock()
 

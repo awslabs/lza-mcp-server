@@ -15,7 +15,7 @@
 """Unit tests for S3UploadUtils AWS connectivity verification."""
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 
 from awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils import S3UploadUtils
 
@@ -24,18 +24,20 @@ class TestEnsureAwsConnectivity:
     """Test AWS connectivity verification and caching."""
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
     async def test_ensure_connectivity_success(self, mock_check_connectivity):
         """Test successful AWS connectivity verification."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = Mock()
-        
+
         connectivity_result = {
             "connected": True,
             "account_id": "123456789012",
             "region": "us-east-1",
-            "message": "Connected successfully"
+            "message": "Connected successfully",
         }
         mock_check_connectivity.return_value = connectivity_result
 
@@ -49,17 +51,19 @@ class TestEnsureAwsConnectivity:
         mock_check_connectivity.assert_called_once_with(mock_ctx)
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
     async def test_ensure_connectivity_caches_result(self, mock_check_connectivity):
         """Test AWS connectivity result is cached."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = Mock()
-        
+
         connectivity_result = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-east-1"
+            "region": "us-east-1",
         }
         mock_check_connectivity.return_value = connectivity_result
 
@@ -75,30 +79,34 @@ class TestEnsureAwsConnectivity:
         mock_check_connectivity.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
     async def test_ensure_connectivity_failure(self, mock_check_connectivity):
         """Test AWS connectivity verification failure."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = Mock()
-        
+
         connectivity_result = {
             "connected": False,
-            "message": "Unable to connect to AWS"
+            "message": "Unable to connect to AWS",
         }
         mock_check_connectivity.return_value = connectivity_result
 
         # Act & Assert
         with pytest.raises(Exception) as exc_info:
             await utils.ensure_aws_connectivity(mock_ctx)
-        
+
         assert "AWS connectivity failed" in str(exc_info.value)
         assert "Unable to connect to AWS" in str(exc_info.value)
         assert utils._aws_connectivity_verified is False
         assert utils._aws_context is None
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
     async def test_ensure_connectivity_exception(self, mock_check_connectivity):
         """Test AWS connectivity check raises exception."""
         # Arrange
@@ -109,35 +117,39 @@ class TestEnsureAwsConnectivity:
         # Act & Assert
         with pytest.raises(Exception) as exc_info:
             await utils.ensure_aws_connectivity(mock_ctx)
-        
+
         assert "Network error" in str(exc_info.value)
         assert utils._aws_connectivity_verified is False
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity")
-    async def test_ensure_connectivity_returns_cached_on_subsequent_calls(self, mock_check_connectivity):
+    @patch(
+        "awslabs.lza_mcp_server.tools.aws_services.s3_upload_utils.tool_check_aws_connectivity"
+    )
+    async def test_ensure_connectivity_returns_cached_on_subsequent_calls(
+        self, mock_check_connectivity
+    ):
         """Test cached connectivity result is returned without re-checking."""
         # Arrange
         utils = S3UploadUtils()
         mock_ctx = Mock()
-        
+
         connectivity_result = {
             "connected": True,
             "account_id": "123456789012",
-            "region": "us-west-2"
+            "region": "us-west-2",
         }
         mock_check_connectivity.return_value = connectivity_result
 
         # Act
         await utils.ensure_aws_connectivity(mock_ctx)
-        
+
         # Modify the mock to return different result
         mock_check_connectivity.return_value = {
             "connected": True,
             "account_id": "999999999999",
-            "region": "eu-west-1"
+            "region": "eu-west-1",
         }
-        
+
         # Second call should return cached result
         result = await utils.ensure_aws_connectivity(mock_ctx)
 
