@@ -1,6 +1,11 @@
-# AWS Landing Zone Accelerator (LZA) MCP Server
+# Landing Zone Accelerator on AWS (LZA) MCP Server
 
-A Model Context Protocol (MCP) server that enables AI-assisted management of AWS Landing Zone Accelerator deployments through compatible development tools and IDEs.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.txt)
+[![Code of Conduct](https://img.shields.io/badge/Code%20of%20Conduct-Amazon-orange.svg)](CODE_OF_CONDUCT.md)
+
+A Model Context Protocol (MCP) server that enables AI-assisted management of [Landing Zone Accelerator on AWS](https://aws.amazon.com/solutions/implementations/landing-zone-accelerator-on-aws/) (LZA) deployments through compatible development tools and IDEs.
+
+**Documentation:** [Contributing](CONTRIBUTING.md) | [Code of Conduct](CODE_OF_CONDUCT.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md) | [License](LICENSE.txt)
 
 ## Table of Contents
 
@@ -19,7 +24,7 @@ A Model Context Protocol (MCP) server that enables AI-assisted management of AWS
 
 ## Overview
 
-The LZA MCP Server streamlines Landing Zone Accelerator operations by providing AI-powered assistance for configuration management, pipeline orchestration, and schema discovery. Organizations can reduce operational complexity and accelerate deployment cycles while maintaining security and compliance standards. The server includes specialized tools for merging [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) templates, enabling rapid deployment of enterprise-ready, compliance-focused baseline environments.
+The LZA MCP Server streamlines Landing Zone Accelerator on AWS operations by providing AI-powered assistance for configuration management, pipeline orchestration, and schema discovery. Organizations can reduce operational complexity and accelerate deployment cycles while maintaining security and compliance standards. The server includes specialized tools for merging [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) templates, enabling rapid deployment of enterprise-ready, compliance-focused baseline environments.
 
 **Key Benefits:**
 - **Accelerated Operations**: AI-assisted configuration reduces manual effort and deployment time
@@ -30,6 +35,8 @@ The LZA MCP Server streamlines Landing Zone Accelerator operations by providing 
 
 **Architecture:**
 The server operates as a containerized MCP endpoint, invoked by compatible IDEs (Kiro, Claude Desktop) via stdio transport. All AWS operations use temporary credentials following [AWS security best practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html).
+
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
 ## Quick Start
 
@@ -61,7 +68,27 @@ Create an IAM role or user with the [recommended IAM policy](#aws-permissions). 
 > **⚠️ Security Recommendation**  
 > Use [temporary credentials via AWS IAM Identity Center](https://docs.aws.amazon.com/wellarchitected/latest/framework/sec_identities_unique.html) instead of long-term access keys. Temporary credentials reduce risk of credential exposure and align with AWS security best practices.
 
-### 3. Configure MCP Client
+### 3. Configure AWS Credentials
+
+The `extract-aws-credentials.sh` script handles credential extraction from your AWS CLI profile and passes them to the container. This script works with most AWS credential sources:
+
+- Static credentials (access key/secret key)
+- IAM Identity Center (SSO)
+- IAM roles
+- Credential process
+- Temporary credentials
+
+**For IAM Identity Center users**, login to your SSO session before starting the MCP server:
+
+```bash
+aws sso login --profile your-sso-profile
+```
+
+SSO sessions typically expire after 8-12 hours. If the MCP server reports authentication errors, re-run `aws sso login` to refresh your session.
+
+The script uses `aws configure export-credentials` to retrieve temporary credentials from your active session and inject them into the container environment.
+
+### 4. Configure MCP Client
 
 Add the server configuration to your IDE's MCP settings file:
 
@@ -101,8 +128,10 @@ Add the server configuration to your IDE's MCP settings file:
 - `<REPO_PATH>`: Full path to cloned repository (e.g., `/Users/username/repos/lza-mcp-server`)
 - `<CONFIG_PATH>`: Local directory for configuration files (e.g., `/Users/username/Documents/lza-config`)
   - **Recommendation:** Place within your IDE workspace for easier file access (e.g., `.kiro/lza-config` for Kiro IDE)
-- `<YOUR_AWS_PROFILE>`: AWS CLI profile name from `~/.aws/credentials`
+- `<YOUR_AWS_PROFILE>`: AWS CLI profile name from `~/.aws/credentials` or `~/.aws/config`
 - `<YOUR_AWS_REGION>`: AWS region where LZA is deployed (e.g., `us-east-1`)
+
+>**Note:** The [credential extraction script](#3-configure-aws-credentials) requires your AWS CLI profile to be ready for use. Complete any profile-specific prerequisites before starting your LZA MCP server (e.g., `aws sso login` for IAM Identity Center profiles).
 
 ### 4. Verify Installation
 
@@ -113,6 +142,8 @@ Use your tools, check my AWS connectivity
 ```
 
 The server will verify credentials and report the authenticated identity.
+
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
 ## Build Process
 
@@ -186,6 +217,8 @@ finch build \
 | `LZA_UC_RELEASE` | `latest` | Universal Configuration release version |
 
 **Note:** Including more versions increases build time and image size proportionally. Most users only need schemas matching their deployed LZA version.
+
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
 ## AWS Permissions
 
@@ -291,6 +324,8 @@ Replace these placeholders with your deployment values:
 
 **Note:** The KMS policy uses alias-based access control (`kms:ResourceAliases`) for maintainability. This approach allows key rotation without policy updates, following [AWS KMS best practices](https://docs.aws.amazon.com/kms/latest/developerguide/best-practices.html).
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## MCP Client Configuration
 
 ### Configuration File Locations
@@ -380,6 +415,8 @@ Tools that modify resources (`releasePipeline`, `uploadConfigurationToS3`) requi
 
 The server validates schema integrity at startup using SHA-256 checksums. This protects against tampering or corruption of embedded LZA schemas. If validation fails, the server refuses to start with a clear error message.
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## Available Tools
 
 ### AWS Services
@@ -437,6 +474,8 @@ Enable with `ENABLE_UC_MERGE=true` to access UC merge workflow tools:
 - **getUcNetworkCustomizationGuide**: Get customization guidance
 - **copyUcToLzaConfig**: Copy UC configuration to LZA directory
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## Schema Management
 
 Schemas are generated during container build. See [Build Process](#build-process) for build details and customization options.
@@ -488,6 +527,8 @@ getFullSchema(
 )
 ```
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## Universal Configuration
 
 The [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) provides enterprise-ready configuration templates that establish secure, scalable, and well-architected multi-account AWS environments. These templates enable rapid deployment of baseline environments supporting multiple global compliance frameworks.
@@ -530,6 +571,8 @@ docker build \
     └── docs/
 ```
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## Configuration Operations
 
 ### Retrieving Configurations
@@ -560,6 +603,8 @@ The `LZA_CONFIG_HOST_PATH` environment variable must match the volume mount path
 
 This ensures the server provides correct file paths for IDE access.
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## Pipeline Management
 
 ### Deployment Workflow
@@ -587,6 +632,8 @@ This ensures the server provides correct file paths for IDE access.
 ### Pipeline Monitoring
 
 The server provides real-time pipeline monitoring with stage-level details. See [AWS CodePipeline monitoring documentation](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) for execution state details.
+
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
 ## Advanced Topics
 
@@ -628,6 +675,8 @@ Add resource constraints to prevent resource exhaustion:
 }
 ```
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
 ## Troubleshooting
 
 ### Schema Issues
@@ -665,6 +714,22 @@ Verify pipeline name matches LZA deployment (default: `AWSAccelerator-Pipeline`)
 **Execution fails immediately**  
 Check container logs, possibly increase logging level
 
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report issues, and contribute to the project.
+
+## Code of Conduct
+
+This project has adopted the [Amazon Open Source Code of Conduct](CODE_OF_CONDUCT.md). For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of-conduct-faq) or contact opensource-codeofconduct@amazon.com with any additional questions or comments.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for information on reporting security vulnerabilities.
+
 ## License
 
-Apache License 2.0 - see LICENSE file for details.
+Apache License 2.0 - see [LICENSE](LICENSE.txt) file for details.
+
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
