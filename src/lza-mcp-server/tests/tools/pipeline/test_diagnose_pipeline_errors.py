@@ -714,3 +714,291 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
             # Should still have basic error info even without logs
             assert failed_action["error_code"] == "JobFailed"
             assert failed_action["codebuild_logs"] is None
+
+
+    @pytest.mark.asyncio
+    async def test_codebuild_retrieval_failure(self, mock_mcp_context):
+        """Test handling when CodeBuild details retrieval fails."""
+        execution_id = "12345678-1234-1234-1234-123456789012"
+        build_id = "project:build-id"
+
+        mock_pipeline_response = {"pipeline": {"name": "test-pipeline"}}
+        mock_executions_response = {
+            "pipelineExecutionSummaries": [
+                {
+                    "pipelineExecutionId": execution_id,
+                    "status": "Failed",
+                    "startTime": datetime(2024, 1, 15, 10, 30, 0),
+                }
+            ]
+        }
+        mock_execution_response = {
+            "pipelineExecution": {
+                "pipelineExecutionId": execution_id,
+                "status": "Failed",
+            }
+        }
+        mock_state_response = {
+            "stageStates": [
+                {
+                    "stageName": "Build",
+                    "latestExecution": {"pipelineExecutionId": execution_id},
+                    "actionStates": [
+                        {
+                            "actionName": "BuildAction",
+                            "actionTypeId": {"provider": "CodeBuild"},
+                            "latestExecution": {
+                                "status": "Failed",
+                                "errorDetails": {
+                                    "code": "JobFailed",
+                                    "message": "Build failed",
+                                },
+                                "externalExecutionId": build_id,
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+
+        call_count = [0]
+
+        async def mock_retry(func, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return mock_pipeline_response
+            elif call_count[0] == 2:
+                return mock_executions_response
+            elif call_count[0] == 3:
+                return mock_execution_response
+            elif call_count[0] == 4:
+                return mock_state_response
+            else:
+                # CodeBuild call fails
+                raise Exception("CodeBuild API error")
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+        ) as mock_cp_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+        ) as mock_cb_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+            side_effect=mock_retry,
+        ):
+            mock_cp_client.return_value = Mock()
+            mock_cb_client.return_value = Mock()
+
+            result = await tool_diagnose_pipeline_errors(
+                mock_mcp_context, pipeline_name="test-pipeline"
+            )
+
+            # Should still succeed with basic error info even if CodeBuild retrieval fails
+            assert result["success"] is True
+            assert len(result["failed_actions"]) == 1
+            
+            failed_action = result["failed_actions"][0]
+            assert failed_action["error_code"] == "JobFailed"
+            # No logs due to retrieval failure
+            assert failed_action["codebuild_logs"] is None
+
+    @pytest.mark.asyncio
+    async def test_cloudwatch_logs_retrieval_failure(self, mock_mcp_context):
+        """Test handling when CloudWatch logs retrieval fails."""
+        execution_id = "12345678-1234-1234-1234-123456789012"
+        build_id = "project:build-id"
+
+        mock_pipeline_response = {"pipeline": {"name": "test-pipeline"}}
+        mock_executions_response = {
+            "pipelineExecutionSummaries": [
+                {
+                    "pipelineExecutionId": execution_id,
+                    "status": "Failed",
+                    "startTime": datetime(2024, 1, 15, 10, 30, 0),
+                }
+            ]
+        }
+        mock_execution_response = {
+            "pipelineExecution": {
+                "pipelineExecutionId": execution_id,
+                "status": "Failed",
+            }
+        }
+        mock_state_response = {
+            "stageStates": [
+                {
+                    "stageName": "Build",
+                    "latestExecution": {"pipelineExecutionId": execution_id},
+                    "actionStates": [
+                        {
+                            "actionName": "BuildAction",
+                            "actionTypeId": {"provider": "CodeBuild"},
+                            "latestExecution": {
+                                "status": "Failed",
+                                "errorDetails": {
+                                    "code": "JobFailed",
+                                    "message": "Build failed",
+                                },
+                                "externalExecutionId": build_id,
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+
+        mock_build_response = {
+            "builds": [
+                {
+                    "id": build_id,
+                    "logs": {
+                        "groupName": "/aws/codebuild/test-project",
+                        "streamName": "stream-123",
+                    },
+                }
+            ]
+        }
+
+        call_count = [0]
+
+        async def mock_retry(func, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return mock_pipeline_response
+            elif call_count[0] == 2:
+                return mock_executions_response
+            elif call_count[0] == 3:
+                return mock_execution_response
+            elif call_count[0] == 4:
+                return mock_state_response
+            elif call_count[0] == 5:
+                return mock_build_response
+            else:
+                # CloudWatch logs call fails
+                raise Exception("CloudWatch Logs API error")
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+        ) as mock_cp_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+        ) as mock_cb_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+        ) as mock_logs_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+            side_effect=mock_retry,
+        ):
+            mock_cp_client.return_value = Mock()
+            mock_cb_client.return_value = Mock()
+            mock_logs_client.return_value = Mock()
+
+            result = await tool_diagnose_pipeline_errors(
+                mock_mcp_context, pipeline_name="test-pipeline"
+            )
+
+            # Should still succeed even if CloudWatch logs retrieval fails
+            assert result["success"] is True
+            assert len(result["failed_actions"]) == 1
+            
+            failed_action = result["failed_actions"][0]
+            assert failed_action["error_code"] == "JobFailed"
+
+    @pytest.mark.asyncio
+    async def test_empty_cloudwatch_logs(self, mock_mcp_context):
+        """Test handling when CloudWatch logs are empty."""
+        execution_id = "12345678-1234-1234-1234-123456789012"
+        build_id = "project:build-id"
+
+        mock_pipeline_response = {"pipeline": {"name": "test-pipeline"}}
+        mock_executions_response = {
+            "pipelineExecutionSummaries": [
+                {
+                    "pipelineExecutionId": execution_id,
+                    "status": "Failed",
+                    "startTime": datetime(2024, 1, 15, 10, 30, 0),
+                }
+            ]
+        }
+        mock_execution_response = {
+            "pipelineExecution": {
+                "pipelineExecutionId": execution_id,
+                "status": "Failed",
+            }
+        }
+        mock_state_response = {
+            "stageStates": [
+                {
+                    "stageName": "Build",
+                    "latestExecution": {"pipelineExecutionId": execution_id},
+                    "actionStates": [
+                        {
+                            "actionName": "BuildAction",
+                            "actionTypeId": {"provider": "CodeBuild"},
+                            "latestExecution": {
+                                "status": "Failed",
+                                "errorDetails": {
+                                    "code": "JobFailed",
+                                    "message": "Build failed",
+                                },
+                                "externalExecutionId": build_id,
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+
+        mock_build_response = {
+            "builds": [
+                {
+                    "id": build_id,
+                    "logs": {
+                        "groupName": "/aws/codebuild/test-project",
+                        "streamName": "stream-123",
+                    },
+                }
+            ]
+        }
+
+        # Empty log events
+        mock_log_response = {"events": []}
+
+        call_count = [0]
+
+        async def mock_retry(func, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return mock_pipeline_response
+            elif call_count[0] == 2:
+                return mock_executions_response
+            elif call_count[0] == 3:
+                return mock_execution_response
+            elif call_count[0] == 4:
+                return mock_state_response
+            elif call_count[0] == 5:
+                return mock_build_response
+            else:
+                return mock_log_response
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+        ) as mock_cp_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+        ) as mock_cb_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+        ) as mock_logs_client, patch(
+            "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+            side_effect=mock_retry,
+        ):
+            mock_cp_client.return_value = Mock()
+            mock_cb_client.return_value = Mock()
+            mock_logs_client.return_value = Mock()
+
+            result = await tool_diagnose_pipeline_errors(
+                mock_mcp_context, pipeline_name="test-pipeline"
+            )
+
+            assert result["success"] is True
+            assert len(result["failed_actions"]) == 1
+            
+            failed_action = result["failed_actions"][0]
+            # Should have basic error info even with empty logs
+            assert failed_action["error_code"] == "JobFailed"
