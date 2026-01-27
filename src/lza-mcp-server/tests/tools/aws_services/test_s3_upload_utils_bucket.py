@@ -51,7 +51,7 @@ class TestBucketOperations:
         utils.s3_manager.prompt_for_custom_bucket_name = AsyncMock(return_value={})
 
         # Act
-        result = await utils.upload_configuration(mock_ctx)
+        await utils.upload_configuration(mock_ctx)
 
         # Assert
         utils.s3_manager.determine_bucket_name.assert_called_once_with(
@@ -87,7 +87,7 @@ class TestBucketOperations:
         utils.s3_manager.prompt_for_custom_bucket_name = AsyncMock(return_value={})
 
         # Act
-        result = await utils.upload_configuration(mock_ctx, bucket_name=custom_bucket)
+        await utils.upload_configuration(mock_ctx, bucket_name=custom_bucket)
 
         # Assert
         utils.s3_manager.validate_custom_bucket_name.assert_called_once_with(
@@ -165,7 +165,7 @@ class TestBucketOperations:
         # Will fail at ZIP creation but that's OK for this test
         try:
             await utils.upload_configuration(mock_ctx, bucket_name=bucket_name)
-        except:
+        except Exception:
             pass
 
         # Assert

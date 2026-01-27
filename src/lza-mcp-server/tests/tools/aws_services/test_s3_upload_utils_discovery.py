@@ -180,7 +180,7 @@ class TestDiscoverAndSelectConfiguration:
         utils.config_manager.discover_configurations = AsyncMock(return_value=[])
 
         # Act
-        result = await utils._discover_and_select_configuration(mock_ctx)
+        await utils._discover_and_select_configuration(mock_ctx)
 
         # Assert
         utils.config_manager.discover_configurations.assert_called_once_with(
