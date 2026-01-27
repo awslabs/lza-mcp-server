@@ -187,7 +187,7 @@ async def test_access_denied_raises_custom_error(self):
 ### Run All Tests
 ```bash
 cd src/lza-mcp-server
-poetry run pytest
+make test
 ```
 
 ### Run Specific Test Files
@@ -205,7 +205,7 @@ poetry run pytest tests/tools/config/ -v
 ### Run with Coverage
 ```bash
 # All tests with coverage
-poetry run pytest --cov
+make test-coverage
 
 # Specific module with coverage report
 poetry run pytest tests/test_s3_manager*.py -v --cov=awslabs.lza_mcp_server.orchestration.core.s3_manager
@@ -213,6 +213,12 @@ poetry run pytest tests/test_s3_manager*.py -v --cov=awslabs.lza_mcp_server.orch
 
 ### Useful Test Options
 ```bash
+# Fast feedback during development
+make test-fast
+
+# Parallel execution
+make test-parallel
+
 # Verbose output
 poetry run pytest -v
 
@@ -227,6 +233,79 @@ poetry run pytest --lf
 
 # Show test durations
 poetry run pytest --durations=10
+```
+
+## Code Quality Requirements
+
+### Formatter (Ruff)
+**REQUIRED**: All code must be formatted before committing.
+
+```bash
+# Format all Python files
+make format
+```
+
+Ruff enforces consistent code style across the project. All test files must pass formatting.
+
+### Linter (Ruff)
+**REQUIRED**: All code must pass linting with zero errors before committing.
+
+```bash
+# Run linter with auto-fix
+make lint
+```
+
+The linter must return no errors. Warnings should be addressed when possible.
+
+### Pre-Commit Verification
+**REQUIRED**: Run the complete verification pipeline before committing.
+
+```bash
+# Complete pre-commit checks (format, lint, type-check, security, tests, coverage)
+make release
+```
+
+This command runs:
+1. ✅ Cleans caches and updates dependencies
+2. ✅ Validates Python syntax
+3. ✅ Formats code with ruff
+4. ✅ Lints code with ruff
+5. ✅ Type checks with mypy
+6. ✅ Security analysis with bandit
+7. ✅ Runs all tests with coverage ≥59%
+8. ✅ Checks for dependency vulnerabilities
+
+### Pre-Commit Checklist
+Before committing test code:
+
+1. ✅ Run formatter: `make format`
+2. ✅ Run linter: `make lint`
+3. ✅ Run tests: `make test`
+4. ✅ Verify coverage meets target (90%+)
+5. ✅ Document any intentional coverage gaps
+
+**Quick workflow:**
+```bash
+# Format and lint
+make format
+make lint
+
+# Run tests with coverage
+make test-coverage
+
+# If all pass, commit
+git add tests/
+git commit -m "test: Add comprehensive tests"
+```
+
+**Complete workflow (recommended before CR):**
+```bash
+# Run full verification pipeline
+make release
+
+# If all pass, commit
+git add tests/
+git commit -m "test: Add comprehensive tests"
 ```
 
 ## Coverage Guidelines
