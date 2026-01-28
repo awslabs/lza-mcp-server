@@ -37,9 +37,6 @@ def validate_pipeline_name(pipeline_name: str) -> Tuple[bool, str]:
     # - Must be 1-100 characters
     # - Can contain letters, numbers, periods, underscores, and hyphens
     # - Cannot contain spaces or other special characters
-    if len(pipeline_name) < 1:
-        return False, "Pipeline name cannot be empty"
-
     if len(pipeline_name) > 100:
         return (
             False,
@@ -103,8 +100,12 @@ def validate_aws_region(region: str) -> Tuple[bool, str]:
     if not isinstance(region, str):
         return False, "AWS region must be a string"
 
-    # AWS region format: us-east-1, eu-west-1, ap-southeast-2, etc.
-    region_pattern = r"^[a-z]{2,3}-[a-z]+-[0-9]+$"
+    # AWS region format: us-east-1, eu-west-1, ap-southeast-2, us-gov-east-1, eusc-de-east-1, etc.
+    # Pattern breakdown:
+    # - [a-z]{2,4}: 2-4 letter region prefix (us, eu, ap, cn, me, af, sa, ca, eusc)
+    # - (?:-[a-z]+)+: one or more groups of hyphen + letters (handles -gov-, -east-, -west-, -de-, etc.)
+    # - -[1-9][0-9]*: hyphen + number without leading zeros (1, 2, 10, etc.)
+    region_pattern = r"^[a-z]{2,4}(?:-[a-z]+)+-[1-9][0-9]*$"
 
     if not re.match(region_pattern, region):
         return (
