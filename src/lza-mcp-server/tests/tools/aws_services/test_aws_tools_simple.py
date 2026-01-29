@@ -79,7 +79,11 @@ class TestGetAwsSession:
 
     def test_get_aws_session_default_region(self):
         """Test creating AWS session with default region."""
-        with patch("boto3.Session") as mock_session_class:
+        # Patch AWS_REGION in the aws_access module since it's read at import time
+        with (
+            patch("awslabs.lza_mcp_server.aws_access.AWS_REGION", DEFAULT_REGION),
+            patch("boto3.Session") as mock_session_class,
+        ):
             mock_session = Mock()
             mock_session_class.return_value = mock_session
 
