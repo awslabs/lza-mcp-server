@@ -233,8 +233,8 @@ class TestMain:
             call_order.append("is_uc_enabled"),
             False,
         )[1]
-        mock_register_components.side_effect = (
-            lambda *args, **kwargs: call_order.append("register_components")
+        mock_register_components.side_effect = lambda *args, **kwargs: (
+            call_order.append("register_components")
         )
 
         main()
