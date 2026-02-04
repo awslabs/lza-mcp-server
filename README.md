@@ -10,6 +10,7 @@ A Model Context Protocol (MCP) server that enables AI-assisted management of [La
 ## Table of Contents
 
 - [Overview](#overview)
+- [Privacy Notice](#privacy-notice)
 - [Quick Start](#quick-start)
 - [Build Process](#build-process)
 - [AWS Permissions](#aws-permissions)
@@ -35,6 +36,13 @@ The LZA MCP Server streamlines Landing Zone Accelerator on AWS operations by pro
 
 **Architecture:**
 The server operates as a containerized MCP endpoint, invoked by compatible IDEs (Kiro, Claude Desktop) via stdio transport. All AWS operations use temporary credentials following [AWS security best practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html).
+
+[Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
+
+## Privacy Notice
+
+> **⚠️ Data Sharing with AI Providers**  
+> This MCP server executes AWS API calls using your credentials and shares the response data with your third-party AI model provider (e.g., Kiro CLI, Claude Desktop, Cursor, VS Code, Kiro IDE). Users are responsible for understanding your AI provider's data handling practices and ensuring compliance with your organization's security and privacy requirements when using this tool with AWS resources.
 
 [Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
@@ -223,6 +231,9 @@ finch build \
 ## AWS Permissions
 
 The MCP server requires specific IAM permissions for LZA operations. This policy follows AWS least-privilege principles.
+
+> **🔒 Privacy Consideration**  
+> AWS API responses retrieved using these permissions will be shared with your AI model provider. Review your organization's data classification policies before granting access to sensitive AWS resources.
 
 ### Recommended IAM Policy
 
