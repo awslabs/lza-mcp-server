@@ -724,6 +724,40 @@ Verify pipeline name matches LZA deployment (default: `AWSAccelerator-Pipeline`)
 **Execution fails immediately**  
 Check container logs, possibly increase logging level
 
+### AWS Signature Errors
+
+**InvalidSignatureException: Signature expired**  
+This error indicates clock skew between your container and AWS services. AWS requires request signatures to be within 5 minutes of the current time.
+
+**Verify the issue:**
+```bash
+# Check your local time
+date -u
+
+# Check container time (replace CONTAINER_ID)
+docker exec CONTAINER_ID date -u
+# or for Finch:
+finch exec CONTAINER_ID date -u
+```
+
+If times differ by more than a few seconds, you have clock skew.
+
+**Resolution:**
+
+For Docker Desktop:
+```bash
+# Restart Docker Desktop from menu, or:
+docker restart CONTAINER_ID
+```
+
+For Finch:
+```bash
+finch vm stop
+finch vm start
+```
+
+After restarting, reconnect your MCP server to create a fresh container with synchronized time.
+
 [Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
 ## Contributing
