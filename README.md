@@ -50,7 +50,7 @@ The server operates as a containerized MCP endpoint, invoked by compatible IDEs 
 
 ### Prerequisites
 
-- Docker or Finch container runtime
+- **Container Runtime**: Docker or Finch (the build process auto-detects which is available)
 - AWS credentials with [required IAM permissions](#aws-permissions)
 - MCP-compatible IDE (Kiro IDE, Claude Desktop)
 - Existing LZA deployment (for pipeline and configuration operations)
@@ -62,12 +62,30 @@ The server operates as a containerized MCP endpoint, invoked by compatible IDEs 
 
 ### 1. Build Container Image
 
+The build process automatically detects whether Docker or Finch is installed and uses the available runtime:
+
 ```bash
 cd src/lza-mcp-server
 make build
 ```
 
+**Using a specific runtime:**
+
+```bash
+# Force Docker
+make build CONTAINER_RUNTIME=docker
+
+# Force Finch
+make build CONTAINER_RUNTIME=finch
+```
+
 This generates a container image with embedded LZA schemas for versions v1.12.0 and later (mutable).
+
+**What if neither is installed?**
+
+The build will fail with a helpful error message directing you to installation resources:
+- **Docker**: https://docs.docker.com/get-docker/
+- **Finch**: https://github.com/runfinch/finch
 
 ### 2. Configure AWS Permissions
 
@@ -132,6 +150,8 @@ Add the server configuration to your IDE's MCP settings file:
 }
 ```
 
+> **Note:** To use Finch instead of Docker, replace `"docker"` with `"finch"` in the args array.
+
 **Configuration Parameters:**
 - `<REPO_PATH>`: Full path to cloned repository (e.g., `/Users/username/repos/lza-mcp-server`)
 - `<CONFIG_PATH>`: Local directory for configuration files (e.g., `/Users/username/Documents/lza-config`)
@@ -179,42 +199,21 @@ This preprocessing enables sub-second schema searches without runtime analysis o
 Control which LZA versions and UC releases are included in the container:
 
 ```bash
-# Default build (v1.12.0 to latest LZA, latest UC)
+# Default build (v1.12.0 to latest LZA, latest UC) - auto-detects runtime
 make build
 
-# Custom LZA version range
-docker build \
-  --build-arg LZA_MIN_VERSION=v1.10.0 \
-  --build-arg LZA_MAX_VERSION=v1.14.0 \
-  -t lza-mcp-server:local .
-# or with Finch
-finch build \
-  --build-arg LZA_MIN_VERSION=v1.10.0 \
-  --build-arg LZA_MAX_VERSION=v1.14.0 \
-  -t lza-mcp-server:local .
+# Custom LZA version range using Makefile
+make build LZA_MIN_VERSION=v1.10.0 LZA_MAX_VERSION=v1.14.0
 
-# Specific UC release
+# Direct build with specific runtime (replace 'docker' with 'finch' if needed)
 docker build \
-  --build-arg LZA_UC_RELEASE=v1.0.0 \
-  -t lza-mcp-server:local .
-# or with Finch
-finch build \
-  --build-arg LZA_UC_RELEASE=v1.0.0 \
-  -t lza-mcp-server:local .
-
-# Combined customization
-docker build \
-  --build-arg LZA_MIN_VERSION=v1.11.0 \
-  --build-arg LZA_MAX_VERSION=v1.13.0 \
-  --build-arg LZA_UC_RELEASE=v1.0.0 \
-  -t lza-mcp-server:local .
-# or with Finch
-finch build \
   --build-arg LZA_MIN_VERSION=v1.11.0 \
   --build-arg LZA_MAX_VERSION=v1.13.0 \
   --build-arg LZA_UC_RELEASE=v1.0.0 \
   -t lza-mcp-server:local .
 ```
+
+> **Note:** The Makefile auto-detects Docker or Finch. For direct builds, replace `docker` with `finch` if using Finch.
 
 **Build Arguments:**
 
