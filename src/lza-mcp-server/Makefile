@@ -7,6 +7,16 @@
 # - Performance monitoring and optimization
 
 # Configuration variables
+# Auto-detect container runtime: docker or finch
+CONTAINER_RUNTIME ?= $(shell \
+	if command -v docker >/dev/null 2>&1; then \
+		echo "docker"; \
+	elif command -v finch >/dev/null 2>&1; then \
+		echo "finch"; \
+	else \
+		echo "none"; \
+	fi)
+
 LZA_MIN_VERSION ?= v1.12.0
 LZA_MAX_VERSION ?=
 DOCKER_IMAGE_NAME ?= lza-mcp-server:local
@@ -18,6 +28,7 @@ help:
 	@echo "🚀 LZA MCP Server Test Performance Commands"
 	@echo ""
 	@echo "Configuration:"
+	@echo "  CONTAINER_RUNTIME=$(CONTAINER_RUNTIME)  (auto-detected: docker > finch > none)"
 	@echo "  LZA_MIN_VERSION=$(LZA_MIN_VERSION)  (override with: make build LZA_MIN_VERSION=v1.10.0)"
 	@echo "  LZA_MAX_VERSION=$(LZA_MAX_VERSION)  (empty = latest)"
 	@echo "  DOCKER_IMAGE_NAME=$(DOCKER_IMAGE_NAME)"
@@ -80,18 +91,27 @@ release: clean-cache clean-lock update-deps py-compile format lint type-check se
 
 # Build Docker image
 build:
-	@echo "🐳 Building Docker image..."
+	@if [ "$(CONTAINER_RUNTIME)" = "none" ]; then \
+		echo "❌ Error: No container runtime found!"; \
+		echo ""; \
+		echo "Please install either Docker or Finch:"; \
+		echo "  Docker: https://docs.docker.com/get-docker/"; \
+		echo "  Finch: https://github.com/runfinch/finch"; \
+		exit 1; \
+	fi
+	@echo "🐳 Building container image with $(CONTAINER_RUNTIME)..."
 	@echo "  LZA_MIN_VERSION: $(LZA_MIN_VERSION)"
 	@echo "  LZA_MAX_VERSION: $(LZA_MAX_VERSION)"
 	@echo "  This will clone LZA versions and generate schemas during build"
-	@docker build -f Dockerfile \
+	@$(CONTAINER_RUNTIME) build -f Dockerfile \
 		--build-arg LZA_MIN_VERSION=$(LZA_MIN_VERSION) \
 		$(if $(LZA_MAX_VERSION),--build-arg LZA_MAX_VERSION=$(LZA_MAX_VERSION),) \
 		-t $(DOCKER_IMAGE_NAME) .
-	@echo "✅ Docker image built successfully"
+	@echo "✅ Container image built successfully with $(CONTAINER_RUNTIME)"
 	@echo ""
 	@echo "📋 Build Info:"
 	@echo "  Image: $(DOCKER_IMAGE_NAME)"
+	@echo "  Runtime: $(CONTAINER_RUNTIME)"
 	@echo "  Schemas: /app/json-schemas/{version}/"
 	@echo "  Min Version: $(LZA_MIN_VERSION)"
 	@echo "  Max Version: $(if $(LZA_MAX_VERSION),$(LZA_MAX_VERSION),latest)"
@@ -99,6 +119,7 @@ build:
 	@echo "💡 Custom build examples:"
 	@echo "  make build LZA_MIN_VERSION=v1.10.0"
 	@echo "  make build LZA_MIN_VERSION=v1.10.0 LZA_MAX_VERSION=v1.13.0"
+	@echo "  make build CONTAINER_RUNTIME=finch  # Force specific runtime"
 
 # Code formatting
 format:
@@ -127,13 +148,17 @@ security-check:
 
 # Container vulnerability scanning (optional)
 scan-container:
+	@if [ "$(CONTAINER_RUNTIME)" = "none" ]; then \
+		echo "❌ Error: No container runtime found!"; \
+		exit 1; \
+	fi
 	@echo "🔍 Scanning container for vulnerabilities with Trivy..."
 	@echo "  Image: $(DOCKER_IMAGE_NAME)"
 	@if command -v trivy >/dev/null 2>&1; then \
 		trivy image --severity HIGH,CRITICAL $(DOCKER_IMAGE_NAME); \
 	else \
 		echo "⚠️  Trivy not installed. Install with: brew install trivy"; \
-		echo "   Or run via Docker: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image $(DOCKER_IMAGE_NAME)"; \
+		echo "   Or run via $(CONTAINER_RUNTIME): $(CONTAINER_RUNTIME) run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image $(DOCKER_IMAGE_NAME)"; \
 	fi
 	@echo "✅ Container scan complete"
 
