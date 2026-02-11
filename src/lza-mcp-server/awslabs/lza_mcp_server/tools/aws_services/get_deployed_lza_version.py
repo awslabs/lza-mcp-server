@@ -19,10 +19,10 @@ from mcp.server.fastmcp import Context
 from botocore.exceptions import ClientError
 
 from awslabs.lza_mcp_server.aws_access import get_aws_session, handle_aws_error
-from awslabs.lza_mcp_server.constants import DEFAULT_REGION
+from awslabs.lza_mcp_server.constants import DEFAULT_REGION, LZA_PREFIX
 
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
-LZA_VERSION_SSM_PARAMETER = "/accelerator/AWSAccelerator-InstallerStack/version"
+LZA_VERSION_SSM_PARAMETER = f"/accelerator/{LZA_PREFIX}-InstallerStack/version"
 
 
 async def tool_get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:

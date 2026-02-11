@@ -1,5 +1,14 @@
+import os
+
+# LZA Prefix Configuration
+# This prefix is used by LZA to name resources (pipelines, stacks, SSM parameters, etc.)
+# Default is "AWSAccelerator" but can be customized via LZA_PREFIX environment variable
+# Empty or whitespace-only values fall back to default to prevent invalid resource names
+_prefix = os.environ.get("LZA_PREFIX", "AWSAccelerator").strip()
+LZA_PREFIX = _prefix if _prefix else "AWSAccelerator"
+
 DEFAULT_REGION = "us-east-1"
-DEFAULT_PIPELINE_NAME = "AWSAccelerator-Pipeline"
+DEFAULT_PIPELINE_NAME = f"{LZA_PREFIX}-Pipeline"
 BUCKET_PREFIX = "awslabs-lza-mcp-server"
 ACCOUNT_CONFIG_FILENAME = "accounts-config.yaml"
 ORG_CONFIG_FILENAME = "organization-config.yaml"
