@@ -159,6 +159,27 @@ Add the server configuration to your IDE's MCP settings file:
 - `<YOUR_AWS_PROFILE>`: AWS CLI profile name from `~/.aws/credentials` or `~/.aws/config`
 - `<YOUR_AWS_REGION>`: AWS region where LZA is deployed (e.g., `us-east-1`)
 
+**Optional Environment Variables:**
+
+You can customize the MCP server behavior by adding environment variables to the `env` section:
+
+```json
+"env": {
+  "AWS_PROFILE": "<YOUR_AWS_PROFILE>",
+  "AWS_REGION": "<YOUR_AWS_REGION>",
+  "LZA_PREFIX": "AWSAccelerator"
+}
+```
+
+- `LZA_PREFIX`: The prefix used by your LZA deployment for resource naming (default: `AWSAccelerator`)
+  - LZA uses this prefix to name resources like pipelines, CloudFormation stacks, and SSM parameters
+  - If you customized the prefix during LZA installation, set this to match your deployment
+  - Example: If your pipeline is named `MyOrg-Pipeline`, set `LZA_PREFIX="MyOrg"`
+  - This affects:
+    - Pipeline name: `{LZA_PREFIX}-Pipeline`
+    - SSM parameter: `/accelerator/{LZA_PREFIX}-InstallerStack/version`
+    - CloudFormation stacks: `{LZA_PREFIX}-*`
+
 >**Note:** The [credential extraction script](#3-configure-aws-credentials) requires your AWS CLI profile to be ready for use. Complete any profile-specific prerequisites before starting your LZA MCP server (e.g., `aws sso login` for IAM Identity Center profiles).
 
 ### 4. Verify Installation

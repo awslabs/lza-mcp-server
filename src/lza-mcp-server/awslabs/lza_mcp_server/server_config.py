@@ -40,6 +40,15 @@ def get_base_instructions() -> str:
 
 This MCP server helps manage LZA configurations and pipeline operations for the AWS Landing Zone Accelerator solution.
 
+## Configuration
+
+The server can be configured via environment variables in your MCP client configuration:
+
+- **LZA_PREFIX**: The prefix used by your LZA deployment for resource naming (default: "AWSAccelerator")
+  - This prefix is used for pipeline names, SSM parameters, and CloudFormation stacks
+  - Set this if you customized the prefix during LZA installation
+  - Example: If your pipeline is named "MyOrg-Pipeline", set LZA_PREFIX="MyOrg"
+
 ## Available Tools
 
 ### AWS Services
