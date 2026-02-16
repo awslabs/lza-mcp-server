@@ -435,7 +435,7 @@ These flags mitigate container escape vulnerabilities. Keep Docker/Finch updated
 | `ENABLE_UC_MERGE` | Enable Universal Configuration merge tools | `false` (default), `true` |
 | `LOG_INSTRUCTIONS` | Log MCP server instructions at startup | `false` (default), `true` |
 
-**Note:** Setting `ENABLE_UC_MERGE=true` enables 9 additional tools for UC merge workflows but increases context size by ~56%.
+**Note:** Setting `ENABLE_UC_MERGE=true` enables 9 additional tools for UC merge workflows but consumes more of the available context window. Only enable this when you need UC merge functionality to keep context usage efficient.
 
 ### Auto-Approved Tools
 
