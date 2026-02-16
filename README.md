@@ -167,7 +167,8 @@ You can customize the MCP server behavior by adding environment variables to the
 "env": {
   "AWS_PROFILE": "<YOUR_AWS_PROFILE>",
   "AWS_REGION": "<YOUR_AWS_REGION>",
-  "LZA_PREFIX": "AWSAccelerator"
+  "LZA_PREFIX": "AWSAccelerator",
+  "LOG_INSTRUCTIONS": "false"
 }
 ```
 
@@ -179,6 +180,10 @@ You can customize the MCP server behavior by adding environment variables to the
     - Pipeline name: `{LZA_PREFIX}-Pipeline`
     - SSM parameter: `/accelerator/{LZA_PREFIX}-InstallerStack/version`
     - CloudFormation stacks: `{LZA_PREFIX}-*`
+- `LOG_INSTRUCTIONS`: Enable logging of MCP server instructions at startup (default: `false`)
+  - Set to `true`, `1`, or `yes` to enable instruction logging
+  - Useful for debugging or understanding what instructions are provided to the AI model
+  - Instructions are logged at INFO level and include all guidance provided to the model
 
 >**Note:** The [credential extraction script](#3-configure-aws-credentials) requires your AWS CLI profile to be ready for use. Complete any profile-specific prerequisites before starting your LZA MCP server (e.g., `aws sso login` for IAM Identity Center profiles).
 
@@ -428,6 +433,7 @@ These flags mitigate container escape vulnerabilities. Keep Docker/Finch updated
 | `AWS_REGION` | Default AWS region | `us-east-1` |
 | `FASTMCP_LOG_LEVEL` | Logging verbosity | `INFO`, `DEBUG` |
 | `ENABLE_UC_MERGE` | Enable Universal Configuration merge tools | `false` (default), `true` |
+| `LOG_INSTRUCTIONS` | Log MCP server instructions at startup | `false` (default), `true` |
 
 **Note:** Setting `ENABLE_UC_MERGE=true` enables 9 additional tools for UC merge workflows but increases context size by ~56%.
 
