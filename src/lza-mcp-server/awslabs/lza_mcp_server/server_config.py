@@ -14,7 +14,14 @@
 
 """Server configuration and instructions builder."""
 
+import logging
 import os
+
+from awslabs.lza_mcp_server.utils.load_instruction_content import (
+    load_instruction_content,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def is_uc_merge_enabled() -> bool:
@@ -30,45 +37,26 @@ def is_uc_merge_enabled() -> bool:
     )
 
 
+def is_instruction_logging_enabled() -> bool:
+    """Check if instruction logging should be enabled.
+
+    Returns:
+        bool: True if instruction logging is enabled, False otherwise
+    """
+    return os.environ.get("LOG_INSTRUCTIONS", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+
 def get_base_instructions() -> str:
     """Get base server instructions.
 
     Returns:
         str: Base instructions text
     """
-    return """# AWS Landing Zone Accelerator (LZA) MCP Server
-
-This MCP server helps manage LZA configurations and pipeline operations for the AWS Landing Zone Accelerator solution.
-
-## Configuration
-
-The server can be configured via environment variables in your MCP client configuration:
-
-- **LZA_PREFIX**: The prefix used by your LZA deployment for resource naming (default: "AWSAccelerator")
-  - This prefix is used for pipeline names, SSM parameters, and CloudFormation stacks
-  - Set this if you customized the prefix during LZA installation
-  - Example: If your pipeline is named "MyOrg-Pipeline", set LZA_PREFIX="MyOrg"
-
-## Available Tools
-
-### AWS Services
-- **checkAwsConnectivity**: Verify AWS credentials and connectivity
-- **getDeployedLzaVersion**: Get the currently deployed LZA version from SSM Parameter Store
-
-### Configuration Management
-- **getMinimumConfiguration**: Generate minimal LZA configuration templates
-- **uploadConfigurationToS3**: Upload configuration files to S3 bucket
-- **getConfigurationFromS3**: Retrieve and extract current LZA configuration from S3
-
-### Pipeline Management
-- **releasePipeline**: Trigger execution of the LZA Configuration Pipeline
-- **getPipelineStatus**: Monitor pipeline execution status with stage progression
-- **diagnosePipelineErrors**: Retrieve CodeBuild logs for failed executions
-
-### Schema Management
-- **listLzaSupportedVersions**: List all supported LZA versions with schema information
-- **searchJsonSchema**: Search through LZA JSON schemas (requires lza_version parameter)
-- **getFullSchema**: Retrieve complete LZA configuration JSON schemas (requires lza_version parameter)"""
+    return load_instruction_content("base_instructions.md")
 
 
 def get_uc_merge_instructions() -> str:
@@ -77,18 +65,7 @@ def get_uc_merge_instructions() -> str:
     Returns:
         str: UC Merge instructions text
     """
-    return """
-
-### UC Merge Tools (Universal Configuration)
-- **validateLzaForUcMerge**: Validate LZA installation compatibility with UC merge
-- **get_uc_releases**: Discover available UC release versions
-- **get_uc_network_models**: Get network deployment model comparison
-- **start_uc_merge_session**: Initialize a UC merge session
-- **readLzaConfigFile**: Read LZA configuration files
-- **readUcFile**: Read UC files from session
-- **updateUcFile**: Update UC files in session
-- **getUcNetworkCustomizationGuide**: Get customization guidance
-- **copyUcToLzaConfig**: Copy UC configuration to LZA directory"""
+    return load_instruction_content("uc_merge_instructions.md")
 
 
 def get_workflow_instructions() -> str:
@@ -97,27 +74,7 @@ def get_workflow_instructions() -> str:
     Returns:
         str: Workflow instructions text
     """
-    return """
-
-## Typical Workflows
-
-### Deployment Workflow
-1. Check AWS connectivity with `checkAwsConnectivity`
-2. Generate configuration with `getMinimumConfiguration`
-3. Upload to S3 with `uploadConfigurationToS3`
-4. Deploy with `releasePipeline`
-5. Monitor with `getPipelineStatus`
-
-### Schema Query Workflow
-When working with LZA schemas, use this recommended workflow:
-1. Call `getDeployedLzaVersion` to get the currently deployed LZA version
-2. Use the returned version as the `lza_version` parameter in `searchJsonSchema` or `getFullSchema`
-3. This ensures schema queries match your deployed environment
-
-Alternatively, use `listLzaSupportedVersions` to see all available schema versions.
-
-For detailed usage instructions, see the individual tool documentation.
-"""
+    return load_instruction_content("workflow_instructions.md")
 
 
 def build_instructions(include_uc_merge: bool = None) -> str:
@@ -139,5 +96,13 @@ def build_instructions(include_uc_merge: bool = None) -> str:
         instructions += get_uc_merge_instructions()
 
     instructions += get_workflow_instructions()
+
+    # Log instructions if enabled
+    if is_instruction_logging_enabled():
+        logger.info("=" * 80)
+        logger.info("MCP SERVER INSTRUCTIONS")
+        logger.info("=" * 80)
+        logger.info(instructions)
+        logger.info("=" * 80)
 
     return instructions

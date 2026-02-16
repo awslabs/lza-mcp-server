@@ -19,6 +19,7 @@ from awslabs.lza_mcp_server.server_config import (
     get_base_instructions,
     get_uc_merge_instructions,
     get_workflow_instructions,
+    is_instruction_logging_enabled,
     is_uc_merge_enabled,
 )
 
@@ -73,6 +74,58 @@ class TestIsUcMergeEnabled:
         """Test UC Merge disabled with invalid value."""
         monkeypatch.setenv("ENABLE_UC_MERGE", "invalid")
         assert is_uc_merge_enabled() is False
+
+
+class TestIsInstructionLoggingEnabled:
+    """Test instruction logging enablement detection."""
+
+    def test_enabled_with_true(self, monkeypatch):
+        """Test instruction logging enabled with 'true'."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "true")
+        assert is_instruction_logging_enabled() is True
+
+    def test_enabled_with_1(self, monkeypatch):
+        """Test instruction logging enabled with '1'."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "1")
+        assert is_instruction_logging_enabled() is True
+
+    def test_enabled_with_yes(self, monkeypatch):
+        """Test instruction logging enabled with 'yes'."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "yes")
+        assert is_instruction_logging_enabled() is True
+
+    def test_enabled_case_insensitive(self, monkeypatch):
+        """Test instruction logging enabled is case insensitive."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "TRUE")
+        assert is_instruction_logging_enabled() is True
+
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "Yes")
+        assert is_instruction_logging_enabled() is True
+
+    def test_disabled_with_false(self, monkeypatch):
+        """Test instruction logging disabled with 'false'."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "false")
+        assert is_instruction_logging_enabled() is False
+
+    def test_disabled_with_0(self, monkeypatch):
+        """Test instruction logging disabled with '0'."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "0")
+        assert is_instruction_logging_enabled() is False
+
+    def test_disabled_with_no(self, monkeypatch):
+        """Test instruction logging disabled with 'no'."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "no")
+        assert is_instruction_logging_enabled() is False
+
+    def test_disabled_by_default(self, monkeypatch):
+        """Test instruction logging disabled by default when env var not set."""
+        monkeypatch.delenv("LOG_INSTRUCTIONS", raising=False)
+        assert is_instruction_logging_enabled() is False
+
+    def test_disabled_with_invalid_value(self, monkeypatch):
+        """Test instruction logging disabled with invalid value."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "invalid")
+        assert is_instruction_logging_enabled() is False
 
 
 class TestGetBaseInstructions:
@@ -251,3 +304,46 @@ class TestBuildInstructions:
         assert "### UC Merge Tools" in result
         assert "### Deployment Workflow" in result
         assert "### Schema Query Workflow" in result
+
+    def test_logging_disabled_by_default(self, monkeypatch, caplog):
+        """Test instruction logging is disabled by default."""
+        monkeypatch.delenv("LOG_INSTRUCTIONS", raising=False)
+
+        with caplog.at_level("INFO"):
+            build_instructions(include_uc_merge=False)
+
+        # Should not log instructions
+        assert "MCP SERVER INSTRUCTIONS" not in caplog.text
+
+    def test_logging_enabled(self, monkeypatch, caplog):
+        """Test instruction logging when enabled."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "true")
+
+        with caplog.at_level("INFO"):
+            build_instructions(include_uc_merge=False)
+
+        # Should log instructions
+        assert "MCP SERVER INSTRUCTIONS" in caplog.text
+        assert "AWS Landing Zone Accelerator (LZA) MCP Server" in caplog.text
+
+    def test_logging_includes_full_instructions(self, monkeypatch, caplog):
+        """Test logged instructions match returned instructions."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "true")
+
+        with caplog.at_level("INFO"):
+            result = build_instructions(include_uc_merge=False)
+
+        # Logged content should include the instructions
+        assert result in caplog.text
+
+    def test_logging_with_uc_merge(self, monkeypatch, caplog):
+        """Test instruction logging includes UC Merge when enabled."""
+        monkeypatch.setenv("LOG_INSTRUCTIONS", "true")
+        monkeypatch.setenv("ENABLE_UC_MERGE", "true")
+
+        with caplog.at_level("INFO"):
+            build_instructions()
+
+        # Should log instructions with UC Merge
+        assert "MCP SERVER INSTRUCTIONS" in caplog.text
+        assert "UC Merge Tools" in caplog.text
