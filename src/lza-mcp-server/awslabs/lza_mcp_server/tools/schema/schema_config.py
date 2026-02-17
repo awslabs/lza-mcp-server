@@ -61,13 +61,15 @@ class SchemaSearchConfig:
 
     @classmethod
     def get_schema_version_path(
-        cls, version: str, base_dir: str = "/app/json-schemas"
+        cls,
+        version: str,
+        base_dir: str = None,
     ) -> str:
         """Get path to schema file for a specific LZA version.
 
         Args:
             version: LZA version (e.g., "v1.12.0") - must be explicit
-            base_dir: Base directory containing versioned schemas
+            base_dir: Base directory containing versioned schemas (defaults to LZA_SCHEMA_DIR env var or /app/json-schemas)
 
         Returns:
             Path to combined.json for the specified version
@@ -76,6 +78,9 @@ class SchemaSearchConfig:
             FileNotFoundError: If schema file doesn't exist for version
             ValueError: If version is "latest" (not supported)
         """
+        if base_dir is None:
+            base_dir = os.environ.get("LZA_SCHEMA_DIR", "/app/json-schemas")
+
         if version == "latest":
             raise ValueError(
                 'Version "latest" is not supported. '

@@ -181,18 +181,16 @@ async def tool_search_json_schema(
             }
 
         # Use version-specific path (schema_path parameter removed)
-        schema_file_path = os.path.join(
-            "/app/json-schemas", lza_version, "combined.json"
-        )
+        schemas_base = os.environ.get("LZA_SCHEMA_DIR", "/app/json-schemas")
+        schema_file_path = os.path.join(schemas_base, lza_version, "combined.json")
         await ctx.info(f"Using version-specific schema path: {schema_file_path}")
 
         # Check if schema file exists
         if not os.path.exists(schema_file_path):
             # Check if version directory exists to provide better error message
-            version_dir = os.path.join("/app/json-schemas", lza_version)
+            version_dir = os.path.join(schemas_base, lza_version)
             if not os.path.exists(version_dir):
                 available_versions = []
-                schemas_base = "/app/json-schemas"
                 if os.path.exists(schemas_base):
                     available_versions = [
                         d
