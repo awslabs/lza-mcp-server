@@ -275,7 +275,9 @@ class S3ConfigRetrieval:
             # Create extraction directory in Docker mounted volume location
             # This allows the LLM to interact with the configuration files
             # The user maps their local directory to /app/lza-config in the container
-            docker_share_path = "/app/lza-config"
+            docker_share_path = os.environ.get(
+                "LZA_CONFIG_BASE_PATH", "/app/lza-config"
+            )
             os.makedirs(docker_share_path, exist_ok=True)
 
             # Get the host path from environment variable (configured in MCP server settings)

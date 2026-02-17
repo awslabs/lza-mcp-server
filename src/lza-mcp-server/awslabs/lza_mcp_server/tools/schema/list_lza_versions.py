@@ -30,7 +30,7 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
     try:
         await ctx.info("Listing available LZA versions")
 
-        schemas_base = "/app/json-schemas"
+        schemas_base = os.environ.get("LZA_SCHEMA_DIR", "/app/json-schemas")
 
         if not os.path.exists(schemas_base):
             return {
