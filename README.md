@@ -15,6 +15,7 @@ A Model Context Protocol (MCP) server that enables AI-assisted management of [La
 - [Build Process](#build-process)
 - [AWS Permissions](#aws-permissions)
 - [MCP Client Configuration](#mcp-client-configuration)
+- [Kiro IDE: Configuration Validation Hook](#kiro-ide-configuration-validation-hook)
 - [Available Tools](#available-tools)
 - [Schema Management](#schema-management)
 - [Universal Configuration](#universal-configuration)
@@ -447,6 +448,20 @@ The `autoApprove` list includes read-only operations that don't modify AWS resou
 - AWS connectivity verification
 
 Tools that modify resources (`releasePipeline`, `uploadConfigurationToS3`) require explicit approval for safety.
+
+### Kiro IDE: Configuration Validation Hook
+
+For Kiro IDE users, a recommended [agent hook](https://kiro.dev/docs/hooks/) is provided at [`hooks/lza-config-validation.kiro.hook`](hooks/lza-config-validation.kiro.hook). This hook triggers on every prompt and ensures the agent validates all LZA configuration changes against the correct schema before suggesting them — preventing invalid properties or values from reaching your pipeline.
+
+**Installation:**
+
+Copy the hook file into your workspace's `.kiro/hooks/` directory:
+
+```bash
+cp hooks/lza-config-validation.kiro.hook .kiro/hooks/
+```
+
+Once in place, the hook automatically instructs the agent to call `getDeployedLzaVersion()` and `searchJsonSchema()`/`getFullSchema()` before suggesting any changes to LZA configuration files (`accounts-config.yaml`, `network-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `security-config.yaml`, `organization-config.yaml`).
 
 ### Schema Integrity Validation
 

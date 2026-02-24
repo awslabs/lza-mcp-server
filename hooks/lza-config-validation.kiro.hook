@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "LZA Config Validation",
+  "description": "When reviewing or modifying LZA configuration files (accounts-config.yaml, network-config.yaml, etc.), always use available MCP tools to validate schemas and check configuration before suggesting changes",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "CRITICAL REQUIREMENT - LZA Configuration Changes:\n\nWhen suggesting ANY changes to LZA configuration files (accounts-config.yaml, network-config.yaml, global-config.yaml, iam-config.yaml, security-config.yaml, organization-config.yaml):\n\n1. STOP - Do not suggest changes yet\n2. REQUIRED: Call getDeployedLzaVersion() to get the correct schema version\n3. REQUIRED: Call searchJsonSchema() or getFullSchema() to validate:\n   - All property names are valid\n   - Required fields are present\n   - Data types are correct\n   - Values meet constraints (length, pattern, etc.)\n4. ONLY AFTER validation: Suggest the configuration change\n\nFAILURE TO FOLLOW THIS PROCESS WILL RESULT IN INCORRECT CONFIGURATIONS THAT BREAK THE PIPELINE.\n\nIf you catch yourself suggesting a configuration change without using these tools first, STOP and restart the process.\n"
+  }
+}
