@@ -123,7 +123,20 @@ async def update_uc_file(
     Args:
         session_id: Session identifier from start_uc_merge_session()
         file_path: Relative path to file within session (e.g., "replacements-config.yaml")
-        updates: Dictionary of key-value pairs to update in the YAML file
+        updates: Dictionary of key-value pairs to update in the YAML file.
+
+            For files with flat key-value structure (e.g., replacements-config.yaml),
+            use the top-level key name directly:
+                {"HomeRegion": "eu-north-1", "TransitGatewayASN": 64515}
+
+            For files with list-based structures (e.g., accounts-config.yaml),
+            use index-based dot notation to target specific list entries:
+                {"mandatoryAccounts[0].email": "mgmt@example.com"}
+
+            NOTE: accounts-config.yaml uses a list structure. You must use index
+            notation (e.g., "mandatoryAccounts[0].email") to update account emails.
+            Passing account names as top-level keys will append them as new top-level
+            keys rather than updating the existing list entries.
 
     Returns:
         {
@@ -136,12 +149,27 @@ async def update_uc_file(
         }
 
     Example:
+        # Updating network settings in replacements-config.yaml (flat structure):
         result = await update_uc_file(
             session_id="uc-session-20250127-143022",
             file_path="replacements-config.yaml",
             updates={
                 "HomeRegionIngressCidr": "10.0.0.0/16",
                 "DevVpcMaskLength": 24
+            }
+        )
+
+        # Updating account emails in accounts-config.yaml (list-based structure):
+        result = await update_uc_file(
+            session_id="uc-session-20250127-143022",
+            file_path="accounts-config.yaml",
+            updates={
+                "mandatoryAccounts[0].email": "mgmt@example.com",
+                "mandatoryAccounts[1].email": "log@example.com",
+                "mandatoryAccounts[2].email": "audit@example.com",
+                "workloadAccounts[0].email": "shared-services@example.com",
+                "workloadAccounts[1].email": "network@example.com",
+                "workloadAccounts[2].email": "perimeter@example.com",
             }
         )
     """
