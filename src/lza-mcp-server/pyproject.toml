@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "awslabs-lza-mcp-server"
-version = "0.1.0"
-description = "An AWS Labs Model Context Protocol (MCP) server for AWS Landing Zone Accelerator"
+name = "lza-mcp-server"
+version = "1.0.0"
+description = "An Model Context Protocol (MCP) server for Landing Zone Accelerator on AWS"
 authors = ["Amazon Web Services"]
 license = "Apache-2.0"
 # readme = "README.md"  # Commented out to avoid Docker build context issues
-homepage = "https://github.com/awslabs/landing-zone-accelerator-on-aws"
+homepage = "https://github.com/awslabs/lza-mcp-server"
 packages = [{include = "awslabs"}]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",

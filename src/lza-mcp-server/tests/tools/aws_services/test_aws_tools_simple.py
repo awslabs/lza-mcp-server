@@ -26,7 +26,7 @@ from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
 )
 from awslabs.lza_mcp_server.aws_access import get_aws_session, get_aws_account_id
-from awslabs.lza_mcp_server.constants import DEFAULT_REGION, BUCKET_PREFIX
+from awslabs.lza_mcp_server.constants import DEFAULT_REGION
 
 
 # Mock fixtures for testing
@@ -172,10 +172,6 @@ class TestEnvironmentVariableHandling:
     def test_default_region_constant(self):
         """Test that DEFAULT_REGION constant is set correctly."""
         assert DEFAULT_REGION == "us-east-1"
-
-    def test_bucket_prefix_constant(self):
-        """Test that BUCKET_PREFIX constant is set correctly."""
-        assert BUCKET_PREFIX == "awslabs-lza-mcp-server"
 
 
 class TestAsyncAwsOperations:

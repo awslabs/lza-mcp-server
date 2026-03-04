@@ -9,7 +9,6 @@ LZA_PREFIX = _prefix if _prefix else "AWSAccelerator"
 
 DEFAULT_REGION = "us-east-1"
 DEFAULT_PIPELINE_NAME = f"{LZA_PREFIX}-Pipeline"
-BUCKET_PREFIX = "awslabs-lza-mcp-server"
 ACCOUNT_CONFIG_FILENAME = "accounts-config.yaml"
 ORG_CONFIG_FILENAME = "organization-config.yaml"
 # S3 Configuration constants
