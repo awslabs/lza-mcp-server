@@ -27,4 +27,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Notes
 # ***Requires update***
-For detailed release information, see the [GitHub Releases](https://github.com/aws/lza-mcp-server/releases) page.
+For detailed release information, see the [GitHub Releases](https://github.com/awslabs/lza-mcp-server/releases) page.
