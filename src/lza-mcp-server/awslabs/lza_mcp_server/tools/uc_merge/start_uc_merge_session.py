@@ -216,7 +216,7 @@ async def tool_start_uc_merge_session(
                 "network_model": network_model,
                 "files_copied": files_copied,
             },
-            next_steps=f"Session created successfully with {network_model} configuration. REQUIRED: You must now call getConfigurationFromS3() to retrieve the current LZA configuration, then call validateLzaForUcMerge() to ensure compatibility before proceeding with customization.",
+            next_steps=f"Session created successfully with {network_model} configuration. REQUIRED: You must now call getLzaConfiguration() to retrieve the current LZA configuration, then call validateLzaForUcMerge() to ensure compatibility before proceeding with customization.",
         )
 
     except Exception as e:

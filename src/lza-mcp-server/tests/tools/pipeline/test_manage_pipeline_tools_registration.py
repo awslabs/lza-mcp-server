@@ -41,9 +41,9 @@ class TestToolRegistration:
 
         # Verify tool names
         tool_calls = [call[1]["name"] for call in mock_mcp.tool.call_args_list]
-        assert "releasePipeline" in tool_calls
-        assert "getPipelineStatus" in tool_calls
-        assert "diagnosePipelineErrors" in tool_calls
+        assert "startDeployment" in tool_calls
+        assert "getDeploymentStatus" in tool_calls
+        assert "diagnoseDeploymentErrors" in tool_calls
 
     def test_register_pipeline_tools_descriptions(self, mock_mcp):
         """Test that tools are registered with descriptions."""
@@ -55,28 +55,28 @@ class TestToolRegistration:
             assert "description" in kwargs
             assert len(kwargs["description"]) > 0
 
-    def test_register_pipeline_tools_release_pipeline(self, mock_mcp):
-        """Test releasePipeline tool registration."""
+    def test_register_pipeline_tools_start_deployment(self, mock_mcp):
+        """Test startDeployment tool registration."""
         register_pipeline_tools(mock_mcp)
 
-        # Find the releasePipeline tool call
-        release_call = None
+        # Find the startDeployment tool call
+        start_call = None
         for call_args in mock_mcp.tool.call_args_list:
-            if call_args[1]["name"] == "releasePipeline":
-                release_call = call_args
+            if call_args[1]["name"] == "startDeployment":
+                start_call = call_args
                 break
 
-        assert release_call is not None
-        assert "deploy configuration changes" in release_call[1]["description"]
+        assert start_call is not None
+        assert "Start an LZA deployment" in start_call[1]["description"]
 
     def test_register_pipeline_tools_get_pipeline_status(self, mock_mcp):
-        """Test getPipelineStatus tool registration."""
+        """Test getDeploymentStatus tool registration."""
         register_pipeline_tools(mock_mcp)
 
-        # Find the getPipelineStatus tool call
+        # Find the getDeploymentStatus tool call
         status_call = None
         for call_args in mock_mcp.tool.call_args_list:
-            if call_args[1]["name"] == "getPipelineStatus":
+            if call_args[1]["name"] == "getDeploymentStatus":
                 status_call = call_args
                 break
 
@@ -84,20 +84,22 @@ class TestToolRegistration:
         assert "status" in status_call[1]["description"]
         assert "progress" in status_call[1]["description"]
 
-    def test_register_pipeline_tools_diagnose_pipeline_errors(self, mock_mcp):
-        """Test diagnosePipelineErrors tool registration."""
+    def test_register_pipeline_tools_diagnose_deployment_errors(self, mock_mcp):
+        """Test diagnoseDeploymentErrors tool registration."""
         register_pipeline_tools(mock_mcp)
 
-        # Find the diagnosePipelineErrors tool call
+        # Find the diagnoseDeploymentErrors tool call
         diagnose_call = None
         for call_args in mock_mcp.tool.call_args_list:
-            if call_args[1]["name"] == "diagnosePipelineErrors":
+            if call_args[1]["name"] == "diagnoseDeploymentErrors":
                 diagnose_call = call_args
                 break
 
         assert diagnose_call is not None
-        assert "error" in diagnose_call[1]["description"]
-        assert "diagnostics" in diagnose_call[1]["description"]
+        assert (
+            "Deep-dive diagnosis of failed LZA deployments"
+            in diagnose_call[1]["description"]
+        )
 
     @patch("awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.logger")
     def test_register_pipeline_tools_logging(self, mock_logger, mock_mcp):
@@ -132,40 +134,42 @@ class TestToolFunctionWrappers:
 
     @pytest.mark.asyncio
     @patch(
-        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_release_pipeline"
+        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_start_deployment"
     )
-    async def test_release_pipeline_wrapper(self, mock_tool_release, mock_mcp):
-        """Test releasePipeline wrapper function."""
+    async def test_start_deployment_wrapper(self, mock_tool_start, mock_mcp):
+        """Test startDeployment wrapper function."""
         # Register tools
         register_pipeline_tools(mock_mcp)
 
         # Get the registered function
-        release_func = mock_mcp.registered_tools["releasePipeline"]
+        start_func = mock_mcp.registered_tools["startDeployment"]
 
         # Mock the underlying tool function
-        mock_tool_release.return_value = {"success": True}
+        mock_tool_start.return_value = {"success": True}
 
         # Create mock context
         mock_ctx = Mock()
 
-        # Call the wrapper
-        result = await release_func(mock_ctx, "test-pipeline")
+        # Call the wrapper with qualifier
+        result = await start_func(mock_ctx, qualifier="test-qual")
 
         # Verify the underlying function was called correctly
-        mock_tool_release.assert_called_once_with(mock_ctx, "test-pipeline")
+        mock_tool_start.assert_called_once_with(
+            mock_ctx, "test-qual", "AWSAccelerator-Pipeline"
+        )
         assert result == {"success": True}
 
     @pytest.mark.asyncio
     @patch(
-        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_get_pipeline_status"
+        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_get_deployment_status"
     )
     async def test_get_pipeline_status_wrapper(self, mock_tool_status, mock_mcp):
-        """Test getPipelineStatus wrapper function."""
+        """Test getDeploymentStatus wrapper function."""
         # Register tools
         register_pipeline_tools(mock_mcp)
 
         # Get the registered function
-        status_func = mock_mcp.registered_tools["getPipelineStatus"]
+        status_func = mock_mcp.registered_tools["getDeploymentStatus"]
 
         # Mock the underlying tool function
         mock_tool_status.return_value = {"success": True, "status": "InProgress"}
@@ -175,26 +179,28 @@ class TestToolFunctionWrappers:
 
         # Call the wrapper with execution_id
         result = await status_func(
-            mock_ctx, "test-pipeline", "12345678-1234-1234-1234-123456789012"
+            mock_ctx, None, "test-pipeline", "12345678-1234-1234-1234-123456789012"
         )
 
         # Verify the underlying function was called correctly
         mock_tool_status.assert_called_once_with(
-            mock_ctx, "test-pipeline", "12345678-1234-1234-1234-123456789012"
+            mock_ctx, None, "test-pipeline", "12345678-1234-1234-1234-123456789012"
         )
         assert result["success"] is True
 
     @pytest.mark.asyncio
     @patch(
-        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_diagnose_pipeline_errors"
+        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_diagnose_deployment_errors"
     )
-    async def test_diagnose_pipeline_errors_wrapper(self, mock_tool_diagnose, mock_mcp):
-        """Test diagnosePipelineErrors wrapper function."""
+    async def test_diagnose_deployment_errors_wrapper(
+        self, mock_tool_diagnose, mock_mcp
+    ):
+        """Test diagnoseDeploymentErrors wrapper function."""
         # Register tools
         register_pipeline_tools(mock_mcp)
 
         # Get the registered function
-        diagnose_func = mock_mcp.registered_tools["diagnosePipelineErrors"]
+        diagnose_func = mock_mcp.registered_tools["diagnoseDeploymentErrors"]
 
         # Mock the underlying tool function
         mock_tool_diagnose.return_value = {"success": True, "errors": []}
@@ -203,39 +209,43 @@ class TestToolFunctionWrappers:
         mock_ctx = Mock()
 
         # Call the wrapper
-        result = await diagnose_func(mock_ctx, "test-pipeline", None)
+        result = await diagnose_func(mock_ctx, None, "test-pipeline", None)
 
         # Verify the underlying function was called correctly
-        mock_tool_diagnose.assert_called_once_with(mock_ctx, "test-pipeline", None)
+        mock_tool_diagnose.assert_called_once_with(
+            mock_ctx, None, "test-pipeline", None
+        )
         assert result["success"] is True
 
     @pytest.mark.asyncio
     @patch(
-        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_release_pipeline"
+        "awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.tool_start_deployment"
     )
-    async def test_wrapper_default_pipeline_name(self, mock_tool_release, mock_mcp):
+    async def test_wrapper_default_pipeline_name(self, mock_tool_start, mock_mcp):
         """Test wrapper uses default pipeline name when not provided."""
         # Register tools
         register_pipeline_tools(mock_mcp)
 
         # Get the registered function
-        release_func = mock_mcp.registered_tools["releasePipeline"]
+        start_func = mock_mcp.registered_tools["startDeployment"]
 
         # Mock the underlying tool function
-        mock_tool_release.return_value = {"success": True}
+        mock_tool_start.return_value = {"success": True}
 
         # Create mock context
         mock_ctx = Mock()
 
-        # Call the wrapper without pipeline name (should use default)
-        await release_func(mock_ctx)
+        # Call the wrapper without qualifier or pipeline name (should use defaults)
+        await start_func(mock_ctx)
 
-        # Verify the underlying function was called with default pipeline name
-        mock_tool_release.assert_called_once()
-        call_args = mock_tool_release.call_args
+        # Verify the underlying function was called with defaults
+        mock_tool_start.assert_called_once()
+        call_args = mock_tool_start.call_args
         assert call_args[0][0] == mock_ctx
-        # Second argument should be the default pipeline name
-        assert call_args[0][1] == "AWSAccelerator-Pipeline"
+        # qualifier should be None (default)
+        assert call_args[0][1] is None
+        # pipeline_name should be the default
+        assert call_args[0][2] == "AWSAccelerator-Pipeline"
 
 
 class TestToolRegistrationEdgeCases:
@@ -279,9 +289,9 @@ class TestToolRegistrationEdgeCases:
         register_pipeline_tools(mock_mcp)
 
         # Verify function names are preserved
-        assert "releasePipeline" in registered_tools
-        assert "getPipelineStatus" in registered_tools
-        assert "diagnosePipelineErrors" in registered_tools
+        assert "startDeployment" in registered_tools
+        assert "getDeploymentStatus" in registered_tools
+        assert "diagnoseDeploymentErrors" in registered_tools
 
         # Verify functions are callable
         for func in registered_tools.values():
@@ -321,9 +331,9 @@ class TestToolRegistrationIntegration:
 
         # Verify all expected tools are registered
         expected_tools = [
-            "releasePipeline",
-            "getPipelineStatus",
-            "diagnosePipelineErrors",
+            "startDeployment",
+            "getDeploymentStatus",
+            "diagnoseDeploymentErrors",
         ]
 
         for tool_name in expected_tools:
@@ -341,9 +351,9 @@ class TestToolRegistrationIntegration:
         tool_names = list(mock_mcp_with_tracking.tools.keys())
 
         # Verify order matches expected order
-        assert tool_names[0] == "releasePipeline"
-        assert tool_names[1] == "getPipelineStatus"
-        assert tool_names[2] == "diagnosePipelineErrors"
+        assert tool_names[0] == "startDeployment"
+        assert tool_names[1] == "getDeploymentStatus"
+        assert tool_names[2] == "diagnoseDeploymentErrors"
 
     @patch("awslabs.lza_mcp_server.tools.pipeline.manage_pipeline_tools.logger")
     def test_registration_error_handling(self, mock_logger):

@@ -4,9 +4,9 @@
 ### Deployment Workflow
 1. Check AWS connectivity with `checkAwsConnectivity`
 2. Generate configuration with `getMinimumConfiguration`
-3. Upload to S3 with `uploadConfigurationToS3`
-4. Deploy with `releasePipeline`
-5. Monitor with `getPipelineStatus`
+3. Upload to S3 with `putLzaConfiguration`
+4. Deploy with `startDeployment`
+5. Monitor with `getDeploymentStatus`
 
 ### Schema Query Workflow
 When working with LZA schemas, use this recommended workflow:

@@ -19,13 +19,14 @@ The server can be configured via environment variables in your MCP client config
 
 ### Configuration Management
 - **getMinimumConfiguration**: Generate minimal LZA configuration templates
-- **uploadConfigurationToS3**: Upload configuration files to S3 bucket
-- **getConfigurationFromS3**: Retrieve and extract current LZA configuration from S3
+- **getLzaConfiguration**: Retrieve and extract LZA configuration from S3 (supports standard and external pipeline deployments via qualifier)
+- **putLzaConfiguration**: Upload configuration files to S3 (supports standard and external pipeline deployments via qualifier)
+- **readLzaConfigFile**: Read files from the extracted LZA configuration directory
 
 ### Pipeline Management
-- **releasePipeline**: Trigger execution of the LZA Configuration Pipeline
-- **getPipelineStatus**: Monitor pipeline execution status with stage progression
-- **diagnosePipelineErrors**: Retrieve CodeBuild logs for failed executions
+- **startDeployment**: Start an LZA deployment (supports standard pipeline, external CodePipeline, and ECS container deployments)
+- **getDeploymentStatus**: Monitor deployment status with stage progression (supports both standard pipeline and ECS container deployments)
+- **diagnoseDeploymentErrors**: Diagnose failed LZA deployments (supports both standard pipeline and ECS container deployments)
 
 ### Schema Management
 - **listLzaSupportedVersions**: List all supported LZA versions with schema information

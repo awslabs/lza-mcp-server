@@ -679,7 +679,7 @@ class TestUCMergeWorkflowIntegration:
                     network_model="hub-and-spoke",
                 )
         assert "next_steps" in session_result
-        assert "getConfigurationFromS3" in session_result["next_steps"]
+        assert "getLzaConfiguration" in session_result["next_steps"]
 
         session_id = session_result["session_id"]
 
@@ -743,7 +743,7 @@ class TestUCMergeWorkflowIntegration:
                 mock_mcp_context, session_id=session_id
             )
         assert "next_steps" in copy_result
-        assert "uploadConfigurationToS3" in copy_result["next_steps"]
+        assert "putLzaConfiguration" in copy_result["next_steps"]
 
     @pytest.mark.asyncio
     async def test_file_not_found_error_handling(

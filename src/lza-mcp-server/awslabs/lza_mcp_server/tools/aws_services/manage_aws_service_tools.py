@@ -21,7 +21,7 @@ from mcp.server.fastmcp import Context
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
 )
-from awslabs.lza_mcp_server.tools.aws_services.get_deployed_lza_version import (
+from awslabs.lza_mcp_server.tools.aws_services.detect_deployment_version import (
     tool_get_deployed_lza_version,
 )
 

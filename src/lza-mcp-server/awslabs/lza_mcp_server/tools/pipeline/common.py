@@ -1,3 +1,45 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ECS deployment status markers
+ECS_DEPLOYMENT_COMPLETE = "DEPLOYMENT COMPLETE"
+ECS_DEPLOYMENT_FAILED_MARKERS = [
+    "DEPLOYMENT FAILED",
+    "Error: Process completed with exit code",
+    "error Command failed with exit code",
+]
+
+
+def determine_ecs_deployment_status(log_lines: list[str]) -> str:
+    """Determine ECS container deployment status from log lines.
+
+    Scans the log lines (particularly the tail) for deployment outcome markers.
+
+    Returns:
+        "COMPLETE" if DEPLOYMENT COMPLETE found,
+        "FAILED" if a failure marker found,
+        "IN_PROGRESS" otherwise (no terminal marker found)
+    """
+    # Check the last 50 lines for terminal markers — they appear at the end
+    tail = log_lines[-50:] if len(log_lines) > 50 else log_lines
+
+    for line in reversed(tail):
+        if ECS_DEPLOYMENT_COMPLETE in line:
+            return "COMPLETE"
+        for marker in ECS_DEPLOYMENT_FAILED_MARKERS:
+            if marker in line:
+                return "FAILED"
+
+    # Also scan full log for failure markers in case they appear mid-stream
+    for line in log_lines:
+        for marker in ECS_DEPLOYMENT_FAILED_MARKERS:
+            if marker in line:
+                return "FAILED"
+
+    return "IN_PROGRESS"
+
+
 def extract_create_failed_error(logs_content: str) -> str:
     """Extract the first CREATE_FAILED error from CodeBuild logs."""
     if not logs_content:
@@ -57,5 +99,33 @@ def validate_execution_id_local(exec_id: str) -> tuple[bool, str]:
         return (
             False,
             f"Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012), got: {exec_id}",
+        )
+    return True, ""
+
+
+def validate_qualifier(qualifier: str) -> tuple[bool, str]:
+    """Validate LZA Accelerator Qualifier format.
+
+    Qualifiers are alphanumeric with hyphens, used to scope external pipeline deployments.
+
+    Args:
+        qualifier: The qualifier string to validate
+
+    Returns:
+        tuple: (is_valid: bool, error_message: str)
+    """
+    if not qualifier or not isinstance(qualifier, str):
+        return False, "Qualifier cannot be empty"
+    import re
+
+    if len(qualifier) > 100:
+        return (
+            False,
+            f"Qualifier too long ({len(qualifier)} characters). Maximum is 100 characters",
+        )
+    if not re.match(r"^[a-zA-Z0-9-]+$", qualifier):
+        return (
+            False,
+            "Qualifier can only contain letters, numbers, and hyphens",
         )
     return True, ""

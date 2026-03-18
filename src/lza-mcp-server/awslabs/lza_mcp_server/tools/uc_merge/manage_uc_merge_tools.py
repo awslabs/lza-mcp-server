@@ -20,7 +20,6 @@ from mcp.server.fastmcp import Context
 from .get_uc_releases import tool_get_uc_releases
 from .get_uc_network_models import tool_get_uc_network_models
 from .start_uc_merge_session import tool_start_uc_merge_session
-from .read_lza_config_file import read_lza_config_file
 from .read_uc_file import read_uc_file
 from .get_uc_network_customization_guide import get_uc_network_customization_guide
 from .update_uc_file import update_uc_file
@@ -43,7 +42,6 @@ def register_uc_merge_tools(mcp):
     - get_uc_releases: Discover available UC release versions
     - get_uc_network_models: Get network deployment model comparison
     - start_uc_merge_session: Initialize a UC merge session
-    - read_lza_config_file: Read LZA configuration files
     - read_uc_file: Read UC files from session
     - update_uc_file: Update UC files in session
     - get_uc_network_customization_guide: Get customization guidance
@@ -63,7 +61,7 @@ def register_uc_merge_tools(mcp):
         - network-config.yaml has minimal configuration (empty arrays)
         - iam-config.yaml has minimal configuration (empty arrays)
 
-        Call this after getConfigurationFromS3() to ensure the installation is
+        Call this after getLzaConfiguration() to ensure the installation is
         compatible with UC merge before proceeding.
 
         Returns:
@@ -119,28 +117,6 @@ def register_uc_merge_tools(mcp):
             Dictionary with session information or error details
         """
         return await tool_start_uc_merge_session(ctx, uc_release, network_model)
-
-    @mcp.tool()
-    async def readLzaConfigFile(ctx: Context, file_path: str):
-        """Read a configuration file from the extracted LZA configuration.
-
-        This tool reads files from the LZA configuration directory that was
-        extracted via getConfigurationFromS3(). It validates paths for security
-        and provides context-aware guidance based on the file being read.
-
-        Common files to review:
-        - accounts-config.yaml: Account structure and emails
-        - global-config.yaml: Global settings including homeRegion
-        - network-config.yaml: Network configuration
-        - iam-config.yaml: IAM configuration
-
-        Args:
-            file_path: Relative path to file (e.g., "accounts-config.yaml"). Required parameter.
-
-        Returns:
-            Dictionary with file content, metadata, and next steps guidance
-        """
-        return await read_lza_config_file(ctx, file_path)
 
     @mcp.tool()
     async def readUcFile(ctx: Context, session_id: str, file_path: str):
@@ -232,7 +208,7 @@ def register_uc_merge_tools(mcp):
         files from the session directory to the LZA configuration directory. Files are
         overwritten as needed, and directory structure is preserved.
 
-        After this operation completes, call uploadConfigurationToS3() WITHOUT any path
+        After this operation completes, call putLzaConfiguration() WITHOUT any path
         parameter to upload the merged configuration.
 
         Args:
@@ -246,7 +222,7 @@ def register_uc_merge_tools(mcp):
             - directories_created: Number of directories created
             - source: Source directory path (session)
             - destination: Destination directory path (LZA config)
-            - next_steps: Guidance to call uploadConfigurationToS3()
+            - next_steps: Guidance to call putLzaConfiguration()
         """
         return await copy_uc_to_lza_config(ctx, session_id)
 

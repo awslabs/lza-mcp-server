@@ -57,7 +57,7 @@ _extracted_lza_config_path: Path | None = None
 def set_extracted_lza_config_path(path: Path) -> None:
     """Set the extracted LZA configuration path.
 
-    This should be called after getConfigurationFromS3 completes.
+    This should be called after getLzaConfiguration completes.
 
     Args:
         path: Path to extracted LZA configuration directory
@@ -237,7 +237,7 @@ def categorize_uc_merge_error(error: Exception) -> Dict[str, Any]:
                 "Verify the file path is correct",
                 "Check that the file exists in the expected location",
                 "Ensure the session was created successfully",
-                "For LZA files, ensure getConfigurationFromS3() was called first",
+                "For LZA files, ensure getLzaConfiguration() was called first",
             ],
         }
 

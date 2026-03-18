@@ -261,103 +261,45 @@ The MCP server requires specific IAM permissions for LZA operations. This policy
 > **🔒 Privacy Consideration**  
 > AWS API responses retrieved using these permissions will be shared with your AI model provider. Review your organization's data classification policies before granting access to sensitive AWS resources.
 
-### Recommended IAM Policy
+### Recommended IAM Policies
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "STSAccess",
-      "Effect": "Allow",
-      "Action": "sts:GetCallerIdentity",
-      "Resource": "*"
-    },
-    {
-      "Sid": "SSMAccess",
-      "Effect": "Allow",
-      "Action": "ssm:GetParameter",
-      "Resource": "arn:${PARTITION}:ssm:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:parameter/accelerator/*"
-    },
-    {
-      "Sid": "S3WriteAccess",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject"
-      ],
-      "Resource": [
-        "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-config-*/zipped/*"
-      ]
-    },
-    {
-      "Sid": "S3ListBucket",
-      "Effect": "Allow",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-config-*"
-    },
-    {
-      "Sid": "KMSEncryptionAccess",
-      "Effect": "Allow",
-      "Action": [
-        "kms:Decrypt",
-        "kms:GenerateDataKey"
-      ],
-      "Resource": "arn:${PARTITION}:kms:*:${MANAGEMENT_ACCOUNT}:key/*",
-      "Condition": {
-        "ForAnyValue:StringEquals": {
-          "kms:ResourceAliases": "alias/accelerator/installer/kms/key"
-        }
-      }
-    },
-    {
-      "Sid": "PipelineAccess",
-      "Effect": "Allow",
-      "Action": [
-        "codepipeline:GetPipeline",
-        "codepipeline:GetPipelineState",
-        "codepipeline:GetPipelineExecution",
-        "codepipeline:ListPipelineExecutions",
-        "codepipeline:StartPipelineExecution"
-      ],
-      "Resource": "arn:${PARTITION}:codepipeline:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${ACCELERATOR_PREFIX}-Pipeline"
-    },
-    {
-      "Sid": "CodeBuildAccess",
-      "Effect": "Allow",
-      "Action": "codebuild:BatchGetBuilds",
-      "Resource": "arn:${PARTITION}:codebuild:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:project/${ACCELERATOR_PREFIX}-*"
-    },
-    {
-      "Sid": "CloudWatchLogsAccess",
-      "Effect": "Allow",
-      "Action": "logs:GetLogEvents",
-      "Resource": "arn:${PARTITION}:logs:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:log-group:/aws/codebuild/${ACCELERATOR_PREFIX}-*:*"
-    }
-  ]
-}
-```
+Choose the policy that matches your LZA deployment type. All policies follow [AWS least-privilege principles](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege).
+
+| Deployment Type | Description | Policy |
+|----------------|-------------|--------|
+| **Standard CodePipeline** | Default LZA deployment in the management account using CodePipeline and CodeBuild. This is the most common setup. | [standard-codepipeline-policy.json](iam-policies/standard-codepipeline-policy.json) |
+| **External Pipeline — CodePipeline** | LZA deployed from a separate orchestration account using CodePipeline with an Accelerator Qualifier. Includes SSM Automation permissions for triggering deployments. | [external-codepipeline-policy.json](iam-policies/external-codepipeline-policy.json) |
+| **External Pipeline — ECS Container** | LZA deployed from a separate orchestration account using ECS Fargate tasks with an Accelerator Qualifier. Includes ECS task monitoring, CloudWatch Logs for ECS, and SSM Automation permissions. | [external-ecs-container-policy.json](iam-policies/external-ecs-container-policy.json) |
 
 ### Policy Variables
 
 Replace these placeholders with your deployment values:
 
+**All policies:**
 - `${HOME-REGION}`: AWS region where LZA is deployed (e.g., `us-east-1`)
+- `${PARTITION}`: AWS partition (`aws`, `aws-us-gov`, or `aws-cn`)
+
+**Standard CodePipeline:**
 - `${MANAGEMENT_ACCOUNT}`: AWS management account ID (12-digit number)
 - `${ACCELERATOR_PREFIX}`: LZA resource prefix (default: `aws-accelerator`)
-- `${PARTITION}`: AWS partition (`aws`, `aws-us-gov`, or `aws-cn`)
+
+**External Pipeline (CodePipeline and ECS Container):**
+- `${ORCHESTRATION_ACCOUNT}`: AWS orchestration account ID where the external pipeline runs (12-digit number)
+- `${QUALIFIER}`: Accelerator Qualifier set during LZA container/external deployment (e.g., `my-lza`)
 
 ### Permission Scope
 
 | Service | Purpose | Reference |
 |---------|---------|-----------|
 | **STS** | Identity verification for connectivity checks | [AWS STS Documentation](https://docs.aws.amazon.com/STS/latest/APIReference/welcome.html) |
-| **SSM** | Retrieve deployed LZA version from Parameter Store | [AWS Systems Manager Parameters](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) |
+| **SSM** | Retrieve deployed LZA version, discover deployment qualifiers, and scan version parameters from Parameter Store | [AWS Systems Manager Parameters](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) |
+| **SSM Automation** | Start and monitor LZA deployments via SSM Automation documents (external pipelines only) | [SSM Automation](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) |
 | **S3** | Read/write LZA configuration files in config bucket | [S3 Bucket Policies](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-policies.html) |
 | **KMS** | Encrypt/decrypt configurations using LZA KMS key | [AWS KMS Key Policies](https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html) |
-| **CodePipeline** | Monitor and trigger LZA pipeline executions | [CodePipeline Monitoring](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) |
-| **CodeBuild** | Retrieve build project details for diagnostics | [CodeBuild Projects](https://docs.aws.amazon.com/codebuild/latest/userguide/builds-working.html) |
-| **CloudWatch Logs** | Access CodeBuild logs for error analysis | [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html) |
+| **CodePipeline** | Monitor and trigger LZA pipeline executions; list pipelines for deployment type detection (external pipelines) | [CodePipeline Monitoring](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) |
+| **CodeBuild** | Retrieve build project details for diagnostics (CodePipeline deployments only) | [CodeBuild Projects](https://docs.aws.amazon.com/codebuild/latest/userguide/builds-working.html) |
+| **ECS** | List clusters for deployment type detection; monitor ECS Fargate task status (ECS container deployments) | [Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html) |
+| **CloudWatch Logs** | Access build or deployment logs for error analysis | [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html) |
 
 **Note:** The KMS policy uses alias-based access control (`kms:ResourceAliases`) for maintainability. This approach allows key rotation without policy updates, following [AWS KMS best practices](https://docs.aws.amazon.com/kms/latest/developerguide/best-practices.html).
 
@@ -406,8 +348,8 @@ Replace these placeholders with your deployment values:
         "listLzaSupportedVersions",
         "searchJsonSchema",
         "getFullSchema",
-        "getPipelineStatus",
-        "getConfigurationFromS3"
+        "getDeploymentStatus",
+        "getLzaConfiguration"
       ]
     }
   }
@@ -447,7 +389,7 @@ The `autoApprove` list includes read-only operations that don't modify AWS resou
 - Pipeline status monitoring
 - AWS connectivity verification
 
-Tools that modify resources (`releasePipeline`, `uploadConfigurationToS3`) require explicit approval for safety.
+Tools that modify resources (`startDeployment`, `uploadConfigurationToS3`) require explicit approval for safety.
 
 ### Kiro IDE: Configuration Validation Hook
 
@@ -484,22 +426,31 @@ Retrieves the currently deployed LZA version from SSM Parameter Store. Use this 
 **getMinimumConfiguration**  
 Generates minimal LZA configuration templates for new deployments. Templates include required accounts and baseline settings.
 
-**uploadConfigurationToS3**  
-Uploads configuration files to the LZA S3 bucket.
+**getLzaConfiguration**  
+Retrieves current LZA configuration from S3 for inspection or modification. Supports standard and external pipeline deployments via qualifier. Extracts files to shared Docker volume for IDE access.
 
-**getConfigurationFromS3**  
-Retrieves current LZA configuration from S3 for inspection or modification. Extracts files to shared Docker volume for IDE access.
+**putLzaConfiguration**  
+Uploads configuration files to the LZA S3 bucket. Supports standard and external pipeline deployments via qualifier.
+
+**readLzaConfigFile**  
+Reads a file from the extracted LZA configuration directory. Validates paths for security and provides context-aware guidance.
+
+**updateLzaConfigFile**  
+Updates an LZA configuration file in the extracted configuration directory. Supports three mutually exclusive modes: updating existing values via dot-notation paths, inserting new items into YAML lists, or deleting keys/list items. Includes validation for CIDR ranges, ASN values, and VPC mask lengths.
+
+**createLzaConfigFile**  
+Creates a new YAML or JSON configuration file in the extracted LZA configuration directory. Useful for adding IAM policy files (JSON), custom configuration files, or any additional files needed by the LZA configuration. Supports configurable JSON indentation.
 
 ### Pipeline Management
 
-**releasePipeline**  
-Starts LZA pipeline execution to deploy configuration changes. See [CodePipeline execution documentation](https://docs.aws.amazon.com/codepipeline/latest/userguide/executions-view.html) for execution details.
+**startDeployment**  
+Starts an LZA deployment. Supports standard CodePipeline, external CodePipeline ({qualifier}-pipeline), and ECS container deployments ({qualifier}-RunEngine SSM Automation). When a qualifier is provided, checks both CodePipeline and SSM Automation and starts whichever exists.
 
-**getPipelineStatus**  
-Monitors pipeline execution progress with stage-level details. Returns real-time status for all pipeline stages.
+**getDeploymentStatus**  
+Monitors deployment status and execution progress. Supports both standard CodePipeline and ECS container deployments. Returns real-time status for all pipeline stages, and when a qualifier is provided, checks both CodePipeline and ECS container logs.
 
-**diagnosePipelineErrors**  
-Retrieves detailed error logs from failed pipeline executions. Analyzes CodeBuild logs and provides troubleshooting guidance.
+**diagnoseDeploymentErrors**  
+Diagnoses failed LZA deployments. Supports both standard CodePipeline and ECS container deployments. Analyzes logs and provides troubleshooting guidance.
 
 ### Schema Search
 
@@ -520,7 +471,6 @@ Enable with `ENABLE_UC_MERGE=true` to access UC merge workflow tools:
 - **get_uc_releases**: Discover available UC release versions
 - **get_uc_network_models**: Compare network deployment models
 - **start_uc_merge_session**: Initialize UC merge session
-- **readLzaConfigFile**: Read LZA configuration files
 - **readUcFile**: Read UC files from merge session
 - **updateUcFile**: Update UC files in merge session
 - **getUcNetworkCustomizationGuide**: Get customization guidance
@@ -629,10 +579,10 @@ docker build \
 
 ### Retrieving Configurations
 
-The `getConfigurationFromS3` tool downloads and extracts the current LZA configuration:
+The `getLzaConfiguration` tool downloads and extracts the current LZA configuration:
 
 1. Downloads ZIP from `zipped/aws-accelerator-config.zip`
-2. Extracts to `/app/lza-config/retrieved-config` (container path)
+2. Extracts to `/app/lza-config/retrieved-config` (LZA MCP container path)
 3. Returns `host_path` for IDE file access
 4. Provides metadata (file counts, directory structure)
 5. Automatically cleans up previous retrievals

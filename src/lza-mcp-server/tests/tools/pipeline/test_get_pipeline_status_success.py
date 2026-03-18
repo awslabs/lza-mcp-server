@@ -18,8 +18,8 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
-    tool_get_pipeline_status,
+from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
+    tool_get_deployment_status,
 )
 
 
@@ -52,16 +52,16 @@ class TestPipelineStatusSuccess:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 
@@ -74,7 +74,7 @@ class TestPipelineStatusSuccess:
     async def test_get_pipeline_status_in_progress(self, mock_mcp_context):
         """Test getting status for pipeline in progress."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -172,16 +172,16 @@ class TestPipelineStatusSuccess:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 
@@ -197,7 +197,7 @@ class TestPipelineStatusSuccess:
     async def test_get_pipeline_status_succeeded(self, mock_mcp_context):
         """Test getting status for successfully completed pipeline."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -283,16 +283,16 @@ class TestPipelineStatusSuccess:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 

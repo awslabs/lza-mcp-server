@@ -25,6 +25,8 @@ from awslabs.lza_mcp_server.aws_access import (
     get_codepipeline_client,
     get_codebuild_client,
     get_logs_client,
+    get_ssm_client,
+    get_ecs_client,
 )
 
 
@@ -300,3 +302,75 @@ class TestLogsClientCreation:
         assert client is not None
         assert hasattr(client, "get_log_events")
         assert hasattr(client, "describe_log_streams")
+
+    @patch("awslabs.lza_mcp_server.aws_access.get_aws_session")
+    def test_get_ssm_client_success(self, mock_get_session):
+        """Test successful SSM client creation."""
+        mock_session = Mock()
+        mock_client = Mock()
+        mock_session.client.return_value = mock_client
+        mock_get_session.return_value = mock_session
+
+        client = get_ssm_client()
+
+        assert client is not None
+        mock_session.client.assert_called_once()
+        assert mock_session.client.call_args[0][0] == "ssm"
+
+    @patch("awslabs.lza_mcp_server.aws_access.get_aws_session")
+    def test_get_ssm_client_with_config(self, mock_get_session):
+        """Test SSM client creation includes configuration."""
+        mock_session = Mock()
+        mock_client = Mock()
+        mock_session.client.return_value = mock_client
+        mock_get_session.return_value = mock_session
+
+        client = get_ssm_client()
+
+        assert client is not None
+        call_args = mock_session.client.call_args
+        assert "config" in call_args[1]
+
+    def test_get_ssm_client_returns_valid_client(self):
+        """Test that get_ssm_client returns a valid client."""
+        client = get_ssm_client()
+
+        assert client is not None
+        assert hasattr(client, "describe_document")
+        assert hasattr(client, "start_automation_execution")
+
+    @patch("awslabs.lza_mcp_server.aws_access.get_aws_session")
+    def test_get_ecs_client_success(self, mock_get_session):
+        """Test successful ECS client creation."""
+        mock_session = Mock()
+        mock_client = Mock()
+        mock_session.client.return_value = mock_client
+        mock_get_session.return_value = mock_session
+
+        client = get_ecs_client()
+
+        assert client is not None
+        mock_session.client.assert_called_once()
+        assert mock_session.client.call_args[0][0] == "ecs"
+
+    @patch("awslabs.lza_mcp_server.aws_access.get_aws_session")
+    def test_get_ecs_client_with_config(self, mock_get_session):
+        """Test ECS client creation includes configuration."""
+        mock_session = Mock()
+        mock_client = Mock()
+        mock_session.client.return_value = mock_client
+        mock_get_session.return_value = mock_session
+
+        client = get_ecs_client()
+
+        assert client is not None
+        call_args = mock_session.client.call_args
+        assert "config" in call_args[1]
+
+    def test_get_ecs_client_returns_valid_client(self):
+        """Test that get_ecs_client returns a valid client."""
+        client = get_ecs_client()
+
+        assert client is not None
+        assert hasattr(client, "list_clusters")
+        assert hasattr(client, "describe_tasks")

@@ -44,7 +44,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
     - network-config.yaml has minimal configuration (empty arrays)
     - iam-config.yaml has minimal configuration (empty arrays)
 
-    Call this after getConfigurationFromS3() to ensure the installation is
+    Call this after getLzaConfiguration() to ensure the installation is
     compatible with UC merge before proceeding.
 
     Returns:
@@ -70,17 +70,17 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
             return create_error_response(
                 error_message=(
                     "LZA configuration directory not found. "
-                    "Call getConfigurationFromS3() first to retrieve the configuration."
+                    "Call getLzaConfiguration() first to retrieve the configuration."
                 ),
                 error_code="CONFIG_NOT_RETRIEVED",
                 category=ErrorCategory.CONFIGURATION,
                 troubleshooting=[
-                    "Call getConfigurationFromS3() to retrieve the LZA configuration",
+                    "Call getLzaConfiguration() to retrieve the LZA configuration",
                     "Verify the configuration was extracted successfully",
-                    "Ensure getConfigurationFromS3() completed without errors",
+                    "Ensure getLzaConfiguration() completed without errors",
                 ],
                 context={"expected_directory": str(base_directory)},
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration.",
+                next_steps="Call getLzaConfiguration() to retrieve the LZA configuration.",
             )
 
         validation_results = {
@@ -97,7 +97,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 error_code="FILE_NOT_FOUND",
                 category=ErrorCategory.FILE_NOT_FOUND,
                 troubleshooting=[
-                    "Verify getConfigurationFromS3() extracted all files",
+                    "Verify getLzaConfiguration() extracted all files",
                     "Check that accounts-config.yaml exists in the S3 configuration",
                     "Ensure the LZA installation is complete",
                 ],
@@ -124,7 +124,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 error_code="FILE_NOT_FOUND",
                 category=ErrorCategory.FILE_NOT_FOUND,
                 troubleshooting=[
-                    "Verify getConfigurationFromS3() extracted all files",
+                    "Verify getLzaConfiguration() extracted all files",
                     "Check that network-config.yaml exists in the S3 configuration",
                     "Ensure the LZA installation is complete",
                 ],
@@ -151,7 +151,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 error_code="FILE_NOT_FOUND",
                 category=ErrorCategory.FILE_NOT_FOUND,
                 troubleshooting=[
-                    "Verify getConfigurationFromS3() extracted all files",
+                    "Verify getLzaConfiguration() extracted all files",
                     "Check that iam-config.yaml exists in the S3 configuration",
                     "Ensure the LZA installation is complete",
                 ],
@@ -226,7 +226,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
                 "Check system logs for more details",
                 "Verify the configuration directory is accessible",
                 "Ensure configuration files are valid YAML",
-                "Try calling getConfigurationFromS3() again",
+                "Try calling getLzaConfiguration() again",
             ],
             context={"error_type": type(e).__name__},
             next_steps="Review the error and retry the operation.",

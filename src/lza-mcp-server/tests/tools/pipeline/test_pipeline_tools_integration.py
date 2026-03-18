@@ -90,9 +90,9 @@ class TestPipelineToolsIntegration:
         """
         # Verify all expected tools are registered
         expected_tools = [
-            "releasePipeline",
-            "getPipelineStatus",
-            "diagnosePipelineErrors",
+            "startDeployment",
+            "getDeploymentStatus",
+            "diagnoseDeploymentErrors",
         ]
 
         for tool_name in expected_tools:
@@ -113,7 +113,7 @@ class TestPipelineToolsIntegration:
 
         Requirements: 2.1, 2.2, 2.3, 2.4, 2.5 - Pipeline status monitoring
         """
-        get_status_func = registered_tools["getPipelineStatus"]
+        get_status_func = registered_tools["getDeploymentStatus"]
 
         # Test with default pipeline name
         result = await get_status_func(mock_context)
@@ -190,7 +190,7 @@ class TestPipelineToolsIntegration:
         """
         from unittest.mock import patch, Mock
 
-        get_status_func = registered_tools["getPipelineStatus"]
+        get_status_func = registered_tools["getDeploymentStatus"]
 
         # Mock the AWS CodePipeline client
         with patch(
@@ -256,7 +256,7 @@ class TestPipelineToolsIntegration:
 
         Requirements: 1.1, 1.2, 1.3, 1.4 - Pipeline release functionality
         """
-        release_func = registered_tools["releasePipeline"]
+        release_func = registered_tools["startDeployment"]
 
         # Test with invalid pipeline name (should fail validation before AWS call)
         result = await release_func(mock_context, pipeline_name="invalid pipeline name")
@@ -288,7 +288,7 @@ class TestPipelineToolsIntegration:
 
         Requirements: 3.1, 3.2, 3.3, 3.4, 3.5 - Error diagnosis functionality
         """
-        diagnose_func = registered_tools["diagnosePipelineErrors"]
+        diagnose_func = registered_tools["diagnoseDeploymentErrors"]
 
         # Test with invalid execution ID format
         result = await diagnose_func(mock_context, execution_id="invalid-execution-id")
@@ -323,13 +323,13 @@ class TestPipelineToolsIntegration:
         tasks = []
 
         # Create concurrent calls to all tools
-        tasks.append(registered_tools["getPipelineStatus"](mock_context))
+        tasks.append(registered_tools["getDeploymentStatus"](mock_context))
         tasks.append(
-            registered_tools["releasePipeline"](
+            registered_tools["startDeployment"](
                 mock_context, pipeline_name="test-concurrent"
             )
         )
-        tasks.append(registered_tools["diagnosePipelineErrors"](mock_context))
+        tasks.append(registered_tools["diagnoseDeploymentErrors"](mock_context))
 
         # Execute all tasks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -356,7 +356,7 @@ class TestPipelineToolsIntegration:
         mock_context = Mock(spec=Context)
 
         # Test that context is passed to tools without errors
-        get_status_func = registered_tools["getPipelineStatus"]
+        get_status_func = registered_tools["getDeploymentStatus"]
         result = await get_status_func(mock_context)
 
         # Verify the function completed and returned a result
@@ -374,7 +374,7 @@ class TestPipelineToolsIntegration:
         Requirements: 5.1, 5.2, 5.3, 5.4, 5.5 - Error handling
         """
         # Test with non-existent pipeline
-        get_status_func = registered_tools["getPipelineStatus"]
+        get_status_func = registered_tools["getDeploymentStatus"]
         result = await get_status_func(
             mock_context, pipeline_name="definitely-does-not-exist-pipeline-12345"
         )

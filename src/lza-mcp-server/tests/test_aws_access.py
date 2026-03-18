@@ -23,6 +23,8 @@ from awslabs.lza_mcp_server.aws_access import (
     get_codepipeline_client,
     get_codebuild_client,
     get_logs_client,
+    get_ssm_client,
+    get_ecs_client,
     format_error_response,
     handle_aws_error,
     get_iam_permission_guidance,
@@ -56,6 +58,18 @@ class TestAWSClients:
         client = get_logs_client()
         assert client is not None
         assert hasattr(client, "get_log_events")
+
+    def test_get_ssm_client(self):
+        """Test SSM client creation."""
+        client = get_ssm_client()
+        assert client is not None
+        assert hasattr(client, "describe_document")
+
+    def test_get_ecs_client(self):
+        """Test ECS client creation."""
+        client = get_ecs_client()
+        assert client is not None
+        assert hasattr(client, "list_clusters")
 
 
 class TestAWSErrorHandling:

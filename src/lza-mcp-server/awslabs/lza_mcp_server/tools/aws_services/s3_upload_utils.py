@@ -359,7 +359,7 @@ class S3UploadUtils:
                     await ctx.info("")
                     await ctx.info("✅ Configuration uploaded successfully!")
                     await ctx.info(
-                        "🚀 Use 'releasePipeline' to deploy the configuration"
+                        "🚀 Use 'startDeployment' to deploy the configuration"
                     )
                     final_result["pipeline_release_offered"] = True
 

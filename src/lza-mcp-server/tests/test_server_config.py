@@ -153,16 +153,16 @@ class TestGetBaseInstructions:
         result = get_base_instructions()
         assert "### Configuration Management" in result
         assert "getMinimumConfiguration" in result
-        assert "uploadConfigurationToS3" in result
-        assert "getConfigurationFromS3" in result
+        assert "getLzaConfiguration" in result
+        assert "putLzaConfiguration" in result
 
     def test_contains_pipeline_management_section(self):
         """Test base instructions contains Pipeline Management section."""
         result = get_base_instructions()
         assert "### Pipeline Management" in result
-        assert "releasePipeline" in result
-        assert "getPipelineStatus" in result
-        assert "diagnosePipelineErrors" in result
+        assert "startDeployment" in result
+        assert "getDeploymentStatus" in result
+        assert "diagnoseDeploymentErrors" in result
 
     def test_contains_schema_management_section(self):
         """Test base instructions contains Schema Management section."""
@@ -193,7 +193,6 @@ class TestGetUcMergeInstructions:
         assert "get_uc_releases" in result
         assert "get_uc_network_models" in result
         assert "start_uc_merge_session" in result
-        assert "readLzaConfigFile" in result
         assert "readUcFile" in result
         assert "updateUcFile" in result
         assert "getUcNetworkCustomizationGuide" in result
@@ -219,9 +218,9 @@ class TestGetWorkflowInstructions:
         assert "### Deployment Workflow" in result
         assert "checkAwsConnectivity" in result
         assert "getMinimumConfiguration" in result
-        assert "uploadConfigurationToS3" in result
-        assert "releasePipeline" in result
-        assert "getPipelineStatus" in result
+        assert "putLzaConfiguration" in result
+        assert "startDeployment" in result
+        assert "getDeploymentStatus" in result
 
     def test_contains_schema_query_workflow(self):
         """Test workflow instructions contains Schema Query Workflow."""

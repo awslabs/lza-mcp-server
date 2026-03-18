@@ -137,3 +137,32 @@ class TestReadLzaConfigFileCoverage:
         assert "context" in result
         assert result["context"]["file_path"] == "test.yaml"
         assert result["context"]["error_type"] == "RuntimeError"
+
+    @pytest.mark.asyncio
+    async def test_outer_exception_handler(self, mock_ctx, tmp_path, monkeypatch):
+        """Test the outer exception handler (lines 243-245).
+
+        Covers the top-level except block that catches unexpected errors
+        before any file operations begin.
+        """
+        # Patch LZA_CONFIG_BASE_PATH to a valid path so the base_directory check passes
+        config_dir = tmp_path / "retrieved-config"
+        config_dir.mkdir(parents=True)
+        (config_dir / "test.yaml").write_text("content")
+
+        monkeypatch.setattr(
+            "awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file.LZA_CONFIG_BASE_PATH",
+            tmp_path,
+        )
+
+        # Patch validate_path_security to raise an unexpected exception
+        with patch(
+            "awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file.validate_path_security",
+            side_effect=RuntimeError("Unexpected system failure"),
+        ):
+            result = await read_lza_config_file(mock_ctx, "test.yaml")
+
+        assert result["success"] is False
+        assert result["error_code"] == "UNEXPECTED_ERROR"
+        assert "Unexpected system failure" in result["error"]
+        assert "troubleshooting" in result
