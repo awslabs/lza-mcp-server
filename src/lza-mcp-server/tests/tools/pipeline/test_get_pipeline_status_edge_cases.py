@@ -18,8 +18,8 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
-    tool_get_pipeline_status,
+from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
+    tool_get_deployment_status,
 )
 
 
@@ -30,7 +30,7 @@ class TestPipelineStatusEdgeCases:
     async def test_inprogress_execution_no_active_stages(self, mock_mcp_context):
         """Test INPROGRESS execution when no stages show InProgress status (fallback logic)."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -94,16 +94,16 @@ class TestPipelineStatusEdgeCases:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 
@@ -119,7 +119,7 @@ class TestPipelineStatusEdgeCases:
     async def test_failed_pipeline_execution(self, mock_mcp_context):
         """Test FAILED pipeline execution status."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -195,16 +195,16 @@ class TestPipelineStatusEdgeCases:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 
@@ -217,7 +217,7 @@ class TestPipelineStatusEdgeCases:
     async def test_stopped_pipeline_execution(self, mock_mcp_context):
         """Test STOPPED pipeline execution status."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -287,16 +287,16 @@ class TestPipelineStatusEdgeCases:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 
@@ -308,7 +308,7 @@ class TestPipelineStatusEdgeCases:
     async def test_specific_execution_id_with_completed_status(self, mock_mcp_context):
         """Test providing specific execution ID for a completed execution."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -386,16 +386,16 @@ class TestPipelineStatusEdgeCases:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context,
                 pipeline_name="test-pipeline",
                 execution_id=execution_id,
@@ -411,7 +411,7 @@ class TestPipelineStatusEdgeCases:
     async def test_unknown_status_handling(self, mock_mcp_context):
         """Test handling of unknown/unexpected pipeline status."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -475,16 +475,16 @@ class TestPipelineStatusEdgeCases:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 
@@ -502,7 +502,7 @@ class TestPipelineStatusEdgeCases:
     async def test_multiple_inprogress_stages(self, mock_mcp_context):
         """Test handling when multiple stages are in progress simultaneously."""
         # Clear cache before test
-        from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+        from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
             _pipeline_cache,
         )
 
@@ -611,16 +611,16 @@ class TestPipelineStatusEdgeCases:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 

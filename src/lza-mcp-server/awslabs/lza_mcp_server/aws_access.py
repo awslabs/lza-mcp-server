@@ -181,6 +181,56 @@ def get_logs_client() -> boto3.client:
     return session.client("logs", config=config)
 
 
+def get_ssm_client() -> boto3.client:
+    """Create an SSM client using the configured AWS session with retry and timeout configuration.
+
+    Timeout Configuration (T-005, T-012):
+    - connect_timeout: Maximum time to establish connection (10s)
+    - read_timeout: Maximum time to wait for data (60s)
+    - Prevents hanging operations and ensures responsive behavior
+
+    Returns:
+        boto3.client: SSM client configured with the current session, retry logic, and timeouts
+
+    Raises:
+        NoCredentialsError: If AWS credentials are not properly configured
+        ClientError: If there are issues creating the client
+    """
+    session = get_aws_session()
+    config = Config(
+        retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
+        max_pool_connections=50,
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
+    )
+    return session.client("ssm", config=config)
+
+
+def get_ecs_client() -> boto3.client:
+    """Create an ECS client using the configured AWS session with retry and timeout configuration.
+
+    Timeout Configuration (T-005, T-012):
+    - connect_timeout: Maximum time to establish connection (10s)
+    - read_timeout: Maximum time to wait for data (60s)
+    - Prevents hanging operations and ensures responsive behavior
+
+    Returns:
+        boto3.client: ECS client configured with the current session, retry logic, and timeouts
+
+    Raises:
+        NoCredentialsError: If AWS credentials are not properly configured
+        ClientError: If there are issues creating the client
+    """
+    session = get_aws_session()
+    config = Config(
+        retries={"max_attempts": MAX_RETRY_ATTEMPTS, "mode": "adaptive"},
+        max_pool_connections=50,
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
+    )
+    return session.client("ecs", config=config)
+
+
 async def retry_with_exponential_backoff(func, *args, **kwargs):
     """Execute a function with exponential backoff retry logic.
 

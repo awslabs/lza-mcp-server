@@ -19,8 +19,8 @@ from unittest.mock import Mock, patch
 from datetime import datetime
 from botocore.exceptions import ClientError
 
-from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
-    tool_get_pipeline_status,
+from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
+    tool_get_deployment_status,
 )
 
 
@@ -35,16 +35,16 @@ class TestPipelineStatusErrors:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=client_error,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="non-existent-pipeline"
             )
 
@@ -93,16 +93,16 @@ class TestPipelineStatusErrors:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context,
                 pipeline_name="test-pipeline",
                 execution_id=execution_id,
@@ -120,16 +120,16 @@ class TestPipelineStatusErrors:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.get_deployment_status.retry_with_exponential_backoff",
                 side_effect=client_error,
             ),
         ):
             mock_client.return_value = Mock()
 
-            result = await tool_get_pipeline_status(
+            result = await tool_get_deployment_status(
                 mock_mcp_context, pipeline_name="test-pipeline"
             )
 

@@ -18,8 +18,8 @@ import pytest
 from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
 
-from awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors import (
-    tool_diagnose_pipeline_errors,
+from awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors import (
+    _diagnose_standard_pipeline as tool_diagnose_pipeline_errors,
 )
 
 
@@ -47,10 +47,10 @@ class TestDiagnosePipelineErrorsErrors:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_error,
             ),
         ):
@@ -98,11 +98,11 @@ class TestDiagnosePipelineErrorsErrors:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client",
                 return_value=mock_codepipeline,
             ),
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -126,10 +126,10 @@ class TestDiagnosePipelineErrorsErrors:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_error,
             ),
         ):

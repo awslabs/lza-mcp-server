@@ -67,7 +67,7 @@ class TestCopyUcToLzaConfigSuccess:
             assert result["session_id"] == "test-session-id"
             assert result["files_copied"] == 3
             assert result["directories_created"] == 1
-            assert "uploadConfigurationToS3()" in result["next_steps"]
+            assert "putLzaConfiguration()" in result["next_steps"]
 
             # Verify files were copied
             assert (lza_path / "file1.yaml").exists()

@@ -115,7 +115,7 @@ async def test_start_session_with_valid_parameters(
         assert result["network_model"] == "hub-and-spoke"
         assert result["files_copied"] == 3
         assert "next_steps" in result
-        assert "getConfigurationFromS3" in result["next_steps"]
+        assert "getLzaConfiguration" in result["next_steps"]
 
         # Verify session manager was called correctly
         mock_session_manager.generate_session_id.assert_called_once()
@@ -381,3 +381,59 @@ async def test_start_session_exception_handling(mock_ctx, mock_uc_structure):
         assert "error_code" in result
         assert "troubleshooting" in result
         assert len(result["troubleshooting"]) > 0
+
+
+@pytest.mark.unit
+@pytest.mark.uc_merge
+@pytest.mark.asyncio
+async def test_start_session_uc_release_not_found_no_releases(mock_ctx, tmp_path):
+    """Test error when uc_release not found and no releases exist at all.
+
+    Covers branch 122->129: available_releases is empty.
+    """
+    # Create empty UC base directory (no releases)
+    uc_base = tmp_path / "lza-uc"
+    uc_base.mkdir()
+
+    with patch.dict(os.environ, {"LZA_UC_BASE_PATH": str(uc_base)}):
+        result = await tool_start_uc_merge_session(
+            ctx=mock_ctx, uc_release="v9.9.9", network_model="hub-and-spoke"
+        )
+
+        assert result["success"] is False
+        assert result["error_code"] == "UC_RELEASE_NOT_FOUND"
+        assert result["context"]["available_releases"] == []
+
+
+@pytest.mark.unit
+@pytest.mark.uc_merge
+@pytest.mark.asyncio
+async def test_start_session_network_model_not_found_no_models(
+    mock_ctx, mock_uc_structure
+):
+    """Test error when network_model not found and release has no model dirs.
+
+    Covers branch 152->159: available_models is empty.
+    """
+    # Create a release with no model subdirectories
+    empty_release = mock_uc_structure / "v2.0.0"
+    empty_release.mkdir()
+
+    with (
+        patch(
+            "awslabs.lza_mcp_server.tools.uc_merge.start_uc_merge_session.get_uc_release_path"
+        ) as mock_release_path,
+        patch(
+            "awslabs.lza_mcp_server.tools.uc_merge.start_uc_merge_session.get_uc_network_model_path"
+        ) as mock_model_path,
+    ):
+        mock_release_path.return_value = empty_release
+        mock_model_path.return_value = empty_release / "nonexistent"
+
+        result = await tool_start_uc_merge_session(
+            ctx=mock_ctx, uc_release="v2.0.0", network_model="nonexistent"
+        )
+
+        assert result["success"] is False
+        assert result["error_code"] == "NETWORK_MODEL_NOT_FOUND"
+        assert result["context"]["available_models"] == []

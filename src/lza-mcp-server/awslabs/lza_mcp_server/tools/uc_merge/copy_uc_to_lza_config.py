@@ -39,7 +39,7 @@ async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]
     files from the session directory to the LZA configuration directory. Files are
     overwritten as needed, and directory structure is preserved.
 
-    After this operation completes, call uploadConfigurationToS3() WITHOUT any path
+    After this operation completes, call putLzaConfiguration() WITHOUT any path
     parameter to upload the merged configuration.
 
     Args:
@@ -108,12 +108,12 @@ async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]
                 error_code="LZA_CONFIG_NOT_FOUND",
                 category=ErrorCategory.VALIDATION,
                 troubleshooting=[
-                    "Call getConfigurationFromS3() first to retrieve the LZA configuration",
-                    "Ensure getConfigurationFromS3() completed successfully",
+                    "Call getLzaConfiguration() first to retrieve the LZA configuration",
+                    "Ensure getLzaConfiguration() completed successfully",
                     "Verify the extracted configuration path was set correctly",
                 ],
                 context={"session_id": session_id},
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration first.",
+                next_steps="Call getLzaConfiguration() to retrieve the LZA configuration first.",
             )
 
         # Verify LZA config directory exists
@@ -123,7 +123,7 @@ async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]
                 error_code="LZA_CONFIG_NOT_FOUND",
                 category=ErrorCategory.FILE_NOT_FOUND,
                 troubleshooting=[
-                    "Call getConfigurationFromS3() to retrieve the LZA configuration",
+                    "Call getLzaConfiguration() to retrieve the LZA configuration",
                     "Verify the configuration was extracted successfully",
                     "Check that the directory was not deleted",
                 ],
@@ -131,7 +131,7 @@ async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]
                     "session_id": session_id,
                     "lza_config_path": str(lza_config_path),
                 },
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration.",
+                next_steps="Call getLzaConfiguration() to retrieve the LZA configuration.",
             )
 
         # Verify session directory exists and has files
@@ -215,7 +215,7 @@ async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]
                 },
                 next_steps=(
                     "UC configuration merged successfully. Session directory has been cleaned up. "
-                    "Call uploadConfigurationToS3() WITHOUT any path parameter "
+                    "Call putLzaConfiguration() WITHOUT any path parameter "
                     "to upload the merged configuration."
                 ),
             )

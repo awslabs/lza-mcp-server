@@ -1,0 +1,101 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "STSAccess",
+            "Effect": "Allow",
+            "Action": "sts:GetCallerIdentity",
+            "Resource": "*"
+        },
+        {
+            "Sid": "SSMParameterAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter",
+                "ssm:GetParametersByPath"
+            ],
+            "Resource": "arn:${PARTITION}:ssm:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:parameter/accelerator/*"
+        },
+        {
+            "Sid": "SSMDescribeParameters",
+            "Effect": "Allow",
+            "Action": "ssm:DescribeParameters",
+            "Resource": "*"
+        },
+        {
+            "Sid": "DeploymentTypeDetection",
+            "Effect": "Allow",
+            "Action": "codepipeline:ListPipelines",
+            "Resource": "*"
+        },
+        {
+            "Sid": "S3ConfigAccess",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:${PARTITION}:s3:::${QUALIFIER}-config-*/lza/*"
+            ]
+        },
+        {
+            "Sid": "S3ListBucket",
+            "Effect": "Allow",
+            "Action": "s3:ListBucket",
+            "Resource": "arn:${PARTITION}:s3:::${QUALIFIER}-config-*"
+        },
+        {
+            "Sid": "KMSEncryptionAccess",
+            "Effect": "Allow",
+            "Action": [
+                "kms:Decrypt",
+                "kms:GenerateDataKey"
+            ],
+            "Resource": "arn:${PARTITION}:kms:*:${ORCHESTRATION_ACCOUNT}:key/*",
+            "Condition": {
+                "ForAnyValue:StringEquals": {
+                    "kms:ResourceAliases": "alias/accelerator/${QUALIFIER}/installer/kms/key"
+                }
+            }
+        },
+        {
+            "Sid": "PipelineAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codepipeline:GetPipeline",
+                "codepipeline:GetPipelineState",
+                "codepipeline:GetPipelineExecution",
+                "codepipeline:ListPipelineExecutions",
+                "codepipeline:StartPipelineExecution"
+            ],
+            "Resource": "arn:${PARTITION}:codepipeline:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:${QUALIFIER}-pipeline"
+        },
+        {
+            "Sid": "CodeBuildAccess",
+            "Effect": "Allow",
+            "Action": "codebuild:BatchGetBuilds",
+            "Resource": "arn:${PARTITION}:codebuild:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:project/${QUALIFIER}-*"
+        },
+        {
+            "Sid": "CloudWatchLogsCodeBuildAccess",
+            "Effect": "Allow",
+            "Action": "logs:GetLogEvents",
+            "Resource": "arn:${PARTITION}:logs:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:log-group:/aws/codebuild/${QUALIFIER}-*:*"
+        },
+        {
+            "Sid": "SSMAutomationAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:StartAutomationExecution",
+                "ssm:GetAutomationExecution",
+                "ssm:DescribeAutomationExecutions",
+                "ssm:DescribeDocument"
+            ],
+            "Resource": [
+                "arn:${PARTITION}:ssm:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:document/${QUALIFIER}-*",
+                "arn:${PARTITION}:ssm:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:automation-execution/*"
+            ]
+        }
+    ]
+}

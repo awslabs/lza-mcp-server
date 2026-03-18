@@ -275,7 +275,7 @@ async def test_validate_config_not_retrieved(mock_ctx, tmp_path, monkeypatch):
     # Assertions
     assert result["success"] is False
     assert result["error_code"] == "CONFIG_NOT_RETRIEVED"
-    assert "getConfigurationFromS3()" in result["error"]
+    assert "getLzaConfiguration()" in result["error"]
 
 
 @pytest.mark.unit

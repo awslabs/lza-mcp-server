@@ -103,7 +103,7 @@ class TestCopyUcToLzaConfigValidation:
         assert result["success"] is False
         assert result["error_code"] == "LZA_CONFIG_NOT_FOUND"
         assert "LZA configuration directory not found" in result["error"]
-        assert "getConfigurationFromS3()" in result["next_steps"]
+        assert "getLzaConfiguration()" in result["next_steps"]
 
     @pytest.mark.asyncio
     @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")

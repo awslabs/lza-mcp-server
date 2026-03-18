@@ -18,8 +18,8 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-from awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors import (
-    tool_diagnose_pipeline_errors,
+from awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors import (
+    _diagnose_standard_pipeline as tool_diagnose_pipeline_errors,
 )
 
 
@@ -123,16 +123,16 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_logs_client"
             ) as mock_logs_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -239,16 +239,16 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_logs_client"
             ) as mock_logs_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -340,13 +340,13 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -428,13 +428,13 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -531,16 +531,16 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_logs_client"
             ) as mock_logs_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -638,16 +638,16 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_logs_client"
             ) as mock_logs_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -753,16 +753,16 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_logs_client"
             ) as mock_logs_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):
@@ -870,16 +870,16 @@ class TestDiagnosePipelineErrorsCodeBuildIntegration:
 
         with (
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codepipeline_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codepipeline_client"
             ) as mock_cp_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_codebuild_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_codebuild_client"
             ) as mock_cb_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.get_logs_client"
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.get_logs_client"
             ) as mock_logs_client,
             patch(
-                "awslabs.lza_mcp_server.tools.pipeline.diagnose_pipeline_errors.retry_with_exponential_backoff",
+                "awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors.retry_with_exponential_backoff",
                 side_effect=mock_retry,
             ),
         ):

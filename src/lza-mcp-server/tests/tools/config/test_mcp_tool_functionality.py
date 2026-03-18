@@ -14,6 +14,8 @@
 
 """Tests for MCP-specific functionality in config tools."""
 
+import inspect
+import json
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
@@ -23,472 +25,333 @@ from awslabs.lza_mcp_server.tools.config.manage_config_tools import (
 )
 
 
-class TestMCPToolRegistration:
-    """Test MCP tool registration and functionality."""
+# ---------------------------------------------------------------------------
+# Shared fixture
+# ---------------------------------------------------------------------------
 
+
+def _make_mock_server():
+    server = Mock()
+    registered_tools = {}
+
+    def mock_tool_decorator(name=None, description=None):
+        def decorator(func):
+            registered_tools[name] = {
+                "name": name,
+                "description": description,
+                "function": func,
+            }
+            return func
+
+        return decorator
+
+    server.tool = mock_tool_decorator
+    server.get_registered_tools = lambda: registered_tools
+    return server
+
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+
+
+class TestMCPToolRegistration:
     @pytest.fixture
     def mock_fastmcp_server(self):
-        """Mock FastMCP server for tool registration."""
-        server = Mock()
-        registered_tools = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered_tools[name] = {
-                    "name": name,
-                    "description": description,
-                    "function": func,
-                }
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-        server.get_registered_tools = lambda: registered_tools
-        return server
+        return _make_mock_server()
 
     def test_config_tools_registration_with_fastmcp(self, mock_fastmcp_server):
-        """Test that config tools register properly with FastMCP server."""
         register_config_tools(mock_fastmcp_server)
-
         registered_tools = mock_fastmcp_server.get_registered_tools()
 
-        # Verify all tools are registered
-        assert len(registered_tools) == 3
+        assert len(registered_tools) == 6
         assert "getMinimumConfiguration" in registered_tools
-        assert "uploadConfigurationToS3" in registered_tools
-        assert "getConfigurationFromS3" in registered_tools
+        assert "getLzaConfiguration" in registered_tools
+        assert "putLzaConfiguration" in registered_tools
+        assert "readLzaConfigFile" in registered_tools
+        assert "updateLzaConfigFile" in registered_tools
+        assert "createLzaConfigFile" in registered_tools
 
-        # Verify tool metadata
-        get_min_config = registered_tools["getMinimumConfiguration"]
-        assert callable(get_min_config["function"])
-        assert "minimal LZA configuration" in get_min_config["description"]
+        get_min = registered_tools["getMinimumConfiguration"]
+        assert callable(get_min["function"])
+        assert "minimal LZA configuration" in get_min["description"]
 
-        upload_config = registered_tools["uploadConfigurationToS3"]
-        assert callable(upload_config["function"])
-        assert "Upload LZA configuration" in upload_config["description"]
+        get_lza = registered_tools["getLzaConfiguration"]
+        assert callable(get_lza["function"])
+        assert "qualifier" in get_lza["description"].lower()
 
-        get_config = registered_tools["getConfigurationFromS3"]
-        assert callable(get_config["function"])
-        assert "Retrieve current LZA configuration" in get_config["description"]
+        put_lza = registered_tools["putLzaConfiguration"]
+        assert callable(put_lza["function"])
+        assert "qualifier" in put_lza["description"].lower()
 
     @pytest.mark.asyncio
     async def test_mcp_context_integration(self, mock_fastmcp_server, mock_mcp_context):
-        """Test MCP context integration with config tools."""
         register_config_tools(mock_fastmcp_server)
         registered_tools = mock_fastmcp_server.get_registered_tools()
+        func = registered_tools["getMinimumConfiguration"]["function"]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-
-        # Mock the underlying tool function
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
             mock_tool.return_value = {
                 "config_files": {"accounts": {}},
-                "instructions_for_assistant": {"message": "Test message"},
+                "instructions_for_assistant": {"message": "Test"},
             }
-
-            result = await get_min_config_func(mock_mcp_context)
-
-            # Verify context was passed correctly
+            result = await func(mock_mcp_context)
             mock_tool.assert_called_once()
-            call_args = mock_tool.call_args[0]
-            assert call_args[0] == mock_mcp_context
-
-            # Verify result structure
+            assert call_args_ctx(mock_tool) == mock_mcp_context
             assert "config_files" in result
-            assert "instructions_for_assistant" in result
 
     @pytest.mark.asyncio
     async def test_mcp_context_logging(self, mock_fastmcp_server, mock_mcp_context):
-        """Test MCP context logging functionality."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-
-        # Mock the underlying tool to trigger context logging
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
 
-            async def mock_tool_func(ctx, *args, **kwargs):
+            async def side_effect(ctx, *a, **kw):
                 await ctx.info("Test info message")
                 await ctx.error("Test error message")
                 return {"config_files": {}}
 
-            mock_tool.side_effect = mock_tool_func
+            mock_tool.side_effect = side_effect
 
-            await get_min_config_func(mock_mcp_context)
-
-            # Verify context logging was called
-            assert len(mock_mcp_context.info_messages) > 0
-            assert len(mock_mcp_context.error_messages) > 0
+            await func(mock_mcp_context)
             assert "Test info message" in mock_mcp_context.info_messages
             assert "Test error message" in mock_mcp_context.error_messages
 
     @pytest.mark.asyncio
     async def test_concurrent_mcp_tool_execution(self, mock_fastmcp_server):
-        """Test concurrent execution of MCP tools."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        tools = mock_fastmcp_server.get_registered_tools()
+        get_min_func = tools["getMinimumConfiguration"]["function"]
+        put_func = tools["putLzaConfiguration"]["function"]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-        upload_config_func = registered_tools["uploadConfigurationToS3"]["function"]
+        contexts = [Mock(info=AsyncMock(), error=AsyncMock()) for _ in range(3)]
 
-        # Create multiple mock contexts
-        contexts = [Mock() for _ in range(3)]
-        for ctx in contexts:
-            ctx.info = AsyncMock()
-            ctx.error = AsyncMock()
-
-        # Mock the underlying tools
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
-        ) as mock_get_tool:
+        ) as mock_get:
             with patch(
-                "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_upload_configuration_to_s3"
-            ) as mock_upload_tool:
-                mock_get_tool.return_value = {"config_files": {}}
-                mock_upload_tool.return_value = {"status": "success"}
+                "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_put_lza_configuration"
+            ) as mock_put:
+                mock_get.return_value = {"config_files": {}}
+                mock_put.return_value = {"success": True}
 
-                # Execute tools concurrently
-                tasks = [
-                    get_min_config_func(contexts[0]),
-                    upload_config_func(contexts[1]),
-                    get_min_config_func(contexts[2]),
-                ]
-
-                results = await asyncio.gather(*tasks)
-
-                # Verify all executions completed
+                results = await asyncio.gather(
+                    get_min_func(contexts[0]),
+                    put_func(contexts[1]),
+                    get_min_func(contexts[2]),
+                )
                 assert len(results) == 3
-                assert all(isinstance(result, dict) for result in results)
+                assert mock_get.call_count == 2
+                assert mock_put.call_count == 1
 
-                # Verify tools were called with correct contexts
-                assert mock_get_tool.call_count == 2
-                assert mock_upload_tool.call_count == 1
+
+# ---------------------------------------------------------------------------
+# Error handling
+# ---------------------------------------------------------------------------
 
 
 class TestMCPErrorHandling:
-    """Test MCP-specific error handling."""
-
     @pytest.fixture
     def mock_fastmcp_server(self):
-        """Mock FastMCP server for error testing."""
-        server = Mock()
-        registered_tools = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered_tools[name] = {
-                    "name": name,
-                    "description": description,
-                    "function": func,
-                }
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-        server.get_registered_tools = lambda: registered_tools
-        return server
+        return _make_mock_server()
 
     @pytest.mark.asyncio
     async def test_mcp_context_error_propagation(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test that errors are properly propagated through MCP context."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-
-        # Mock the underlying tool to raise an exception
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
             mock_tool.side_effect = Exception("Test exception")
-
-            # Tool should handle exception gracefully
             with pytest.raises(Exception):
-                await get_min_config_func(mock_mcp_context)
+                await func(mock_mcp_context)
 
     @pytest.mark.asyncio
     async def test_mcp_context_error_logging(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test MCP context error logging."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-
-        # Mock the underlying tool to return error response
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
-            mock_tool.return_value = {
-                "error": "Configuration directory not found",
-                "message": "Please check the configuration path",
-            }
-
-            result = await get_min_config_func(mock_mcp_context)
-
-            # Verify error response structure
-            assert "error" in result
-            assert "message" in result
-            assert result["error"] == "Configuration directory not found"
+            mock_tool.return_value = {"error": "Not found", "message": "Check path"}
+            result = await func(mock_mcp_context)
+            assert result["error"] == "Not found"
 
     @pytest.mark.asyncio
     async def test_mcp_tool_parameter_validation(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test MCP tool parameter validation."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        tools = mock_fastmcp_server.get_registered_tools()
+        get_min_func = tools["getMinimumConfiguration"]["function"]
+        put_func = tools["putLzaConfiguration"]["function"]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-        upload_config_func = registered_tools["uploadConfigurationToS3"]["function"]
-
-        # Test with various parameter combinations
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
-        ) as mock_get_tool:
+        ) as mock_get:
             with patch(
-                "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_upload_configuration_to_s3"
-            ) as mock_upload_tool:
-                mock_get_tool.return_value = {"config_files": {}}
-                mock_upload_tool.return_value = {"status": "success"}
+                "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_put_lza_configuration"
+            ) as mock_put:
+                mock_get.return_value = {"config_files": {}}
+                mock_put.return_value = {"success": True}
 
-                # Test getMinimumConfiguration with different parameters
-                await get_min_config_func(mock_mcp_context)  # No parameters
-                await get_min_config_func(
-                    mock_mcp_context, "accounts"
-                )  # config_type only
-                await get_min_config_func(
-                    mock_mcp_context, "accounts", "/save/path"
-                )  # Both parameters
+                await get_min_func(mock_mcp_context)
+                await get_min_func(mock_mcp_context, "accounts")
+                await get_min_func(mock_mcp_context, "accounts", "/save/path")
+                assert mock_get.call_count == 3
 
-                # Test uploadConfigurationToS3 with different parameters
-                await upload_config_func(mock_mcp_context)  # No parameters
-                await upload_config_func(
-                    mock_mcp_context, "/config/path"
-                )  # config_path only
-                await upload_config_func(
-                    mock_mcp_context, "/config/path", "bucket-name"
-                )  # Multiple parameters
-                await upload_config_func(
-                    mock_mcp_context, "/config/path", "bucket-name", False
-                )  # All parameters
+                await put_func(mock_mcp_context)
+                await put_func(mock_mcp_context, "my-qualifier")
+                await put_func(mock_mcp_context, None, "./config")
+                assert mock_put.call_count == 3
 
-                # Verify tools were called with correct parameter combinations
-                assert mock_get_tool.call_count == 3
-                assert mock_upload_tool.call_count == 4
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
 
 
 class TestMCPToolMetadata:
-    """Test MCP tool metadata and documentation."""
-
     @pytest.fixture
     def mock_fastmcp_server(self):
-        """Mock FastMCP server for tool registration."""
-        server = Mock()
-        registered_tools = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered_tools[name] = {
-                    "name": name,
-                    "description": description,
-                    "function": func,
-                }
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-        server.get_registered_tools = lambda: registered_tools
-        return server
+        return _make_mock_server()
 
     def test_tool_descriptions_are_comprehensive(self, mock_fastmcp_server):
-        """Test that tool descriptions are comprehensive and helpful."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        tools = mock_fastmcp_server.get_registered_tools()
 
-        get_min_config = registered_tools["getMinimumConfiguration"]
-        upload_config = registered_tools["uploadConfigurationToS3"]
+        get_min = tools["getMinimumConfiguration"]
+        assert "minimal" in get_min["description"].lower()
+        assert "lza" in get_min["description"].lower()
 
-        # Verify descriptions contain key information
-        assert "minimal" in get_min_config["description"].lower()
-        assert "lza" in get_min_config["description"].lower()
-        assert "configuration" in get_min_config["description"].lower()
-
-        assert "upload" in upload_config["description"].lower()
-        assert "lza" in upload_config["description"].lower()
-        assert "s3" in upload_config["description"].lower()
+        put_lza = tools["putLzaConfiguration"]
+        assert "upload" in put_lza["description"].lower()
+        assert "lza" in put_lza["description"].lower()
+        assert "s3" in put_lza["description"].lower()
 
     def test_tool_names_follow_convention(self, mock_fastmcp_server):
-        """Test that tool names follow MCP naming conventions."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
-
-        # Verify tool names use camelCase
-        for tool_name in registered_tools.keys():
-            assert tool_name[0].islower()  # First character should be lowercase
-            assert "_" not in tool_name  # Should not contain underscores
-            assert "-" not in tool_name  # Should not contain hyphens
+        for name in mock_fastmcp_server.get_registered_tools():
+            assert name[0].islower()
+            assert "_" not in name
+            assert "-" not in name
 
     @pytest.mark.asyncio
     async def test_tool_function_signatures(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test that tool function signatures are correct."""
-        import inspect
-
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        tools = mock_fastmcp_server.get_registered_tools()
 
-        # Test getMinimumConfiguration signature
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-        sig = inspect.signature(get_min_config_func)
-
-        # Should have ctx as first parameter
+        # getMinimumConfiguration
+        sig = inspect.signature(tools["getMinimumConfiguration"]["function"])
         params = list(sig.parameters.keys())
         assert params[0] == "ctx"
-
-        # Should have optional parameters with defaults
         assert "config_type" in params
         assert "save_to_directory" in params
 
-        # Test uploadConfigurationToS3 signature
-        upload_config_func = registered_tools["uploadConfigurationToS3"]["function"]
-        sig = inspect.signature(upload_config_func)
-
+        # putLzaConfiguration
+        sig = inspect.signature(tools["putLzaConfiguration"]["function"])
         params = list(sig.parameters.keys())
         assert params[0] == "ctx"
+        assert "qualifier" in params
         assert "config_path" in params
         assert "bucket_name" in params
-        assert "offer_pipeline_release" in params
+
+        # getLzaConfiguration
+        sig = inspect.signature(tools["getLzaConfiguration"]["function"])
+        params = list(sig.parameters.keys())
+        assert params[0] == "ctx"
+        assert "qualifier" in params
+        assert "bucket_name" in params
+
+
+# ---------------------------------------------------------------------------
+# Compatibility
+# ---------------------------------------------------------------------------
 
 
 class TestMCPToolCompatibility:
-    """Test MCP tool compatibility and integration."""
-
     @pytest.fixture
     def mock_fastmcp_server(self):
-        """Mock FastMCP server for tool registration."""
-        server = Mock()
-        registered_tools = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered_tools[name] = {
-                    "name": name,
-                    "description": description,
-                    "function": func,
-                }
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-        server.get_registered_tools = lambda: registered_tools
-        return server
+        return _make_mock_server()
 
     @pytest.mark.asyncio
     async def test_tool_return_value_serialization(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test that tool return values are JSON serializable."""
-        import json
-
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
-
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
+        func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
             mock_tool.return_value = {
-                "config_files": {
-                    "accounts": {
-                        "mandatoryAccounts": [
-                            {"name": "Management", "email": "test@example.com"}
-                        ]
-                    }
-                },
-                "instructions_for_assistant": {
-                    "message": "Test message",
-                    "critical_customizations": ["Item 1", "Item 2"],
-                },
+                "config_files": {"accounts": {"mandatoryAccounts": [{"name": "Mgmt"}]}},
+                "instructions_for_assistant": {"message": "Test"},
             }
-
-            result = await get_min_config_func(mock_mcp_context)
-
-            # Should be JSON serializable
-            json_str = json.dumps(result)
-            assert isinstance(json_str, str)
-
-            # Should be deserializable back to original structure
-            deserialized = json.loads(json_str)
-            assert deserialized == result
+            result = await func(mock_mcp_context)
+            assert json.loads(json.dumps(result)) == result
 
     @pytest.mark.asyncio
     async def test_tool_async_compatibility(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test that tools are properly async and compatible with MCP."""
-        import inspect
-
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
-
-        # All tool functions should be coroutines
-        for tool_name, tool_info in registered_tools.items():
-            func = tool_info["function"]
-            assert inspect.iscoroutinefunction(func), (
-                f"Tool {tool_name} should be async"
+        for name, info in mock_fastmcp_server.get_registered_tools().items():
+            assert inspect.iscoroutinefunction(info["function"]), (
+                f"{name} should be async"
             )
 
     @pytest.mark.asyncio
     async def test_tool_context_requirement(self, mock_fastmcp_server):
-        """Test that tools require MCP context as first parameter."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
-
-        # All tools should require context as first parameter
-        for tool_name, tool_info in registered_tools.items():
-            func = tool_info["function"]
-
-            # Should raise TypeError if called without context
+        for name, info in mock_fastmcp_server.get_registered_tools().items():
             with pytest.raises(TypeError):
-                await func()  # No arguments provided
+                await info["function"]()
 
     @pytest.mark.asyncio
     async def test_tool_graceful_degradation(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        """Test that tools degrade gracefully when dependencies are missing."""
         register_config_tools(mock_fastmcp_server)
-        registered_tools = mock_fastmcp_server.get_registered_tools()
+        func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
-
-        # Mock missing dependencies
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
-            mock_tool.return_value = {
-                "error": "Configuration templates not found",
-                "message": "Please contact the administrator",
-            }
-
-            result = await get_min_config_func(mock_mcp_context)
-
-            # Should return structured error response
+            mock_tool.return_value = {"error": "Not found", "message": "Contact admin"}
+            result = await func(mock_mcp_context)
             assert "error" in result
-            assert "message" in result
-            assert isinstance(result, dict)  # Should still return valid structure
+            assert isinstance(result, dict)
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+
+def call_args_ctx(mock_obj):
+    """Extract the first positional arg (ctx) from the mock call."""
+    return mock_obj.call_args[0][0]

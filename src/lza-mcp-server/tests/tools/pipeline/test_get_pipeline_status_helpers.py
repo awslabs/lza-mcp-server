@@ -14,7 +14,7 @@
 
 """Unit tests for get_pipeline_status helper functions."""
 
-from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
+from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
     get_stage_description,
     get_action_description,
     get_cached_pipeline_metadata,

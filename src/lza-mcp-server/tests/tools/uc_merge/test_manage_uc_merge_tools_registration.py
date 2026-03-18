@@ -36,8 +36,8 @@ class TestToolRegistration:
         """Test basic tool registration."""
         register_uc_merge_tools(mock_mcp)
 
-        # Verify tool decorator was called for each tool (9 tools total)
-        assert mock_mcp.tool.call_count == 9
+        # Verify tool decorator was called for each tool (8 tools total)
+        assert mock_mcp.tool.call_count == 8
 
     @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.logger")
     def test_register_uc_merge_tools_logging(self, mock_logger, mock_mcp):
@@ -150,26 +150,6 @@ class TestToolFunctionWrappers:
         assert result["session_id"] == "uc-session-123"
 
     @pytest.mark.asyncio
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.read_lza_config_file"
-    )
-    async def test_read_lza_config_file_wrapper(self, mock_read_lza, mock_mcp):
-        """Test readLzaConfigFile wrapper function."""
-        register_uc_merge_tools(mock_mcp)
-
-        read_func = mock_mcp.registered_tools["readLzaConfigFile"]
-        mock_read_lza.return_value = {
-            "success": True,
-            "content": "accounts: []",
-        }
-
-        mock_ctx = Mock()
-        result = await read_func(mock_ctx, "accounts-config.yaml")
-
-        mock_read_lza.assert_called_once_with(mock_ctx, "accounts-config.yaml")
-        assert result["success"] is True
-
-    @pytest.mark.asyncio
     @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.read_uc_file")
     async def test_read_uc_file_wrapper(self, mock_read_uc, mock_mcp):
         """Test readUcFile wrapper function."""
@@ -269,9 +249,9 @@ class TestToolRegistrationEdgeCases:
         register_uc_merge_tools(mock_mcp)
         second_call_count = mock_mcp.tool.call_count
 
-        # Should register tools both times (9 tools each)
-        assert first_call_count == 9
-        assert second_call_count == 18
+        # Should register tools both times (8 tools each)
+        assert first_call_count == 8
+        assert second_call_count == 16
 
     def test_register_uc_merge_tools_with_none_mcp(self):
         """Test registering tools with None MCP instance."""
@@ -300,7 +280,6 @@ class TestToolRegistrationEdgeCases:
             "get_uc_releases",
             "get_uc_network_models",
             "start_uc_merge_session",
-            "readLzaConfigFile",
             "readUcFile",
             "getUcNetworkCustomizationGuide",
             "updateUcFile",
@@ -348,7 +327,6 @@ class TestToolRegistrationIntegration:
             "get_uc_releases",
             "get_uc_network_models",
             "start_uc_merge_session",
-            "readLzaConfigFile",
             "readUcFile",
             "getUcNetworkCustomizationGuide",
             "updateUcFile",
@@ -365,9 +343,9 @@ class TestToolRegistrationIntegration:
         """Test that correct number of tools are registered."""
         register_uc_merge_tools(mock_mcp_with_tracking)
 
-        # Should have exactly 9 tools
-        assert len(mock_mcp_with_tracking.tools) == 9
-        assert mock_mcp_with_tracking.tool_call_count == 9
+        # Should have exactly 8 tools
+        assert len(mock_mcp_with_tracking.tools) == 8
+        assert mock_mcp_with_tracking.tool_call_count == 8
 
     @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.logger")
     def test_registration_error_handling(self, mock_logger):

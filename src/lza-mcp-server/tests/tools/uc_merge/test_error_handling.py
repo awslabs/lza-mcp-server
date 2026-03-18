@@ -457,3 +457,221 @@ class TestErrorHandlingDocumentation:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ---------------------------------------------------------------
+# Coverage tests for common.py uncovered lines
+# ---------------------------------------------------------------
+
+
+class TestValidatePathSecurity:
+    """Tests for validate_path_security covering uncovered branches."""
+
+    def test_absolute_path_rejected(self):
+        """Cover line 100: absolute path check."""
+        from awslabs.lza_mcp_server.tools.uc_merge.common import validate_path_security
+        from pathlib import Path
+
+        is_valid, error, resolved = validate_path_security(
+            "/etc/passwd", Path("/app/config")
+        )
+        assert is_valid is False
+        assert "Absolute paths" in error
+        assert resolved is None
+
+    def test_path_resolve_os_error(self):
+        """Cover lines 114-115: OSError during path resolution."""
+        from awslabs.lza_mcp_server.tools.uc_merge.common import validate_path_security
+        from pathlib import Path
+        from unittest.mock import patch
+
+        # Force an OSError during resolve by using a base dir that triggers it
+        with patch("pathlib.Path.resolve", side_effect=OSError("bad path")):
+            is_valid, error, resolved = validate_path_security(
+                "file.yaml", Path("/app/config")
+            )
+            assert is_valid is False
+            assert "Invalid file path" in error
+            assert resolved is None
+
+    def test_path_outside_boundary(self):
+        """Cover lines 120-121: path escapes base directory."""
+        from awslabs.lza_mcp_server.tools.uc_merge.common import validate_path_security
+        from pathlib import Path
+        import tempfile
+        import os
+
+        # Create two separate directories
+        with tempfile.TemporaryDirectory() as base_dir:
+            with tempfile.TemporaryDirectory() as other_dir:
+                # Create a symlink that escapes the base directory
+                link_path = os.path.join(base_dir, "escape")
+                try:
+                    os.symlink(other_dir, link_path)
+                    is_valid, error, resolved = validate_path_security(
+                        "escape/file.txt", Path(base_dir)
+                    )
+                    # The symlink resolves outside base_dir
+                    assert is_valid is False
+                    assert "outside" in error.lower()
+                except OSError:
+                    # Symlinks may not be supported on all platforms
+                    pytest.skip("Symlinks not supported")
+
+    def test_non_string_path_rejected(self):
+        """Cover line 97: non-string file_path."""
+        from awslabs.lza_mcp_server.tools.uc_merge.common import validate_path_security
+        from pathlib import Path
+
+        is_valid, error, resolved = validate_path_security(
+            123,
+            Path("/app/config"),  # type: ignore
+        )
+        assert is_valid is False
+        assert "must be a string" in error
+
+    def test_empty_path_rejected(self):
+        """Cover line 94: empty file_path."""
+        from awslabs.lza_mcp_server.tools.uc_merge.common import validate_path_security
+        from pathlib import Path
+
+        is_valid, error, resolved = validate_path_security("", Path("/app/config"))
+        assert is_valid is False
+        assert "cannot be empty" in error
+
+
+class TestFormatFileSize:
+    """Tests for format_file_size covering all unit branches."""
+
+    def test_bytes(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import format_file_size
+
+        assert format_file_size(500) == "500.0 B"
+
+    def test_kilobytes(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import format_file_size
+
+        assert "KB" in format_file_size(2048)
+
+    def test_megabytes(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import format_file_size
+
+        assert "MB" in format_file_size(5 * 1024 * 1024)
+
+    def test_gigabytes(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import format_file_size
+
+        assert "GB" in format_file_size(3 * 1024 * 1024 * 1024)
+
+    def test_terabytes(self):
+        """Cover line 334: TB branch."""
+        from awslabs.lza_mcp_server.tools.uc_merge.common import format_file_size
+
+        result = format_file_size(2 * 1024 * 1024 * 1024 * 1024)
+        assert "TB" in result
+
+
+class TestCreateSuccessResponse:
+    """Tests for create_success_response."""
+
+    def test_with_next_steps(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import create_success_response
+
+        result = create_success_response(
+            data={"key": "value"}, next_steps="Do this next"
+        )
+        assert result["success"] is True
+        assert result["key"] == "value"
+        assert result["next_steps"] == "Do this next"
+
+    def test_without_next_steps(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import create_success_response
+
+        result = create_success_response(data={"key": "value"})
+        assert result["success"] is True
+        assert result["key"] == "value"
+        assert "next_steps" not in result or result["next_steps"] == ""
+
+
+class TestCommonPathHelpers:
+    """Tests for path helper functions."""
+
+    def test_get_uc_base_path_default(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import get_uc_base_path
+        from unittest.mock import patch
+        import os
+
+        with patch.dict(os.environ, {}, clear=True):
+            # Remove LZA_UC_BASE_PATH if set
+            os.environ.pop("LZA_UC_BASE_PATH", None)
+            path = get_uc_base_path()
+            assert str(path) == "/app/lza-uc"
+
+    def test_get_uc_base_path_from_env(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import get_uc_base_path
+        from unittest.mock import patch
+        import os
+
+        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": "/custom/path"}):
+            path = get_uc_base_path()
+            assert str(path) == "/custom/path"
+
+    def test_get_lza_config_base_path_default(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import (
+            get_lza_config_base_path,
+        )
+        from unittest.mock import patch
+        import os
+
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("LZA_CONFIG_BASE_PATH", None)
+            path = get_lza_config_base_path()
+            assert str(path) == "/app/lza-config"
+
+    def test_get_uc_release_path(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import get_uc_release_path
+        from unittest.mock import patch
+        import os
+
+        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": "/uc"}):
+            path = get_uc_release_path("v1.0.0")
+            assert str(path) == "/uc/v1.0.0"
+
+    def test_get_uc_network_model_path(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import (
+            get_uc_network_model_path,
+        )
+        from unittest.mock import patch
+        import os
+
+        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": "/uc"}):
+            path = get_uc_network_model_path("v1.0.0", "hub-and-spoke")
+            assert str(path) == "/uc/v1.0.0/hub-and-spoke"
+
+    def test_set_and_get_extracted_path(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import (
+            set_extracted_lza_config_path,
+            get_extracted_lza_config_path,
+        )
+        from pathlib import Path
+
+        set_extracted_lza_config_path(Path("/test/path"))
+        assert get_extracted_lza_config_path() == Path("/test/path")
+
+        # Reset
+        set_extracted_lza_config_path(None)
+        assert get_extracted_lza_config_path() is None
+
+
+class TestCategorizeAbsolutePathError:
+    """Test the 'absolute not allowed' branch in categorize_uc_merge_error."""
+
+    def test_absolute_not_allowed(self):
+        from awslabs.lza_mcp_server.tools.uc_merge.common import (
+            categorize_uc_merge_error,
+        )
+
+        error = Exception("Absolute paths are not allowed: /etc/passwd")
+        result = categorize_uc_merge_error(error)
+        assert result["category"] == ErrorCategory.SECURITY
+        assert result["error_code"] == "BOUNDARY_VIOLATION"

@@ -15,6 +15,11 @@ ORG_CONFIG_FILENAME = "organization-config.yaml"
 S3_OBJECT_KEY = "zipped/aws-accelerator-config.zip"
 BUCKET_NAME_PATTERN = "aws-accelerator-config-{account_id}-{region}"
 
+# External pipeline (qualifier-based) S3 configuration constants
+# When a qualifier is used, the bucket and key patterns differ from standard deployments
+QUALIFIER_BUCKET_NAME_PATTERN = "{qualifier}-config-{account_id}-{region}"
+QUALIFIER_S3_OBJECT_KEY = "lza/aws-accelerator-config.zip"
+
 MAX_LOG_SIZE = 50000  # Maximum log size in characters to prevent memory issues
 CACHE_TTL_SECONDS = 300  # 5 minutes cache TTL for pipeline metadata
 MAX_RETRY_ATTEMPTS = 3

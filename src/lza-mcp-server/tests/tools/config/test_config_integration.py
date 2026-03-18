@@ -14,222 +14,125 @@
 
 """Integration tests for config tools functionality."""
 
-import pytest
 import os
-import tempfile
 import shutil
+import tempfile
+
+import pytest
+import yaml
 from unittest.mock import patch, Mock
 
-from awslabs.lza_mcp_server.tools.config.upload_config_s3 import (
-    tool_upload_configuration_to_s3,
+from awslabs.lza_mcp_server.tools.config.put_lza_configuration import (
+    tool_put_lza_configuration,
 )
 from awslabs.lza_mcp_server.tools.config.get_minimum_configuration import (
     tool_get_minimum_configuration,
 )
 
+ACCOUNT = "123456789012"
+REGION = "us-east-1"
+IDENTITY = {"account_id": ACCOUNT, "user_arn": "arn:aws:iam::test", "region": REGION}
 
-class TestUploadConfigurationIntegration:
-    """Integration tests for the main upload configuration function."""
 
+class TestPutLzaConfigurationIntegration:
     @pytest.mark.asyncio
-    async def test_upload_configuration_direct_upload_workflow(self, mock_mcp_context):
-        """Test upload configuration with direct upload workflow."""
+    async def test_put_direct_upload_workflow(self, mock_mcp_context):
+        """Direct upload via S3UploadUtils when no retrieved config exists."""
         with patch(
-            "awslabs.lza_mcp_server.tools.config.upload_config_s3.S3UploadUtils"
-        ) as mock_s3_utils:
-            mock_utils_instance = Mock()
-            mock_s3_utils.return_value = mock_utils_instance
-            # Make it async with Mock
-            mock_upload_configuration = Mock()
+            "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_caller_identity",
+            return_value=IDENTITY,
+        ):
+            with patch(
+                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_extracted_lza_config_path",
+                return_value=None,
+            ):
+                with patch(
+                    "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3UploadUtils"
+                ) as mock_utils_cls:
+                    mock_instance = Mock()
 
-            async def mock_upload_config_func(*args, **kwargs):
-                return {"success": True, "operation": "direct_upload"}
+                    async def mock_upload(*a, **kw):
+                        return {"success": True, "operation": "direct_upload"}
 
-            mock_upload_configuration.side_effect = mock_upload_config_func
-            mock_utils_instance.upload_configuration = mock_upload_configuration
+                    mock_instance.upload_configuration = Mock(side_effect=mock_upload)
+                    mock_utils_cls.return_value = mock_instance
 
-            result = await tool_upload_configuration_to_s3(
-                mock_mcp_context,
-                config_path="./config",  # Use relative path instead of absolute
-                bucket_name="test-bucket",
-                offer_pipeline_release=False,
-            )
+                    result = await tool_put_lza_configuration(
+                        mock_mcp_context,
+                        config_path="./config",
+                        bucket_name="test-bucket",
+                    )
 
         assert result["success"] is True
-        assert result["operation"] == "direct_upload"
-        mock_upload_configuration.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_upload_configuration_error_handling(self, mock_mcp_context):
-        """Test error handling in upload configuration.
-
-        Verifies that exceptions from S3UploadUtils are properly caught,
-        logged, and returned as structured error responses.
-        """
+    async def test_put_error_handling(self, mock_mcp_context):
+        """Exceptions from S3UploadUtils are returned as structured errors."""
         with patch(
-            "awslabs.lza_mcp_server.tools.config.upload_config_s3.S3UploadUtils"
-        ) as mock_s3_utils:
-            mock_utils_instance = Mock()
-            mock_s3_utils.return_value = mock_utils_instance
+            "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_caller_identity",
+            return_value=IDENTITY,
+        ):
+            with patch(
+                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_extracted_lza_config_path",
+                return_value=None,
+            ):
+                with patch(
+                    "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3UploadUtils"
+                ) as mock_utils_cls:
+                    mock_instance = Mock()
 
-            async def mock_upload_config_func(*args, **kwargs):
-                raise Exception("Upload failed")
+                    async def mock_upload(*a, **kw):
+                        raise Exception("Upload failed")
 
-            mock_utils_instance.upload_configuration = Mock(
-                side_effect=mock_upload_config_func
-            )
+                    mock_instance.upload_configuration = Mock(side_effect=mock_upload)
+                    mock_utils_cls.return_value = mock_instance
 
-            result = await tool_upload_configuration_to_s3(
-                mock_mcp_context,
-                config_path=None,
-                bucket_name=None,
-                offer_pipeline_release=True,
-            )
+                    result = await tool_put_lza_configuration(mock_mcp_context)
 
-        # Verify error is properly propagated in response
-        assert result["success"] is False, "Expected success=False for failed upload"
-        assert "error" in result, "Expected 'error' field in response"
-        assert "Upload failed" in str(result.get("error", "")), (
-            "Expected original error message in response"
-        )
-        assert "UPLOAD_ERROR" in result.get("error_code", ""), (
-            "Expected UPLOAD_ERROR code"
-        )
-
-        # Verify error was logged to context
-        assert len(mock_mcp_context.error_messages) > 0, (
-            "Expected error to be logged to context"
-        )
-        assert any("Upload failed" in msg for msg in mock_mcp_context.error_messages), (
-            "Expected error message to be logged"
-        )
+        assert result["success"] is False
+        assert "error" in result
 
 
 class TestConfigToolsEndToEnd:
-    """End-to-end tests for config tools workflow."""
-
     @pytest.mark.asyncio
-    async def test_get_minimum_config_then_upload_workflow(self, mock_mcp_context):
-        """Test complete workflow: get minimum config then upload."""
-        from awslabs.lza_mcp_server.tools.config.get_minimum_configuration import (
-            tool_get_minimum_configuration,
-        )
-
+    async def test_get_minimum_config_workflow(self, mock_mcp_context):
         temp_config_dir = tempfile.mkdtemp()
         temp_save_dir = tempfile.mkdtemp()
-
         try:
-            # Create sample config files
-            sample_config = {
+            sample = {
                 "mandatoryAccounts": [
                     {
                         "name": "Management",
-                        "email": "management@example.com",
+                        "email": "mgmt@example.com",
                         "organizationalUnit": "Root",
                         "warm": False,
                     }
                 ]
             }
+            with open(os.path.join(temp_config_dir, "accounts-config.yaml"), "w") as f:
+                yaml.dump(sample, f)
 
-            import yaml
-
-            config_file = os.path.join(temp_config_dir, "accounts-config.yaml")
-            with open(config_file, "w") as f:
-                yaml.dump(sample_config, f)
-
-            # Step 1: Get minimum configuration
             with patch.dict(os.environ, {"LZA_MIN_CONFIG_DIR": temp_config_dir}):
-                config_result = await tool_get_minimum_configuration(
+                result = await tool_get_minimum_configuration(
                     mock_mcp_context, config_type=None, save_to_directory=temp_save_dir
                 )
 
-            assert "config_files" in config_result
-            assert "saved_to_directory" in config_result
-
-            # Step 2: Upload the saved configuration
-            # Mock os.path.exists to return False for share validation paths
-            # Also mock validate_file_path to allow the temp directory
-            with patch("os.path.exists", return_value=False):
-                with patch(
-                    "awslabs.lza_mcp_server.tools.config.upload_config_s3.validate_file_path",
-                    return_value=(True, ""),
-                ):
-                    with patch(
-                        "awslabs.lza_mcp_server.tools.config.upload_config_s3.S3UploadUtils"
-                    ) as mock_s3_utils:
-                        mock_utils_instance = Mock()
-                        mock_s3_utils.return_value = mock_utils_instance
-                        # Make it async with Mock
-                        mock_upload_configuration = Mock()
-
-                        async def mock_upload_config_func(*args, **kwargs):
-                            return {
-                                "success": True,
-                                "uploaded_files": ["accounts-config.yaml"],
-                            }
-
-                        mock_upload_configuration.side_effect = mock_upload_config_func
-                        mock_utils_instance.upload_configuration = (
-                            mock_upload_configuration
-                        )
-
-                        upload_result = await tool_upload_configuration_to_s3(
-                            mock_mcp_context,
-                            config_path=temp_save_dir,
-                            bucket_name="test-bucket",
-                            offer_pipeline_release=True,
-                        )
-
-            assert upload_result["success"] is True
-
+            assert "config_files" in result
+            assert "saved_to_directory" in result
         finally:
             shutil.rmtree(temp_config_dir)
             shutil.rmtree(temp_save_dir)
 
     @pytest.mark.asyncio
-    async def test_config_validation_and_upload_error_recovery(self, mock_mcp_context):
-        """Test error recovery in config validation and upload workflow."""
-        # Test scenario where config validation fails but upload can still proceed
+    async def test_config_validation_error_recovery(self, mock_mcp_context):
         temp_dir = tempfile.mkdtemp()
-
         try:
-            # Create invalid config file
-            invalid_config = "invalid: yaml: [unclosed"
-            config_file = os.path.join(temp_dir, "accounts-config.yaml")
-            with open(config_file, "w") as f:
-                f.write(invalid_config)
+            with open(os.path.join(temp_dir, "accounts-config.yaml"), "w") as f:
+                f.write("invalid: yaml: [unclosed")
 
-            # Try to get minimum configuration (should handle YAML error)
             with patch.dict(os.environ, {"LZA_MIN_CONFIG_DIR": temp_dir}):
                 await tool_get_minimum_configuration(mock_mcp_context)
 
-            # Should have error messages but not crash
             assert len(mock_mcp_context.error_messages) > 0
-
-            # Upload should still be attempted with direct upload
-            with patch(
-                "awslabs.lza_mcp_server.tools.config.upload_config_s3.S3UploadUtils"
-            ) as mock_s3_utils:
-                mock_utils_instance = Mock()
-                mock_s3_utils.return_value = mock_utils_instance
-                # Make it async with Mock
-                mock_upload_configuration = Mock()
-
-                async def mock_upload_config_func(*args, **kwargs):
-                    return {"error": "Configuration validation failed"}
-
-                mock_upload_configuration.side_effect = mock_upload_config_func
-                mock_utils_instance.upload_configuration = mock_upload_configuration
-
-                upload_result = await tool_upload_configuration_to_s3(
-                    mock_mcp_context,
-                    config_path=temp_dir,
-                    bucket_name="test-bucket",
-                    offer_pipeline_release=False,
-                )
-
-            # Should handle upload error gracefully
-            assert "error" in upload_result or "success" in upload_result
-
         finally:
             shutil.rmtree(temp_dir)

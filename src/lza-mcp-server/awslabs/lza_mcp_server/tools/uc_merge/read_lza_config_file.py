@@ -71,7 +71,7 @@ async def read_lza_config_file(ctx: Context, file_path: str) -> Dict[str, Any]:
     """Read a configuration file from the extracted LZA configuration.
 
     This tool reads files from the LZA configuration directory that was
-    extracted via getConfigurationFromS3(). It validates paths for security
+    extracted via getLzaConfiguration(). It validates paths for security
     and provides context-aware guidance based on the file being read.
 
     Common files to review:
@@ -99,7 +99,7 @@ async def read_lza_config_file(ctx: Context, file_path: str) -> Dict[str, Any]:
         await ctx.info(f"Reading LZA config file: {file_path}")
 
         # Use the standard extracted config path
-        # This matches what getConfigurationFromS3 uses
+        # This matches what getLzaConfiguration uses
         base_directory = LZA_CONFIG_BASE_PATH / "retrieved-config"
 
         # Check if the base directory exists
@@ -107,21 +107,21 @@ async def read_lza_config_file(ctx: Context, file_path: str) -> Dict[str, Any]:
             return create_error_response(
                 error_message=(
                     "LZA configuration directory not found. "
-                    "Call getConfigurationFromS3() first to retrieve the configuration."
+                    "Call getLzaConfiguration() first to retrieve the configuration."
                 ),
                 error_code="CONFIG_NOT_RETRIEVED",
                 category=ErrorCategory.CONFIGURATION,
                 troubleshooting=[
-                    "Call getConfigurationFromS3() to retrieve the LZA configuration",
+                    "Call getLzaConfiguration() to retrieve the LZA configuration",
                     "Verify the configuration was extracted successfully",
                     "Check that the configuration directory exists at /app/lza-config/retrieved-config",
-                    "Ensure getConfigurationFromS3() completed without errors",
+                    "Ensure getLzaConfiguration() completed without errors",
                 ],
                 context={
                     "expected_directory": str(base_directory),
                     "file_path": file_path,
                 },
-                next_steps="Call getConfigurationFromS3() to retrieve the LZA configuration before reading files.",
+                next_steps="Call getLzaConfiguration() to retrieve the LZA configuration before reading files.",
             )
 
         # Validate path security
@@ -150,7 +150,7 @@ async def read_lza_config_file(ctx: Context, file_path: str) -> Dict[str, Any]:
                     f"Verify the file path is correct: {file_path}",
                     "Check that the file exists in the extracted configuration",
                     "List available files in the configuration directory",
-                    "Ensure getConfigurationFromS3() extracted all files successfully",
+                    "Ensure getLzaConfiguration() extracted all files successfully",
                 ],
                 context={
                     "file_path": file_path,
@@ -250,7 +250,7 @@ async def read_lza_config_file(ctx: Context, file_path: str) -> Dict[str, Any]:
                 "Check system logs for more details",
                 "Verify the configuration directory is accessible",
                 "Ensure sufficient system resources",
-                "Try calling getConfigurationFromS3() again",
+                "Try calling getLzaConfiguration() again",
             ],
             context={"file_path": file_path, "error_type": type(e).__name__},
             next_steps="Review the error and retry the operation.",

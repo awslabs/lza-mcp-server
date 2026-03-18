@@ -15,225 +15,168 @@
 """Unit tests for manage_config_tools module."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from awslabs.lza_mcp_server.tools.config.manage_config_tools import (
     register_config_tools,
 )
 
 
-class TestRegisterConfigTools:
-    """Test cases for register_config_tools function."""
+def _make_mock_server():
+    server = Mock()
+    registered_tools = {}
 
+    def mock_tool_decorator(name=None, description=None):
+        def decorator(func):
+            registered_tools[name] = {
+                "name": name,
+                "description": description,
+                "function": func,
+            }
+            return func
+
+        return decorator
+
+    server.tool = mock_tool_decorator
+    server.get_registered_tools = lambda: registered_tools
+    return server
+
+
+class TestRegisterConfigTools:
     @pytest.fixture
     def mock_mcp_server(self):
-        """Mock MCP server for tool registration."""
-        server = Mock()
-        registered_tools = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered_tools[name] = {
-                    "name": name,
-                    "description": description,
-                    "function": func,
-                }
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-        server.get_registered_tools = lambda: registered_tools
-        return server
+        return _make_mock_server()
 
     def test_register_config_tools_success(self, mock_mcp_server):
-        """Test successful registration of config tools."""
         register_config_tools(mock_mcp_server)
+        tools = mock_mcp_server.get_registered_tools()
 
-        registered_tools = mock_mcp_server.get_registered_tools()
+        assert "getMinimumConfiguration" in tools
+        assert "getLzaConfiguration" in tools
+        assert "putLzaConfiguration" in tools
 
-        # Verify all tools are registered
-        assert "getMinimumConfiguration" in registered_tools
-        assert "uploadConfigurationToS3" in registered_tools
-        assert "getConfigurationFromS3" in registered_tools
-
-        # Verify tool details
-        get_min_config = registered_tools["getMinimumConfiguration"]
-        assert get_min_config["name"] == "getMinimumConfiguration"
-        assert "minimal LZA configuration" in get_min_config["description"]
-
-        upload_config = registered_tools["uploadConfigurationToS3"]
-        assert upload_config["name"] == "uploadConfigurationToS3"
-        assert "Upload LZA configuration" in upload_config["description"]
-
-        retrieve_config = registered_tools["getConfigurationFromS3"]
-        assert retrieve_config["name"] == "getConfigurationFromS3"
-        assert "Retrieve current LZA configuration" in retrieve_config["description"]
+        assert (
+            "minimal LZA configuration"
+            in tools["getMinimumConfiguration"]["description"]
+        )
+        assert "qualifier" in tools["getLzaConfiguration"]["description"].lower()
+        assert "qualifier" in tools["putLzaConfiguration"]["description"].lower()
 
     @pytest.mark.asyncio
-    async def test_get_minimum_configuration_tool_wrapper(
+    async def test_get_minimum_configuration_wrapper(
         self, mock_mcp_server, mock_mcp_context
     ):
-        """Test getMinimumConfiguration tool wrapper."""
         register_config_tools(mock_mcp_server)
-        registered_tools = mock_mcp_server.get_registered_tools()
-
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
+        func = mock_mcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
             mock_tool.return_value = {"config_files": {}}
-
-            result = await get_min_config_func(mock_mcp_context)
-
-            # Verify the underlying tool was called
+            result = await func(mock_mcp_context)
             mock_tool.assert_called_once_with(mock_mcp_context, None, None)
             assert result == {"config_files": {}}
 
     @pytest.mark.asyncio
-    async def test_upload_configuration_to_s3_tool_wrapper(
+    async def test_get_minimum_configuration_with_params(
         self, mock_mcp_server, mock_mcp_context
     ):
-        """Test uploadConfigurationToS3 tool wrapper."""
         register_config_tools(mock_mcp_server)
-        registered_tools = mock_mcp_server.get_registered_tools()
-
-        upload_config_func = registered_tools["uploadConfigurationToS3"]["function"]
-
-        with patch(
-            "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_upload_configuration_to_s3"
-        ) as mock_tool:
-            mock_tool.return_value = {"status": "success"}
-
-            result = await upload_config_func(
-                mock_mcp_context, "/path/to/config", "my-bucket", False
-            )
-
-            # Verify the underlying tool was called with correct parameters
-            mock_tool.assert_called_once_with(
-                mock_mcp_context, "/path/to/config", "my-bucket", False
-            )
-            assert result == {"status": "success"}
-
-    @pytest.mark.asyncio
-    async def test_get_minimum_configuration_with_parameters(
-        self, mock_mcp_server, mock_mcp_context
-    ):
-        """Test getMinimumConfiguration with specific parameters."""
-        register_config_tools(mock_mcp_server)
-        registered_tools = mock_mcp_server.get_registered_tools()
-
-        get_min_config_func = registered_tools["getMinimumConfiguration"]["function"]
+        func = mock_mcp_server.get_registered_tools()["getMinimumConfiguration"][
+            "function"
+        ]
 
         with patch(
             "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_get_minimum_configuration"
         ) as mock_tool:
             mock_tool.return_value = {"config_files": {"accounts": {}}}
-
-            result = await get_min_config_func(
-                mock_mcp_context, "accounts", "/save/path"
-            )
-
-            # Verify parameters are passed correctly
+            await func(mock_mcp_context, "accounts", "/save/path")
             mock_tool.assert_called_once_with(
                 mock_mcp_context, "accounts", "/save/path"
             )
-            assert result == {"config_files": {"accounts": {}}}
 
     @pytest.mark.asyncio
-    async def test_upload_configuration_default_parameters(
+    async def test_get_lza_configuration_wrapper(
         self, mock_mcp_server, mock_mcp_context
     ):
-        """Test uploadConfigurationToS3 with default parameters."""
         register_config_tools(mock_mcp_server)
-        registered_tools = mock_mcp_server.get_registered_tools()
-
-        upload_config_func = registered_tools["uploadConfigurationToS3"]["function"]
 
         with patch(
-            "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_upload_configuration_to_s3"
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.LzaConfigRetrieval"
+        ) as mock_cls:
+            mock_instance = Mock()
+            mock_instance.get_configuration = AsyncMock(
+                return_value={"success": True, "file_count": 7}
+            )
+            mock_cls.return_value = mock_instance
+
+            # Re-register so the patched class is used
+            register_config_tools(mock_mcp_server)
+            func = mock_mcp_server.get_registered_tools()["getLzaConfiguration"][
+                "function"
+            ]
+
+            result = await func(mock_mcp_context, "container-dev-1", "my-bucket")
+            mock_instance.get_configuration.assert_called_once_with(
+                mock_mcp_context, "container-dev-1", "my-bucket"
+            )
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_lza_configuration_default_params(
+        self, mock_mcp_server, mock_mcp_context
+    ):
+        register_config_tools(mock_mcp_server)
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.LzaConfigRetrieval"
+        ) as mock_cls:
+            mock_instance = Mock()
+            mock_instance.get_configuration = AsyncMock(return_value={"success": True})
+            mock_cls.return_value = mock_instance
+
+            register_config_tools(mock_mcp_server)
+            func = mock_mcp_server.get_registered_tools()["getLzaConfiguration"][
+                "function"
+            ]
+
+            result = await func(mock_mcp_context)
+            mock_instance.get_configuration.assert_called_once_with(
+                mock_mcp_context, None, None
+            )
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_put_lza_configuration_wrapper(
+        self, mock_mcp_server, mock_mcp_context
+    ):
+        register_config_tools(mock_mcp_server)
+        func = mock_mcp_server.get_registered_tools()["putLzaConfiguration"]["function"]
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_put_lza_configuration"
         ) as mock_tool:
-            mock_tool.return_value = {"status": "success"}
-
-            result = await upload_config_func(mock_mcp_context)
-
-            # Verify default parameters are used
-            mock_tool.assert_called_once_with(mock_mcp_context, None, None, True)
-            assert result == {"status": "success"}
-
-    @pytest.mark.asyncio
-    async def test_get_configuration_from_s3_tool_wrapper(
-        self, mock_mcp_server, mock_mcp_context
-    ):
-        """Test getConfigurationFromS3 tool wrapper."""
-        from unittest.mock import AsyncMock
-
-        register_config_tools(mock_mcp_server)
-        registered_tools = mock_mcp_server.get_registered_tools()
-
-        get_config_func = registered_tools["getConfigurationFromS3"]["function"]
-
-        with patch(
-            "awslabs.lza_mcp_server.tools.config.manage_config_tools.S3ConfigRetrieval"
-        ) as mock_retrieval_class:
-            mock_instance = Mock()
-            mock_instance.get_configuration = AsyncMock(
-                return_value={
-                    "success": True,
-                    "temp_directory": "/tmp/lza-config-abc123",
-                    "file_count": 7,
-                }
+            mock_tool.return_value = {"success": True}
+            result = await func(
+                mock_mcp_context, "container-dev-1", "./config", "my-bucket", False
             )
-            mock_retrieval_class.return_value = mock_instance
-
-            # Re-register to use the mocked class
-            register_config_tools(mock_mcp_server)
-            registered_tools = mock_mcp_server.get_registered_tools()
-            get_config_func = registered_tools["getConfigurationFromS3"]["function"]
-
-            result = await get_config_func(mock_mcp_context, "my-bucket")
-
-            # Verify the underlying method was called
-            mock_instance.get_configuration.assert_called_once_with(
-                mock_mcp_context, "my-bucket"
+            mock_tool.assert_called_once_with(
+                mock_mcp_context, "container-dev-1", "./config", "my-bucket", False
             )
             assert result["success"] is True
-            assert result["temp_directory"] == "/tmp/lza-config-abc123"
 
     @pytest.mark.asyncio
-    async def test_get_configuration_default_bucket(
+    async def test_put_lza_configuration_default_params(
         self, mock_mcp_server, mock_mcp_context
     ):
-        """Test getConfigurationFromS3 with default bucket."""
-        from unittest.mock import AsyncMock
-
         register_config_tools(mock_mcp_server)
-        registered_tools = mock_mcp_server.get_registered_tools()
-
-        get_config_func = registered_tools["getConfigurationFromS3"]["function"]
+        func = mock_mcp_server.get_registered_tools()["putLzaConfiguration"]["function"]
 
         with patch(
-            "awslabs.lza_mcp_server.tools.config.manage_config_tools.S3ConfigRetrieval"
-        ) as mock_retrieval_class:
-            mock_instance = Mock()
-            mock_instance.get_configuration = AsyncMock(
-                return_value={
-                    "success": True,
-                    "temp_directory": "/tmp/lza-config-xyz789",
-                }
-            )
-            mock_retrieval_class.return_value = mock_instance
-
-            # Re-register to use the mocked class
-            register_config_tools(mock_mcp_server)
-            registered_tools = mock_mcp_server.get_registered_tools()
-            get_config_func = registered_tools["getConfigurationFromS3"]["function"]
-
-            result = await get_config_func(mock_mcp_context)
-
-            # Verify default bucket (None) is passed
-            mock_instance.get_configuration.assert_called_once_with(
-                mock_mcp_context, None
-            )
-            assert result["success"] is True
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.tool_put_lza_configuration"
+        ) as mock_tool:
+            mock_tool.return_value = {"success": True}
+            await func(mock_mcp_context)
+            mock_tool.assert_called_once_with(mock_mcp_context, None, None, None, True)

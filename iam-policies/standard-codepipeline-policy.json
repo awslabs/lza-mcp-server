@@ -1,0 +1,81 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "STSAccess",
+            "Effect": "Allow",
+            "Action": "sts:GetCallerIdentity",
+            "Resource": "*"
+        },
+        {
+            "Sid": "SSMAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter",
+                "ssm:GetParametersByPath"
+            ],
+            "Resource": "arn:${PARTITION}:ssm:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:parameter/accelerator/*"
+        },
+        {
+            "Sid": "SSMDescribeParameters",
+            "Effect": "Allow",
+            "Action": "ssm:DescribeParameters",
+            "Resource": "*"
+        },
+        {
+            "Sid": "S3WriteAccess",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-config-*/zipped/*"
+            ]
+        },
+        {
+            "Sid": "S3ListBucket",
+            "Effect": "Allow",
+            "Action": "s3:ListBucket",
+            "Resource": "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-config-*"
+        },
+        {
+            "Sid": "KMSEncryptionAccess",
+            "Effect": "Allow",
+            "Action": [
+                "kms:Decrypt",
+                "kms:GenerateDataKey"
+            ],
+            "Resource": "arn:${PARTITION}:kms:*:${MANAGEMENT_ACCOUNT}:key/*",
+            "Condition": {
+                "ForAnyValue:StringEquals": {
+                    "kms:ResourceAliases": "alias/accelerator/installer/kms/key"
+                }
+            }
+        },
+        {
+            "Sid": "PipelineAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codepipeline:GetPipeline",
+                "codepipeline:GetPipelineState",
+                "codepipeline:GetPipelineExecution",
+                "codepipeline:ListPipelineExecutions",
+                "codepipeline:StartPipelineExecution"
+            ],
+            "Resource": "arn:${PARTITION}:codepipeline:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${ACCELERATOR_PREFIX}-Pipeline"
+        },
+        {
+            "Sid": "CodeBuildAccess",
+            "Effect": "Allow",
+            "Action": "codebuild:BatchGetBuilds",
+            "Resource": "arn:${PARTITION}:codebuild:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:project/${ACCELERATOR_PREFIX}-*"
+        },
+        {
+            "Sid": "CloudWatchLogsAccess",
+            "Effect": "Allow",
+            "Action": "logs:GetLogEvents",
+            "Resource": "arn:${PARTITION}:logs:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:log-group:/aws/codebuild/${ACCELERATOR_PREFIX}-*:*"
+        }
+    ]
+}

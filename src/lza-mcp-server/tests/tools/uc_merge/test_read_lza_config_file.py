@@ -148,7 +148,7 @@ async def test_config_not_retrieved(mock_ctx, tmp_path, monkeypatch):
     assert result["success"] is False
     assert result["error_code"] == "CONFIG_NOT_RETRIEVED"
     assert result["category"] == ErrorCategory.CONFIGURATION
-    assert "getConfigurationFromS3" in result["error"]
+    assert "getLzaConfiguration" in result["error"]
     assert "troubleshooting" in result
 
 

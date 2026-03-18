@@ -16,8 +16,8 @@
 
 import pytest
 
-from awslabs.lza_mcp_server.tools.pipeline.get_pipeline_status import (
-    tool_get_pipeline_status,
+from awslabs.lza_mcp_server.tools.pipeline.get_deployment_status import (
+    tool_get_deployment_status,
 )
 
 
@@ -27,7 +27,7 @@ class TestPipelineStatusValidation:
     @pytest.mark.asyncio
     async def test_invalid_pipeline_name_empty(self, mock_mcp_context):
         """Test with empty pipeline name."""
-        result = await tool_get_pipeline_status(mock_mcp_context, pipeline_name="")
+        result = await tool_get_deployment_status(mock_mcp_context, pipeline_name="")
 
         assert result["success"] is False
         assert "Invalid pipeline name" in result["error"]
@@ -37,7 +37,7 @@ class TestPipelineStatusValidation:
     async def test_invalid_pipeline_name_too_long(self, mock_mcp_context):
         """Test with pipeline name exceeding max length."""
         long_name = "a" * 101
-        result = await tool_get_pipeline_status(
+        result = await tool_get_deployment_status(
             mock_mcp_context, pipeline_name=long_name
         )
 
@@ -47,7 +47,7 @@ class TestPipelineStatusValidation:
     @pytest.mark.asyncio
     async def test_invalid_pipeline_name_special_chars(self, mock_mcp_context):
         """Test with pipeline name containing invalid characters."""
-        result = await tool_get_pipeline_status(
+        result = await tool_get_deployment_status(
             mock_mcp_context, pipeline_name="pipeline with spaces"
         )
 
@@ -57,7 +57,7 @@ class TestPipelineStatusValidation:
     @pytest.mark.asyncio
     async def test_invalid_execution_id_format(self, mock_mcp_context):
         """Test with invalid execution ID format."""
-        result = await tool_get_pipeline_status(
+        result = await tool_get_deployment_status(
             mock_mcp_context,
             pipeline_name="test-pipeline",
             execution_id="invalid-format",
@@ -69,7 +69,7 @@ class TestPipelineStatusValidation:
     @pytest.mark.asyncio
     async def test_invalid_execution_id_empty(self, mock_mcp_context):
         """Test with empty execution ID."""
-        result = await tool_get_pipeline_status(
+        result = await tool_get_deployment_status(
             mock_mcp_context, pipeline_name="test-pipeline", execution_id=""
         )
 

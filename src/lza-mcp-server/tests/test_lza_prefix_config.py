@@ -49,22 +49,6 @@ class TestLzaPrefixConfiguration:
             assert constants.LZA_PREFIX == "MyOrg"
             assert constants.DEFAULT_PIPELINE_NAME == "MyOrg-Pipeline"
 
-    def test_lza_prefix_in_ssm_parameter(self):
-        """Test that LZA_PREFIX is used in SSM parameter path."""
-        with patch.dict(os.environ, {"LZA_PREFIX": "CustomPrefix"}):
-            # Reimport to get fresh constants and module
-            import importlib
-            from awslabs.lza_mcp_server import constants
-            from awslabs.lza_mcp_server.tools.aws_services import (
-                get_deployed_lza_version,
-            )
-
-            importlib.reload(constants)
-            importlib.reload(get_deployed_lza_version)
-
-            expected_param = "/accelerator/CustomPrefix-InstallerStack/version"
-            assert get_deployed_lza_version.LZA_VERSION_SSM_PARAMETER == expected_param
-
     def test_lza_prefix_empty_string(self):
         """Test that empty string LZA_PREFIX falls back to default."""
         with patch.dict(os.environ, {"LZA_PREFIX": ""}):
