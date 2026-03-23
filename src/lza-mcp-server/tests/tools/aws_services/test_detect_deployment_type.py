@@ -17,7 +17,12 @@
 from unittest.mock import MagicMock
 
 import pytest
-from botocore.exceptions import ClientError, EndpointResolutionError
+from botocore.exceptions import (
+    ClientError,
+    ConnectionError as BotocoreConnectionError,
+    EndpointConnectionError,
+    EndpointResolutionError,
+)
 
 from awslabs.lza_mcp_server.tools.aws_services.detect_deployment_type import (
     DEPLOYMENT_TYPE_EXTERNAL_PIPELINE,
@@ -161,6 +166,43 @@ class TestDetectRunnerForQualifier:
         session = self._mock_session(cp_pipelines=["CONTAINER-DEV-1-Pipeline"])
         result = _detect_runner_for_qualifier(session, "container-dev-1", "us-east-1")
         assert result == RUNNER_CODEPIPELINE
+
+    def test_codepipeline_endpoint_connection_error_falls_through_to_ecs(self):
+        """ESC regions where CodePipeline doesn't exist raise EndpointConnectionError."""
+        session = self._mock_session(
+            cp_error=EndpointConnectionError(
+                endpoint_url="https://codepipeline.eusc-de-east-1.amazonaws.eu/"
+            ),
+            ecs_clusters=[
+                "arn:aws:ecs:eusc-de-east-1:123:cluster/my-qualifier-cluster"
+            ],
+        )
+        result = _detect_runner_for_qualifier(session, "my-qualifier", "eusc-de-east-1")
+        assert result == RUNNER_ECS_CONTAINER
+
+    def test_codepipeline_botocore_connection_error_falls_through_to_ecs(self):
+        """Generic botocore ConnectionError also falls through gracefully."""
+        session = self._mock_session(
+            cp_error=BotocoreConnectionError(error="Connection refused"),
+            ecs_clusters=[
+                "arn:aws:ecs:eusc-de-east-1:123:cluster/my-qualifier-cluster"
+            ],
+        )
+        result = _detect_runner_for_qualifier(session, "my-qualifier", "eusc-de-east-1")
+        assert result == RUNNER_ECS_CONTAINER
+
+    def test_both_services_endpoint_connection_error_returns_unknown(self):
+        """When both services are unavailable in the region, return unknown."""
+        session = self._mock_session(
+            cp_error=EndpointConnectionError(
+                endpoint_url="https://codepipeline.eusc-de-east-1.amazonaws.eu/"
+            ),
+            ecs_error=EndpointConnectionError(
+                endpoint_url="https://ecs.eusc-de-east-1.amazonaws.eu/"
+            ),
+        )
+        result = _detect_runner_for_qualifier(session, "my-qualifier", "eusc-de-east-1")
+        assert result == RUNNER_UNKNOWN
 
 
 # ---------------------------------------------------------------------------

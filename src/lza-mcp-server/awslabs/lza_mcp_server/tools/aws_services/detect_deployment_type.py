@@ -19,7 +19,12 @@ import re
 from typing import Any, Dict, List, Optional
 
 import boto3
-from botocore.exceptions import ClientError, EndpointResolutionError
+from botocore.exceptions import (
+    ClientError,
+    ConnectionError as BotocoreConnectionError,
+    EndpointConnectionError,
+    EndpointResolutionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +89,13 @@ def _detect_runner_for_qualifier(
                     )
                     return RUNNER_CODEPIPELINE
         logger.info("No CodePipeline pipelines found for qualifier '%s'", qualifier)
-    except (ClientError, EndpointResolutionError) as e:
-        # CodePipeline may not be available in all regions — treat as inconclusive
+    except (
+        ClientError,
+        EndpointResolutionError,
+        EndpointConnectionError,
+        BotocoreConnectionError,
+    ) as e:
+        # CodePipeline may not be available in all regions/partitions (e.g. ESC) — treat as inconclusive
         logger.info(
             "CodePipeline check inconclusive for qualifier '%s': %s", qualifier, str(e)
         )
@@ -106,7 +116,12 @@ def _detect_runner_for_qualifier(
                     )
                     return RUNNER_ECS_CONTAINER
         logger.info("No ECS clusters found for qualifier '%s'", qualifier)
-    except (ClientError, EndpointResolutionError) as e:
+    except (
+        ClientError,
+        EndpointResolutionError,
+        EndpointConnectionError,
+        BotocoreConnectionError,
+    ) as e:
         logger.info("ECS check inconclusive for qualifier '%s': %s", qualifier, str(e))
 
     return RUNNER_UNKNOWN
