@@ -169,7 +169,8 @@ You can customize the MCP server behavior by adding environment variables to the
   "AWS_PROFILE": "<YOUR_AWS_PROFILE>",
   "AWS_REGION": "<YOUR_AWS_REGION>",
   "LZA_PREFIX": "AWSAccelerator",
-  "LOG_INSTRUCTIONS": "false"
+  "LOG_INSTRUCTIONS": "false",
+  "DISABLE_LLM_GUIDANCE": "false"
 }
 ```
 
@@ -185,6 +186,11 @@ You can customize the MCP server behavior by adding environment variables to the
   - Set to `true`, `1`, or `yes` to enable instruction logging
   - Useful for debugging or understanding what instructions are provided to the AI model
   - Instructions are logged at INFO level and include all guidance provided to the model
+- `DISABLE_LLM_GUIDANCE`: Disable LLM guidance in tool responses and server instructions (default: `false`)
+  - Set to `true` to strip guidance keys (`llm_instructions`, `next_steps`, `hint`, `required_action`, `instructions_for_assistant`, `example`, `troubleshooting`, `usage_hint`) from all tool responses
+  - Also disables the server-level `instructions` passed to `FastMCP`, returning an empty string
+  - Designed for deployments where an external entity owns workflow orchestration outside of the LZA MCP Server
+  - When disabled, tool responses contain only operational data (`success`, `error`, `data`, etc.)
 
 >**Note:** The [credential extraction script](#3-configure-aws-credentials) requires your AWS CLI profile to be ready for use. Complete any profile-specific prerequisites before starting your LZA MCP server (e.g., `aws sso login` for IAM Identity Center profiles).
 
@@ -377,6 +383,7 @@ These flags mitigate container escape vulnerabilities. Keep Docker/Finch updated
 | `FASTMCP_LOG_LEVEL` | Logging verbosity | `INFO`, `DEBUG` |
 | `ENABLE_UC_MERGE` | Enable Universal Configuration merge tools | `false` (default), `true` |
 | `LOG_INSTRUCTIONS` | Log MCP server instructions at startup | `false` (default), `true` |
+| `DISABLE_LLM_GUIDANCE` | Strip LLM guidance keys from tool responses and disable server instructions. Use when an external entity owns workflow orchestration outside of the LZA MCP Server | `false` (default), `true` |
 
 **Note:** Setting `ENABLE_UC_MERGE=true` enables 9 additional tools for UC merge workflows but consumes more of the available context window. Only enable this when you need UC merge functionality to keep context usage efficient.
 

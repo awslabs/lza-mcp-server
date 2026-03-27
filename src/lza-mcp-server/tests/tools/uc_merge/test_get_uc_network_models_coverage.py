@@ -176,3 +176,42 @@ class TestGetUCNetworkModelsCoverage:
         assert "scripts" not in result["available_models"]
         assert ".git" not in result["available_models"]
         assert ".github" not in result["available_models"]
+
+    @pytest.mark.asyncio
+    async def test_path_traversal_in_uc_release(self, mock_context):
+        """Test that path traversal sequences in uc_release are rejected.
+
+        Covers lines 96-98: path traversal detection
+        """
+        result = await tool_get_uc_network_models(mock_context, "../etc/passwd")
+
+        assert result["success"] is False
+        assert result["error_code"] == "PATH_TRAVERSAL_DETECTED"
+        assert "path traversal" in result["error"].lower()
+        assert "next_steps" in result
+
+    @pytest.mark.asyncio
+    async def test_release_not_found_uc_base_does_not_exist(
+        self, mock_context, tmp_path
+    ):
+        """Test error when release not found and uc_base itself doesn't exist.
+
+        Covers branch 118->123: uc_base.exists() is False so available_releases stays []
+        """
+        nonexistent = tmp_path / "no-such-uc-base"
+        # Don't create it
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models.common.get_uc_release_path",
+            return_value=nonexistent / "v1.0.0",
+        ):
+            with patch(
+                "awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models.common.get_uc_base_path",
+                return_value=nonexistent,
+            ):
+                result = await tool_get_uc_network_models(mock_context, "v1.0.0")
+
+        assert result["success"] is False
+        assert result["error_code"] == "UC_RELEASE_NOT_FOUND"
+        assert result["context"]["available_releases"] == []
+        assert "Contact administrator" in result["next_steps"]

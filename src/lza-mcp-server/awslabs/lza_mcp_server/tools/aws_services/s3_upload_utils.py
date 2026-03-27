@@ -200,20 +200,14 @@ class S3UploadUtils:
         ctx: Context,
         config_path: Optional[str] = None,
         bucket_name: Optional[str] = None,
-        offer_pipeline_release: bool = True,
     ) -> Dict[str, Any]:
         """
         Upload validated LZA configuration to S3 bucket.
-
-        This method integrates with existing AWS connectivity and session management
-        to provide a seamless upload experience. It reuses configuration discovery
-        functionality from the validation workflow.
 
         Args:
             ctx: MCP context
             config_path: Optional path to configuration folder
             bucket_name: Optional custom bucket name
-            offer_pipeline_release: Whether to offer pipeline release after upload
 
         Returns:
             Upload result with success status and details
@@ -354,14 +348,18 @@ class S3UploadUtils:
                     "upload_size": upload_result["file_size"],
                 }
 
-                # Step 8: Offer pipeline release if requested
-                if offer_pipeline_release:
-                    await ctx.info("")
-                    await ctx.info("✅ Configuration uploaded successfully!")
-                    await ctx.info(
-                        "🚀 Use 'startDeployment' to deploy the configuration"
-                    )
-                    final_result["pipeline_release_offered"] = True
+                # Step 8: Prepare final success response
+                final_result = {
+                    "success": True,
+                    "message": "Configuration successfully uploaded to S3",
+                    "aws_context": aws_context,
+                    "config_discovery": config_result,
+                    "bucket_name": bucket_name,
+                    "zip_creation": zip_result,
+                    "s3_upload": upload_result,
+                    "s3_location": f"s3://{bucket_name}/{S3_OBJECT_KEY}",
+                    "upload_size": upload_result["file_size"],
+                }
 
                 return final_result
 
@@ -399,7 +397,6 @@ class S3UploadUtils:
                 context={
                     "config_path": config_path,
                     "bucket_name": bucket_name,
-                    "offer_pipeline_release": offer_pipeline_release,
                     "operation": "upload_configuration",
                     "error_type": type(e).__name__,
                 },

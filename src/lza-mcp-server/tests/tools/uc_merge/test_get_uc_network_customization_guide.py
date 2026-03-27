@@ -143,7 +143,7 @@ class TestGetUcNetworkCustomizationGuide:
                     return False, "Session ID cannot be empty"
                 return (
                     False,
-                    f"Session '{session_id}' does not exist. Start a session first with start_uc_merge_session()",
+                    f"Session '{session_id}' does not exist",
                 )
 
         guide_module.SessionManager = MockSessionManager
@@ -175,7 +175,7 @@ class TestGetUcNetworkCustomizationGuide:
             def validate_session(self, session_id):
                 return (
                     False,
-                    f"Session '{session_id}' does not exist. Start a session first with start_uc_merge_session()",
+                    f"Session '{session_id}' does not exist",
                 )
 
         guide_module.SessionManager = MockSessionManager
@@ -328,3 +328,54 @@ class TestGetUcNetworkCustomizationGuide:
             assert "next_steps" in result
         finally:
             guide_module.SessionManager = original_session_manager
+
+    def test_error_when_metadata_missing_network_model(self, tmp_path):
+        """Test error when session metadata exists but lacks network_model key."""
+        session_id = "uc-session-20250127-143022"
+        session_path = tmp_path / session_id
+        session_path.mkdir(parents=True)
+
+        # Metadata without network_model
+        import json as _json
+
+        metadata_file = session_path / ".session_metadata.json"
+        with open(metadata_file, "w") as f:
+            _json.dump({"session_id": session_id, "uc_release": "v1.0.0"}, f)
+
+        from awslabs.lza_mcp_server.tools.uc_merge import (
+            get_uc_network_customization_guide as guide_module,
+        )
+
+        original = guide_module.SessionManager
+
+        class MockSessionManager:
+            def __init__(self):
+                self.base_session_dir = tmp_path
+
+            def get_session_path(self, sid):
+                return tmp_path / sid
+
+            def validate_session(self, sid):
+                return True, ""
+
+            def load_session_metadata(self, sid):
+                p = tmp_path / sid / ".session_metadata.json"
+                if not p.exists():
+                    return None
+                with open(p) as f:
+                    return _json.load(f)
+
+        guide_module.SessionManager = MockSessionManager
+        try:
+            result = get_uc_network_customization_guide(session_id)
+            assert result["success"] is False
+            assert result["error_code"] == "INVALID_SESSION_METADATA"
+        finally:
+            guide_module.SessionManager = original
+
+    def test_scan_configuration_files_nonexistent_path(self, tmp_path):
+        """_scan_configuration_files returns empty lists for nonexistent path."""
+        result = _scan_configuration_files(tmp_path / "does-not-exist")
+        assert result["config_files"] == []
+        assert result["policy_directories"] == []
+        assert result["supporting_directories"] == []

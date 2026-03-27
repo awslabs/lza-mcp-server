@@ -157,7 +157,7 @@ class SessionManager:
         if not self.session_exists(session_id):
             return (
                 False,
-                f"Session '{session_id}' does not exist. Start a session first with start_uc_merge_session()",
+                f"Session '{session_id}' does not exist",
             )
 
         # Check if metadata exists

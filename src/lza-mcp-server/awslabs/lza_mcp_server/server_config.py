@@ -17,6 +17,7 @@
 import logging
 import os
 
+from awslabs.lza_mcp_server.utils.guidance_toggle import is_guidance_disabled
 from awslabs.lza_mcp_server.utils.load_instruction_content import (
     load_instruction_content,
 )
@@ -89,6 +90,9 @@ def build_instructions(include_uc_merge: bool = None) -> str:
     """
     if include_uc_merge is None:
         include_uc_merge = is_uc_merge_enabled()
+
+    if is_guidance_disabled():
+        return ""
 
     instructions = get_base_instructions()
 

@@ -91,7 +91,7 @@ dependency-audit:
   stage: security
   script:
     - echo "🔒 Running dependency vulnerability scan..."
-    - poetry run pip-audit
+    - poetry run pip-audit --ignore-vuln CVE-2026-4539 # No fix version available yet. Remove --ignore-vuln once pygments releases a patch.
   artifacts:
     when: on_failure
     expire_in: 1 week
@@ -110,7 +110,7 @@ test-coverage:
         --cov-report=term-missing \
         --cov-report=xml \
         --cov-branch \
-        --cov-fail-under=59 \
+        --cov-fail-under=97 \
         --tb=short
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:

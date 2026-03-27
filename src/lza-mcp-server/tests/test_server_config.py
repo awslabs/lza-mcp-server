@@ -335,6 +335,20 @@ class TestBuildInstructions:
         # Logged content should include the instructions
         assert result in caplog.text
 
+    def test_guidance_disabled_returns_empty_string(self, monkeypatch):
+        """When DISABLE_LLM_GUIDANCE=true, build_instructions returns empty string."""
+        monkeypatch.setenv("DISABLE_LLM_GUIDANCE", "true")
+        monkeypatch.delenv("ENABLE_UC_MERGE", raising=False)
+        result = build_instructions()
+        assert result == ""
+
+    def test_guidance_disabled_with_uc_merge_still_empty(self, monkeypatch):
+        """Guidance disabled takes precedence even when UC merge is enabled."""
+        monkeypatch.setenv("DISABLE_LLM_GUIDANCE", "true")
+        monkeypatch.setenv("ENABLE_UC_MERGE", "true")
+        result = build_instructions()
+        assert result == ""
+
     def test_logging_with_uc_merge(self, monkeypatch, caplog):
         """Test instruction logging includes UC Merge when enabled."""
         monkeypatch.setenv("LOG_INSTRUCTIONS", "true")

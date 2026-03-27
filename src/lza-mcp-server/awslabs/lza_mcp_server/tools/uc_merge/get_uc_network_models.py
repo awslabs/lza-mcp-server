@@ -91,6 +91,21 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
             "next_steps": "Call get_uc_releases() to discover available UC release versions",
         }
 
+    # Reject path traversal attempts
+    if ".." in uc_release:
+        error_msg = f"Invalid uc_release: path traversal detected in '{uc_release}'"
+        await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg,
+            "error_code": "PATH_TRAVERSAL_DETECTED",
+            "troubleshooting": [
+                "UC release must not contain path traversal sequences (..)",
+                "Call get_uc_releases() first to discover available releases",
+            ],
+            "next_steps": "Call get_uc_releases() to discover available UC release versions",
+        }
+
     try:
         # Get the release directory path
         release_path = common.get_uc_release_path(uc_release)

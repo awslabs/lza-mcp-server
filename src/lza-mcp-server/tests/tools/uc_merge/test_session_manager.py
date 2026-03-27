@@ -274,7 +274,6 @@ class TestSessionManager:
 
         assert is_valid is False
         assert "does not exist" in error_msg
-        assert "start_uc_merge_session" in error_msg
 
     def test_validate_session_missing_metadata(self, session_manager):
         """Test validation fails when metadata is missing."""
@@ -579,3 +578,58 @@ class TestSessionManager:
         metadata_values = [s["metadata"] for s in sessions]
         assert None in metadata_values
         assert any(m is not None for m in metadata_values)
+
+
+@pytest.mark.unit
+@pytest.mark.uc_merge
+class TestSessionManagerDefaultInit:
+    """Tests for SessionManager default initialization (no base_session_dir)."""
+
+    def test_default_init_uses_common_path(self, tmp_path):
+        """SessionManager with no args calls get_lza_config_base_path()."""
+        with patch(
+            "awslabs.lza_mcp_server.tools.uc_merge.session_manager.SessionManager.__init__",
+            wraps=None,
+        ):
+            pass  # just ensure import works
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.uc_merge.common.get_lza_config_base_path",
+            return_value=tmp_path,
+        ):
+            mgr = SessionManager()
+            assert mgr.base_session_dir == tmp_path
+
+    def test_cleanup_when_base_dir_does_not_exist(self, tmp_path):
+        """cleanup_previous_sessions returns 0 when base dir doesn't exist."""
+        mgr = SessionManager(base_session_dir=tmp_path / "nonexistent")
+        # The __init__ creates it, so delete it to simulate missing dir
+        import shutil as _shutil
+
+        _shutil.rmtree(str(tmp_path / "nonexistent"))
+        result = mgr.cleanup_previous_sessions()
+        assert result == 0
+
+    def test_list_sessions_when_base_dir_does_not_exist(self, tmp_path):
+        """list_sessions returns [] when base dir doesn't exist."""
+        mgr = SessionManager(base_session_dir=tmp_path / "nonexistent")
+        import shutil as _shutil
+
+        _shutil.rmtree(str(tmp_path / "nonexistent"))
+        result = mgr.list_sessions()
+        assert result == []
+
+    def test_cleanup_skips_non_dir_items(self, tmp_path):
+        """cleanup_previous_sessions skips files (non-directories)."""
+        mgr = SessionManager(base_session_dir=tmp_path)
+        # Create a file that starts with uc-session- (edge case)
+        (tmp_path / "uc-session-file.txt").write_text("not a dir")
+        result = mgr.cleanup_previous_sessions()
+        assert result == 0
+
+    def test_list_sessions_skips_non_dir_items(self, tmp_path):
+        """list_sessions skips files (non-directories)."""
+        mgr = SessionManager(base_session_dir=tmp_path)
+        (tmp_path / "uc-session-file.txt").write_text("not a dir")
+        result = mgr.list_sessions()
+        assert result == []
