@@ -22,6 +22,9 @@ from mcp.server.fastmcp import Context
 from .get_full_schema import tool_get_full_schema
 from .search_json_schema import tool_search_json_schema
 from .list_lza_versions import tool_list_lza_supported_versions
+from awslabs.lza_mcp_server.utils.guidance_toggle import strip_llm_guidance
+from awslabs.lza_mcp_server.utils.guidance_toggle import tool_description
+from .descriptions import DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ def register_schema_tools(mcp):
 
     @mcp.tool(
         name="searchJsonSchema",
-        description="Search through LZA JSON schemas to find specific properties and configurations. Searches ACROSS ALL SCHEMAS for the specified version. For schema-specific queries, use getFullSchema instead. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
+        description=tool_description(**DESCRIPTIONS["searchJsonSchema"]),
     )  # nosemgrep: useless-inner-function
     async def search_json_schema(
         ctx: Context,
@@ -44,21 +47,23 @@ def register_schema_tools(mcp):
         filters: Optional[Dict] = None,
         format_level: str = "standard",
     ) -> Dict[str, Any]:
-        return await tool_search_json_schema(
-            ctx,
-            lza_version,
-            search_terms,
-            search_type,
-            max_results,
-            include_metadata,
-            include_schema,
-            filters,
-            format_level,
+        return strip_llm_guidance(
+            await tool_search_json_schema(
+                ctx,
+                lza_version,
+                search_terms,
+                search_type,
+                max_results,
+                include_metadata,
+                include_schema,
+                filters,
+                format_level,
+            )
         )
 
     @mcp.tool(
         name="getFullSchema",
-        description="Retrieve complete LZA configuration JSON schemas with optional property filtering. Use this for schema-specific queries with the schema_path parameter. TIP: Use getDeployedLzaVersion first to get the correct lza_version parameter for your environment.",
+        description=tool_description(**DESCRIPTIONS["getFullSchema"]),
     )  # nosemgrep: useless-inner-function
     async def get_full_schema(
         ctx: Context,
@@ -67,19 +72,21 @@ def register_schema_tools(mcp):
         property_path: Optional[str] = None,
         include_metadata: bool = True,
     ) -> Dict[str, Any]:
-        return await tool_get_full_schema(
-            ctx,
-            lza_version,
-            schema_path,
-            property_path,
-            include_metadata,
+        return strip_llm_guidance(
+            await tool_get_full_schema(
+                ctx,
+                lza_version,
+                schema_path,
+                property_path,
+                include_metadata,
+            )
         )
 
     @mcp.tool(
         name="listLzaSupportedVersions",
-        description="List all supported LZA versions with their schema information",
+        description=tool_description(**DESCRIPTIONS["listLzaSupportedVersions"]),
     )  # nosemgrep: useless-inner-function
     async def list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
-        return await tool_list_lza_supported_versions(ctx)
+        return strip_llm_guidance(await tool_list_lza_supported_versions(ctx))
 
     logger.info("Schema tools registered successfully")

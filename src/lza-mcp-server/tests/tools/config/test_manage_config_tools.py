@@ -160,10 +160,10 @@ class TestRegisterConfigTools:
         ) as mock_tool:
             mock_tool.return_value = {"success": True}
             result = await func(
-                mock_mcp_context, "container-dev-1", "./config", "my-bucket", False
+                mock_mcp_context, "container-dev-1", "./config", "my-bucket"
             )
             mock_tool.assert_called_once_with(
-                mock_mcp_context, "container-dev-1", "./config", "my-bucket", False
+                mock_mcp_context, "container-dev-1", "./config", "my-bucket"
             )
             assert result["success"] is True
 
@@ -179,4 +179,78 @@ class TestRegisterConfigTools:
         ) as mock_tool:
             mock_tool.return_value = {"success": True}
             await func(mock_mcp_context)
-            mock_tool.assert_called_once_with(mock_mcp_context, None, None, None, True)
+            mock_tool.assert_called_once_with(mock_mcp_context, None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_read_lza_config_file_wrapper(
+        self, mock_mcp_server, mock_mcp_context
+    ):
+        """readLzaConfigFile wrapper calls read_lza_config_file and applies strip_llm_guidance."""
+        register_config_tools(mock_mcp_server)
+        func = mock_mcp_server.get_registered_tools()["readLzaConfigFile"]["function"]
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.read_lza_config_file"
+        ) as mock_tool:
+            mock_tool.return_value = {
+                "success": True,
+                "content": "data",
+                "next_steps": "do this",
+            }
+            result = await func(mock_mcp_context, "accounts-config.yaml")
+            mock_tool.assert_called_once_with(mock_mcp_context, "accounts-config.yaml")
+            # guidance not stripped when env var not set
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_lza_config_file_wrapper(
+        self, mock_mcp_server, mock_mcp_context
+    ):
+        """updateLzaConfigFile wrapper calls update_lza_config_file and applies strip_llm_guidance."""
+        register_config_tools(mock_mcp_server)
+        func = mock_mcp_server.get_registered_tools()["updateLzaConfigFile"]["function"]
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.update_lza_config_file"
+        ) as mock_tool:
+            mock_tool.return_value = {"success": True, "next_steps": "do this"}
+            result = await func(
+                mock_mcp_context,
+                "network-config.yaml",
+                {"vpcs[0].vpcName": "prod"},
+            )
+            mock_tool.assert_called_once_with(
+                mock_mcp_context,
+                "network-config.yaml",
+                {"vpcs[0].vpcName": "prod"},
+                None,
+                None,
+                None,
+            )
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_create_lza_config_file_wrapper(
+        self, mock_mcp_server, mock_mcp_context
+    ):
+        """createLzaConfigFile wrapper calls create_lza_config_file and applies strip_llm_guidance."""
+        register_config_tools(mock_mcp_server)
+        func = mock_mcp_server.get_registered_tools()["createLzaConfigFile"]["function"]
+
+        with patch(
+            "awslabs.lza_mcp_server.tools.config.manage_config_tools.create_lza_config_file"
+        ) as mock_tool:
+            mock_tool.return_value = {"success": True, "next_steps": "do this"}
+            result = await func(
+                mock_mcp_context,
+                "iam-policies/policy.json",
+                {"Version": "2012-10-17", "Statement": []},
+            )
+            mock_tool.assert_called_once_with(
+                mock_mcp_context,
+                "iam-policies/policy.json",
+                {"Version": "2012-10-17", "Statement": []},
+                False,
+                None,
+            )
+            assert result["success"] is True

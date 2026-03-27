@@ -29,7 +29,7 @@ class TestToolRegistration:
     def mock_mcp(self):
         """Create a mock MCP server instance."""
         mcp = Mock()
-        mcp.tool = Mock(side_effect=lambda: lambda func: func)
+        mcp.tool = Mock(side_effect=lambda **kwargs: lambda func: func)
         return mcp
 
     def test_register_uc_merge_tools_basic(self, mock_mcp):
@@ -58,7 +58,7 @@ class TestToolFunctionWrappers:
         """Create a mock MCP server that captures registered functions."""
         registered_tools = {}
 
-        def tool_decorator():
+        def tool_decorator(**kwargs):
             def wrapper(func):
                 # Extract function name from the decorated function
                 registered_tools[func.__name__] = func
@@ -241,7 +241,7 @@ class TestToolRegistrationEdgeCases:
     def test_register_uc_merge_tools_multiple_times(self):
         """Test registering tools multiple times."""
         mock_mcp = Mock()
-        mock_mcp.tool = Mock(side_effect=lambda: lambda func: func)
+        mock_mcp.tool = Mock(side_effect=lambda **kwargs: lambda func: func)
 
         register_uc_merge_tools(mock_mcp)
         first_call_count = mock_mcp.tool.call_count
@@ -262,7 +262,7 @@ class TestToolRegistrationEdgeCases:
         """Test that registered functions preserve their names."""
         registered_tools = {}
 
-        def tool_decorator():
+        def tool_decorator(**kwargs):
             def wrapper(func):
                 registered_tools[func.__name__] = func
                 return func
@@ -303,7 +303,7 @@ class TestToolRegistrationIntegration:
                 self.tools = {}
                 self.tool_call_count = 0
 
-            def tool(self):
+            def tool(self, **kwargs):
                 self.tool_call_count += 1
 
                 def decorator(func):

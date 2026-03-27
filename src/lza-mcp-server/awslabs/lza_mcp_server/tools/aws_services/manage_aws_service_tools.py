@@ -24,6 +24,11 @@ from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
 from awslabs.lza_mcp_server.tools.aws_services.detect_deployment_version import (
     tool_get_deployed_lza_version,
 )
+from awslabs.lza_mcp_server.utils.guidance_toggle import (
+    strip_llm_guidance,
+    tool_description,
+)
+from .descriptions import DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +38,16 @@ def register_aws_tools(mcp):
 
     @mcp.tool(
         name="checkAwsConnectivity",
-        description="Verify AWS credentials and connectivity to ensure proper access to AWS services",
+        description=tool_description(**DESCRIPTIONS["checkAwsConnectivity"]),
     )
     async def check_aws_connectivity(ctx: Context) -> Dict[str, Any]:
-        return await tool_check_aws_connectivity(ctx)
+        return strip_llm_guidance(await tool_check_aws_connectivity(ctx))
 
     @mcp.tool(
         name="getDeployedLzaVersion",
-        description="Get the currently deployed LZA version from the environment by reading the SSM parameter",
+        description=tool_description(**DESCRIPTIONS["getDeployedLzaVersion"]),
     )
     async def get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
-        return await tool_get_deployed_lza_version(ctx)
+        return strip_llm_guidance(await tool_get_deployed_lza_version(ctx))
 
     logger.info("AWS tools registered successfully")

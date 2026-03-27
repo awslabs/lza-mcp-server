@@ -74,7 +74,9 @@ py-compile:
 # Complete pre-commit verification pipeline
 release: clean-cache clean-lock update-deps py-compile format lint type-check security-check test-coverage
 	@echo "🔒 Running dependency vulnerability scan..."
-	@poetry run pip-audit
+	# TEMPORARY: ignoring CVE-2026-4539 in pygments 2.19.2 (transitive dep via pytest/rich).
+	# No fix version available yet. Remove --ignore-vuln once pygments releases a patch.
+	@poetry run pip-audit --ignore-vuln CVE-2026-4539
 	@echo "✅ Release verification complete - ready for code review!"
 	@echo ""
 	@echo "📋 Verification Summary:"
@@ -85,7 +87,7 @@ release: clean-cache clean-lock update-deps py-compile format lint type-check se
 	@echo "  ✓ Type checking passed"
 	@echo "  ✓ Security analysis passed"
 	@echo "  ✓ Dependency vulnerabilities checked"
-	@echo "  ✓ All tests passed with coverage ≥59%"
+	@echo "  ✓ All tests passed with coverage ≥97%"
 	@echo ""
 	@echo "🚀 Your code is ready for review!"
 
@@ -136,7 +138,7 @@ lint:
 # Type checking
 type-check:
 	@echo "🔬 Running type checks with mypy..."
-	@poetry run mypy awslabs/ --ignore-missing-imports --no-strict-optional
+	@poetry run mypy awslabs/
 	@echo "✅ Type checking complete"
 
 # Security analysis
@@ -210,7 +212,7 @@ test-coverage:
 		--cov-report=term-missing \
 		--cov-report=xml \
 		--cov-branch \
-		--cov-fail-under=59 \
+		--cov-fail-under=97 \
 		-n auto \
 		--dist=worksteal \
 		--tb=short

@@ -300,14 +300,14 @@ class TestResolve:
 
 
 # ---------------------------------------------------------------
-# Auto-detect + offer_pipeline_release
+# Auto-detect
 # ---------------------------------------------------------------
 
 
 class TestAutoDetect:
     @pytest.mark.asyncio
     @pytest.mark.unit
-    async def test_auto_detect_with_pipeline_release(self, ctx, tmp_path):
+    async def test_auto_detect_uploads_successfully(self, ctx, tmp_path):
         d = tmp_path / "cfg"
         d.mkdir()
         (d / "accounts-config.yaml").write_text("a")
@@ -323,59 +323,8 @@ class TestAutoDetect:
                     new_callable=AsyncMock,
                 ) as mock_upload:
                     mock_upload.return_value = {"success": True}
-                    result = await tool_put_lza_configuration(
-                        ctx, offer_pipeline_release=True
-                    )
+                    result = await tool_put_lza_configuration(ctx)
                     assert result["success"] is True
-                    # Should have logged the startDeployment hint
-                    info_msgs = [str(c) for c in ctx.info.call_args_list]
-                    assert any("startDeployment" in m for m in info_msgs)
-
-    @pytest.mark.asyncio
-    @pytest.mark.unit
-    async def test_auto_detect_with_qualifier_pipeline_hint(self, ctx, tmp_path):
-        d = tmp_path / "cfg"
-        d.mkdir()
-        (d / "accounts-config.yaml").write_text("a")
-        (d / "global-config.yaml").write_text("b")
-
-        with _patch_identity():
-            with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_extracted_lza_config_path",
-                return_value=Path(str(d)),
-            ):
-                with patch(
-                    "awslabs.lza_mcp_server.tools.config.put_lza_configuration._zip_and_upload",
-                    new_callable=AsyncMock,
-                ) as mock_upload:
-                    mock_upload.return_value = {"success": True}
-                    await tool_put_lza_configuration(
-                        ctx, qualifier="env1", offer_pipeline_release=True
-                    )
-                    info_msgs = [str(c) for c in ctx.info.call_args_list]
-                    assert any("env1" in m for m in info_msgs)
-
-    @pytest.mark.asyncio
-    @pytest.mark.unit
-    async def test_auto_detect_no_pipeline_release(self, ctx, tmp_path):
-        d = tmp_path / "cfg"
-        d.mkdir()
-        (d / "accounts-config.yaml").write_text("a")
-        (d / "global-config.yaml").write_text("b")
-
-        with _patch_identity():
-            with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_extracted_lza_config_path",
-                return_value=Path(str(d)),
-            ):
-                with patch(
-                    "awslabs.lza_mcp_server.tools.config.put_lza_configuration._zip_and_upload",
-                    new_callable=AsyncMock,
-                ) as mock_upload:
-                    mock_upload.return_value = {"success": True}
-                    await tool_put_lza_configuration(ctx, offer_pipeline_release=False)
-                    info_msgs = [str(c) for c in ctx.info.call_args_list]
-                    assert not any("startDeployment" in m for m in info_msgs)
 
 
 # ---------------------------------------------------------------

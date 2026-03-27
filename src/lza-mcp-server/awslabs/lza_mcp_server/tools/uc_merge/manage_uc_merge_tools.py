@@ -25,6 +25,11 @@ from .get_uc_network_customization_guide import get_uc_network_customization_gui
 from .update_uc_file import update_uc_file
 from .copy_uc_to_lza_config import copy_uc_to_lza_config
 from .validate_lza_for_uc_merge import validate_lza_for_uc_merge
+from awslabs.lza_mcp_server.utils.guidance_toggle import (
+    strip_llm_guidance,
+    tool_description,
+)
+from .descriptions import DESCRIPTIONS
 
 
 logger = logging.getLogger(__name__)
@@ -51,179 +56,64 @@ def register_uc_merge_tools(mcp):
         mcp: FastMCP server instance
     """
 
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["validateLzaForUcMerge"]),
+    )
     async def validateLzaForUcMerge(ctx: Context):
-        """Validate that the LZA installation is fresh and compatible with UC merge.
+        """Validate that the LZA installation is fresh and compatible with UC merge."""
+        return strip_llm_guidance(await validate_lza_for_uc_merge(ctx))
 
-        This tool validates that the current LZA installation meets the requirements
-        for UC merge by checking:
-        - accounts-config.yaml has only 3 mandatory accounts (no workload accounts)
-        - network-config.yaml has minimal configuration (empty arrays)
-        - iam-config.yaml has minimal configuration (empty arrays)
-
-        Call this after getLzaConfiguration() to ensure the installation is
-        compatible with UC merge before proceeding.
-
-        Returns:
-            Dictionary with validation results and next steps guidance
-        """
-        return await validate_lza_for_uc_merge(ctx)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["get_uc_releases"]),
+    )
     async def get_uc_releases(ctx: Context):
-        """Discover available UC release versions.
+        """Discover available UC release versions."""
+        return strip_llm_guidance(await tool_get_uc_releases(ctx))
 
-        Scans the UC repository directory to find all available release versions
-        of the AWS Landing Zone Accelerator Universal Configuration. Returns
-        releases in descending version order (newest first).
-
-        Returns:
-            Dictionary with available releases and next steps guidance
-        """
-        return await tool_get_uc_releases(ctx)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["get_uc_network_models"]),
+    )
     async def get_uc_network_models(ctx: Context, uc_release: str):
-        """Get available UC network deployment models with comparison information.
+        """Get available UC network deployment models with comparison information."""
+        return strip_llm_guidance(await tool_get_uc_network_models(ctx, uc_release))
 
-        Dynamically discovers available network models from the specified UC release
-        and provides comparison information to help users select the appropriate
-        architecture for their organization.
-
-        Args:
-            uc_release: UC release version (e.g., "v1.0.0"). Required parameter.
-
-        Returns:
-            Dictionary with available models, comparison data, and next steps guidance
-        """
-        return await tool_get_uc_network_models(ctx, uc_release)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["start_uc_merge_session"]),
+    )
     async def start_uc_merge_session(ctx: Context, uc_release: str, network_model: str):
-        """Start a new UC merge session with the selected release and network model.
+        """Start a new UC merge session with the selected release and network model."""
+        return strip_llm_guidance(
+            await tool_start_uc_merge_session(ctx, uc_release, network_model)
+        )
 
-        Creates a session directory with a fresh copy of the UC configuration
-        for the specified network model. The session_id must be passed to
-        subsequent UC merge tools (read_uc_file, update_uc_file, copy_uc_to_lza_config).
-
-        This ensures each merge session works with pristine UC files and doesn't
-        interfere with other sessions.
-
-        Args:
-            uc_release: UC release version (e.g., "v1.0.0"). Required parameter.
-            network_model: Network model name (e.g., "hub-and-spoke", "shared-vpc"). Required parameter.
-
-        Returns:
-            Dictionary with session information or error details
-        """
-        return await tool_start_uc_merge_session(ctx, uc_release, network_model)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["readUcFile"]),
+    )
     async def readUcFile(ctx: Context, session_id: str, file_path: str):
-        """Read a file from the UC session directory.
+        """Read a file from the UC session directory."""
+        return strip_llm_guidance(await read_uc_file(ctx, session_id, file_path))
 
-        This tool reads files from the UC session directory created by
-        start_uc_merge_session(). It validates paths for security and provides
-        context-aware guidance based on the file being read.
-
-        For UC merge workflow, review at minimum:
-        - accounts-config.yaml: Account structure and emails
-        - replacements-config.yaml: Network settings and global replacements
-
-        Args:
-            session_id: Session identifier from start_uc_merge_session(). Required parameter.
-            file_path: Relative path within UC session (e.g., "accounts-config.yaml"). Required parameter.
-
-        Returns:
-            Dictionary with file content, metadata, and next steps guidance
-        """
-        return await read_uc_file(ctx, session_id, file_path)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["getUcNetworkCustomizationGuide"]),
+    )
     async def getUcNetworkCustomizationGuide(ctx: Context, session_id: str):
-        """Get network customization guidance and file list for the session's network model.
+        """Get network customization guidance and file list for the session's network model."""
+        return strip_llm_guidance(get_uc_network_customization_guide(session_id))
 
-        This tool provides metadata about which network settings are relevant for the
-        selected network model and lists all configuration files in the session directory.
-        Use this to understand what settings can be customized and which files are
-        available to read.
-
-        Args:
-            session_id: Session identifier from start_uc_merge_session(). Required parameter.
-
-        Returns:
-            Dictionary with:
-            - network_model: Selected network model
-            - shared_settings: Settings used by all models
-            - model_specific_settings: Settings specific to this model
-            - configuration_files: Files organized by type (config_files, policy_directories, supporting_directories)
-            - customization_guidance: Guidance text
-            - common_changes: List of common customizations
-            - next_steps: Guidance for next actions
-        """
-        return get_uc_network_customization_guide(session_id)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["updateUcFile"]),
+    )
     async def updateUcFile(
         ctx: Context, session_id: str, file_path: str, updates: dict
     ):
-        """Update a UC configuration file in the session directory with new values.
+        """Update a UC configuration file in the session directory with new values."""
+        return strip_llm_guidance(await update_uc_file(session_id, file_path, updates))
 
-        This tool allows updating UC configuration files with user customizations.
-        It validates the session, file existence, and applies security checks before
-        updating. After updates, it validates YAML syntax and performs basic value
-        validation for CIDR ranges and numeric values.
-
-        Args:
-            session_id: Session identifier from start_uc_merge_session(). Required parameter.
-            file_path: Relative path to file within session (e.g., "replacements-config.yaml"). Required parameter.
-            updates: Dictionary of key-value pairs to update in the YAML file. Required parameter.
-
-        Returns:
-            Dictionary with:
-            - success: Operation success status
-            - session_id: Session identifier
-            - file_path: Path to updated file
-            - updates_applied: Dictionary of changes applied (old and new values)
-            - validation_errors: List of validation errors (empty if successful)
-            - next_steps: Guidance for next actions
-
-        Example:
-            result = await updateUcFile(
-                session_id="uc-session-20250127-143022",
-                file_path="replacements-config.yaml",
-                updates={
-                    "HomeRegionIngressCidr": "10.0.0.0/16",
-                    "DevVpcMaskLength": 24
-                }
-            )
-        """
-        return await update_uc_file(session_id, file_path, updates)
-
-    @mcp.tool()
+    @mcp.tool(
+        description=tool_description(**DESCRIPTIONS["copyUcToLzaConfig"]),
+    )
     async def copyUcToLzaConfig(ctx: Context, session_id: str):
-        """Copy UC configuration from session directory to extracted LZA configuration directory.
-
-        This tool merges UC files with the existing LZA configuration by copying all
-        files from the session directory to the LZA configuration directory. Files are
-        overwritten as needed, and directory structure is preserved.
-
-        After this operation completes, call putLzaConfiguration() WITHOUT any path
-        parameter to upload the merged configuration.
-
-        Args:
-            session_id: Session identifier from start_uc_merge_session(). Required parameter.
-
-        Returns:
-            Dictionary with:
-            - success: Operation success status
-            - session_id: Session identifier
-            - files_copied: Number of files copied
-            - directories_created: Number of directories created
-            - source: Source directory path (session)
-            - destination: Destination directory path (LZA config)
-            - next_steps: Guidance to call putLzaConfiguration()
-        """
-        return await copy_uc_to_lza_config(ctx, session_id)
+        """Copy UC configuration from session directory to extracted LZA configuration directory."""
+        return strip_llm_guidance(await copy_uc_to_lza_config(ctx, session_id))
 
     logger.info("UC merge tools registered successfully")

@@ -87,7 +87,6 @@ class TestUploadSuccess:
             == f"s3://{bucket_name}/zipped/aws-accelerator-config.zip"
         )
         assert result["upload_size"] == 1024
-        assert result["pipeline_release_offered"] is True
 
     @pytest.mark.asyncio
     @patch(
@@ -135,13 +134,10 @@ class TestUploadSuccess:
         mock_cleanup_zip.return_value = {"success": True}
 
         # Act
-        result = await utils.upload_configuration(
-            mock_ctx, offer_pipeline_release=False
-        )
+        result = await utils.upload_configuration(mock_ctx)
 
         # Assert
         assert result["success"] is True
-        assert "pipeline_release_offered" not in result
 
     @pytest.mark.asyncio
     @patch(

@@ -30,6 +30,11 @@ from .start_deployment import tool_start_deployment
 from .get_deployment_status import tool_get_deployment_status
 from .diagnose_deployment_errors import tool_diagnose_deployment_errors
 from mcp.server.fastmcp import Context
+from awslabs.lza_mcp_server.utils.guidance_toggle import (
+    strip_llm_guidance,
+    tool_description,
+)
+from .descriptions import DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -249,32 +254,20 @@ def register_pipeline_tools(mcp):
 
     @mcp.tool(
         name="startDeployment",
-        description="Start an LZA deployment — supports standard pipeline, external CodePipeline, and ECS container deployments. "
-        "Call checkAwsConnectivity first to determine deployment type and qualifier. "
-        "For standard deployments, omit the qualifier. "
-        "For external pipeline deployments, pass the qualifier from checkAwsConnectivity. "
-        "When a qualifier is provided, both CodePipeline ({qualifier}-pipeline) and "
-        "SSM Automation ({qualifier}-RunEngine) are checked and started automatically.",
+        description=tool_description(**DESCRIPTIONS["startDeployment"]),
     )  # nosemgrep: useless-inner-function
     async def start_deployment(
         ctx: Context,
         qualifier: Optional[str] = None,
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
     ) -> Dict[str, Any]:
-        return await tool_start_deployment(ctx, qualifier, pipeline_name)
+        return strip_llm_guidance(
+            await tool_start_deployment(ctx, qualifier, pipeline_name)
+        )
 
     @mcp.tool(
         name="getDeploymentStatus",
-        description="Get current deployment status and execution progress for LZA deployments. "
-        "Returns a structured summary: deployment phase, stage progression, error detection, and the specific error message if failed. "
-        "Use this as the primary tool for monitoring deployments and identifying failures. "
-        "For standard CodePipeline deployments: returns stage-by-stage progress (current stage, completed stages, current action). "
-        "For ECS container deployments: checks ECS task status first (detects PROVISIONING/PENDING states), "
-        "then analyzes CloudWatch Logs for deployment phase, status, and errors. "
-        "Does NOT return full deployment logs — use diagnoseDeploymentErrors for complete log output. "
-        "Call checkAwsConnectivity first to determine deployment type and qualifier. "
-        "For standard deployments, omit the qualifier. "
-        "For external pipeline deployments, pass the qualifier from checkAwsConnectivity.",
+        description=tool_description(**DESCRIPTIONS["getDeploymentStatus"]),
     )  # nosemgrep: useless-inner-function
     async def get_deployment_status(
         ctx: Context,
@@ -282,25 +275,15 @@ def register_pipeline_tools(mcp):
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
         execution_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return await tool_get_deployment_status(
-            ctx, qualifier, pipeline_name, execution_id
+        return strip_llm_guidance(
+            await tool_get_deployment_status(
+                ctx, qualifier, pipeline_name, execution_id
+            )
         )
 
     @mcp.tool(
         name="diagnoseDeploymentErrors",
-        description="Deep-dive diagnosis of failed LZA deployments with complete log output. "
-        "Use after getDeploymentStatus confirms a failure and you need full context to understand root cause. "
-        "For standard CodePipeline deployments: finds the most recent FAILED execution, identifies failed actions, "
-        "retrieves CodeBuild logs, and extracts CloudFormation CREATE_FAILED errors with stack traces. "
-        "For ECS container deployments: finds the most recent deployment log stream, paginates through all log events "
-        "(up to 50,000), and returns the complete truncated deployment log alongside error extraction. "
-        "Returns significantly more data than getDeploymentStatus — includes full deployment logs, rollback sequences, "
-        "and complete error chains. "
-        "IMPORTANT: For ECS deployments, this tool targets the most recent log stream by LastEventTime. "
-        "Run this BEFORE starting a new deployment to ensure it captures the correct failure. "
-        "Call checkAwsConnectivity first to determine deployment type and qualifier. "
-        "For standard deployments, omit the qualifier. "
-        "For external pipeline deployments, pass the qualifier from checkAwsConnectivity.",
+        description=tool_description(**DESCRIPTIONS["diagnoseDeploymentErrors"]),
     )  # nosemgrep: useless-inner-function
     async def diagnose_deployment_errors(
         ctx: Context,
@@ -308,8 +291,10 @@ def register_pipeline_tools(mcp):
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
         execution_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return await tool_diagnose_deployment_errors(
-            ctx, qualifier, pipeline_name, execution_id
+        return strip_llm_guidance(
+            await tool_diagnose_deployment_errors(
+                ctx, qualifier, pipeline_name, execution_id
+            )
         )
 
     logger.info("Pipeline tools registered successfully")

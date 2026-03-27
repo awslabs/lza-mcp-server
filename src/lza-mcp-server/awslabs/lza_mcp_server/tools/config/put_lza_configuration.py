@@ -145,17 +145,10 @@ async def tool_put_lza_configuration(
     qualifier: Optional[str] = None,
     config_path: Optional[str] = None,
     bucket_name: Optional[str] = None,
-    offer_pipeline_release: bool = True,
 ) -> Dict[str, Any]:
     """Upload LZA configuration to S3.
 
     Supports both standard and external pipeline (qualifier-based) deployments.
-
-    IMPORTANT - Docker Container Context:
-    This MCP server runs inside a Docker container.
-    - If you retrieved config with getLzaConfiguration(), leave config_path EMPTY.
-    - The tool will automatically find and use the retrieved configuration.
-    - DO NOT pass host paths (e.g. /Users/...) — they are not accessible.
 
     Args:
         ctx: MCP context for logging and progress.
@@ -164,19 +157,11 @@ async def tool_put_lza_configuration(
                    When provided, uploads to {qualifier}-config-{account}-{region}
                    with key lza/aws-accelerator-config.zip.
         config_path: Optional path to configuration folder WITHIN the container.
-                     Leave empty to auto-detect from getLzaConfiguration().
+                     Leave empty to auto-detect.
         bucket_name: Explicit bucket name override.
-        offer_pipeline_release: Whether to suggest startDeployment() after upload.
 
     Returns:
         Dictionary with upload results.
-
-    TYPICAL WORKFLOW:
-        1. checkAwsConnectivity() — verify credentials
-        2. getLzaConfiguration(qualifier=...) — download config
-        3. Edit files via host_path
-        4. putLzaConfiguration(qualifier=...) — upload (no path needed)
-        5. startDeployment(qualifier=...) — deploy
     """
     try:
         await ctx.info("Starting LZA configuration upload...")
@@ -262,9 +247,6 @@ async def tool_put_lza_configuration(
                     f"Using config from getLzaConfiguration(): {detected['config_path']}"
                 )
                 result = await _zip_and_upload(ctx, detected["config_path"], location)
-                if result.get("success") and offer_pipeline_release:
-                    qualifier_hint = f" qualifier={qualifier!r}" if qualifier else ""
-                    await ctx.info(f"Use startDeployment({qualifier_hint}) to deploy")
                 return result
 
         # --- direct upload via S3UploadUtils ---
@@ -278,7 +260,6 @@ async def tool_put_lza_configuration(
             ctx=ctx,
             config_path=config_path,
             bucket_name=location.bucket_name,
-            offer_pipeline_release=offer_pipeline_release,
         )
         return result
 
