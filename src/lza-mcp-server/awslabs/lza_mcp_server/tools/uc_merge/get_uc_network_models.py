@@ -82,7 +82,7 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
         await ctx.error(error_msg)
         return {
             "success": False,
-            "error": error_msg,
+            "error": "Invalid uc_release parameter format",
             "error_code": "INVALID_UC_RELEASE",
             "troubleshooting": [
                 "UC release must be a valid string (1-50 characters)",
@@ -93,11 +93,11 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
 
     # Reject path traversal attempts
     if ".." in uc_release:
-        error_msg = f"Invalid uc_release: path traversal detected in '{uc_release}'"
+        error_msg = "Invalid uc_release: path traversal detected"
         await ctx.error(error_msg)
         return {
             "success": False,
-            "error": error_msg,
+            "error": "Invalid uc_release: path traversal characters are not allowed",
             "error_code": "PATH_TRAVERSAL_DETECTED",
             "troubleshooting": [
                 "UC release must not contain path traversal sequences (..)",
@@ -120,7 +120,7 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
                     item.name for item in uc_base.iterdir() if item.is_dir()
                 ]
 
-            error_msg = f"UC release not found: {uc_release}"
+            error_msg = "UC release not found"
             await ctx.error(error_msg)
 
             if available_releases:
@@ -128,7 +128,7 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
                     [f"  - {r}" for r in sorted(available_releases, reverse=True)]
                 )
                 troubleshooting = [
-                    f"The specified UC release '{uc_release}' does not exist",
+                    "The specified UC release does not exist",
                     "Available releases:",
                     available_list,
                     "Select one of the available releases",
@@ -136,7 +136,7 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
                 next_steps = f"Call get_uc_network_models() with one of the available releases: {', '.join(available_releases)}"
             else:
                 troubleshooting = [
-                    f"The specified UC release '{uc_release}' does not exist",
+                    "The specified UC release does not exist",
                     "No UC releases found in the repository",
                     "Contact administrator to install UC releases",
                 ]
@@ -150,14 +150,13 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
                 "error_code": "UC_RELEASE_NOT_FOUND",
                 "troubleshooting": troubleshooting,
                 "context": {
-                    "uc_release": uc_release,
                     "available_releases": available_releases,
                 },
                 "next_steps": next_steps,
             }
 
         if not release_path.is_dir():
-            error_msg = f"UC release path is not a directory: {uc_release}"
+            error_msg = "UC release path is not a directory"
             await ctx.error(error_msg)
             return {
                 "success": False,
@@ -220,8 +219,8 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
             ),
         }
 
-    except PermissionError as e:
-        error_msg = f"Permission denied accessing UC release directory: {str(e)}"
+    except PermissionError:
+        error_msg = "Permission denied accessing UC release directory"
         await ctx.error(error_msg)
         return {
             "success": False,
@@ -235,7 +234,7 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
             "next_steps": "Contact administrator to verify UC repository permissions",
         }
     except Exception as e:
-        error_msg = f"Unexpected error discovering network models: {str(e)}"
+        error_msg = f"Unexpected error discovering network models: {type(e).__name__}"
         await ctx.error(error_msg)
         return {
             "success": False,
@@ -246,6 +245,5 @@ async def tool_get_uc_network_models(ctx: Context, uc_release: str) -> Dict[str,
                 "Verify UC repository structure is intact",
                 "Contact administrator for assistance",
             ],
-            "context": {"uc_release": uc_release, "error_type": type(e).__name__},
             "next_steps": "Contact administrator for assistance",
         }

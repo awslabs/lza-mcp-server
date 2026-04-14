@@ -279,11 +279,10 @@ async def tool_get_deployment_status(
     if not is_valid:
         return format_error_response(
             error=f"Invalid qualifier: {validation_error}",
-            message=f"Qualifier '{qualifier}' does not meet format requirements",
+            message="Qualifier does not meet format requirements",
             troubleshooting=[
                 "Qualifiers can only contain letters, numbers, and hyphens",
                 "Run checkAwsConnectivity to get valid qualifiers",
-                f"Specific issue: {validation_error}",
             ],
         )
 
@@ -452,12 +451,11 @@ async def tool_get_deployment_status(
 
     if not sources_found:
         return format_error_response(
-            error=f"No deployment infrastructure found for qualifier '{qualifier}'",
-            message=f"Neither CodePipeline '{qualifier_pipeline_name}' nor "
-            f"log group '{log_group_name}' were found in region {AWS_REGION}",
+            error="No deployment infrastructure found for the specified qualifier",
+            message="Neither the CodePipeline nor the ECS log group were found",
             troubleshooting=[
-                f"Verify the qualifier '{qualifier}' is correct",
-                f"Check that the deployment exists in region: {AWS_REGION}",
+                "Verify the qualifier is correct",
+                "Check that the deployment exists in your configured region",
                 "Run checkAwsConnectivity to detect available qualifiers",
                 "The deployment may not have run yet",
             ],
@@ -520,12 +518,11 @@ async def _get_standard_pipeline_status(
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
-            message=f"Pipeline name '{pipeline_name}' does not meet AWS naming requirements",
+            message="Pipeline name does not meet AWS naming requirements",
             troubleshooting=[
                 "Pipeline names must be 1-100 characters long",
                 "Can only contain letters, numbers, periods, underscores, and hyphens",
                 "Cannot contain spaces or other special characters",
-                f"Specific issue: {validation_error}",
             ],
         )
 
@@ -547,11 +544,10 @@ async def _get_standard_pipeline_status(
         if not is_valid:
             return format_error_response(
                 error=f"Invalid execution ID: {validation_error}",
-                message=f"Execution ID '{execution_id}' does not meet AWS format requirements",
+                message="Execution ID does not meet AWS format requirements",
                 troubleshooting=[
                     "Execution IDs must be valid UUIDs (36 characters with hyphens)",
                     "Format: 12345678-1234-1234-1234-123456789012",
-                    f"Specific issue: {validation_error}",
                 ],
             )
 
@@ -587,14 +583,13 @@ async def _get_standard_pipeline_status(
                     == "PipelineNotFoundException"
                 ):
                     return format_error_response(
-                        error=f"Pipeline '{pipeline_name}' not found",
-                        message=f"The specified pipeline '{pipeline_name}' does not exist",
+                        error="Pipeline not found",
+                        message="The specified pipeline does not exist",
                         error_code="PipelineNotFoundException",
                         troubleshooting=[
-                            f"Verify the pipeline name '{pipeline_name}' is correct",
-                            f"Check that the pipeline exists in region: {AWS_REGION}",
+                            "Verify the pipeline name is correct",
+                            "Check that the pipeline exists in your configured region",
                             "Ensure you have permissions to access the pipeline",
-                            "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines",
                         ],
                     )
                 raise
@@ -673,13 +668,12 @@ async def _get_standard_pipeline_status(
                 == "PipelineExecutionNotFoundException"
             ):
                 return format_error_response(
-                    error=f"Execution '{execution_id}' not found",
-                    message=f"The specified execution ID '{execution_id}' does not exist for pipeline '{pipeline_name}'",
+                    error="Execution not found",
+                    message="The specified execution ID does not exist for this pipeline",
                     error_code="PipelineExecutionNotFoundException",
                     troubleshooting=[
                         "Verify the execution ID is correct",
                         "The execution may have been deleted or expired",
-                        "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions",
                     ],
                 )
             raise

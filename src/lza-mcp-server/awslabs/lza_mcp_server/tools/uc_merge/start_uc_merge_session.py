@@ -91,7 +91,6 @@ async def tool_start_uc_merge_session(
                 "Expected format: vX.Y.Z (e.g., v1.0.0)",
                 "Call get_uc_releases() to see available releases",
             ],
-            context={"uc_release": uc_release},
             next_steps="Call get_uc_releases() to discover available UC release versions",
         )
 
@@ -105,10 +104,9 @@ async def tool_start_uc_merge_session(
             troubleshooting=[
                 "Network model format is invalid",
                 "Must contain only lowercase letters, numbers, and hyphens",
-                f"Call get_uc_network_models(uc_release='{uc_release}') to see available models",
+                "Call get_uc_network_models() to see available models",
             ],
-            context={"network_model": network_model},
-            next_steps=f"Call get_uc_network_models(uc_release='{uc_release}') to discover available network models",
+            next_steps="Call get_uc_network_models() to discover available network models",
         )
 
     # Check if uc_release exists
@@ -127,18 +125,17 @@ async def tool_start_uc_merge_session(
             ]
 
         return create_error_response(
-            error_message=f"UC release '{uc_release}' does not exist",
+            error_message="UC release does not exist",
             error_code="UC_RELEASE_NOT_FOUND",
             category=ErrorCategory.FILE_NOT_FOUND,
             troubleshooting=[
-                f"The specified UC release '{uc_release}' was not found",
+                "The specified UC release was not found",
                 "Available releases: " + ", ".join(available_releases)
                 if available_releases
                 else "No releases found",
                 "Call get_uc_releases() to see all available releases",
             ],
             context={
-                "uc_release": uc_release,
                 "available_releases": available_releases,
             },
             next_steps="Call get_uc_releases() to discover available UC release versions",
@@ -157,22 +154,20 @@ async def tool_start_uc_merge_session(
             ]
 
         return create_error_response(
-            error_message=f"Network model '{network_model}' does not exist in release '{uc_release}'",
+            error_message="Network model does not exist in the specified release",
             error_code="NETWORK_MODEL_NOT_FOUND",
             category=ErrorCategory.FILE_NOT_FOUND,
             troubleshooting=[
-                f"The specified network model '{network_model}' was not found in release '{uc_release}'",
+                "The specified network model was not found in the release",
                 "Available models: " + ", ".join(available_models)
                 if available_models
                 else "No models found",
-                f"Call get_uc_network_models(uc_release='{uc_release}') to see available models",
+                "Call get_uc_network_models() to see available models",
             ],
             context={
-                "uc_release": uc_release,
-                "network_model": network_model,
                 "available_models": available_models,
             },
-            next_steps=f"Call get_uc_network_models(uc_release='{uc_release}') to discover available network models",
+            next_steps="Call get_uc_network_models() to discover available network models",
         )
 
     # Create session
@@ -225,10 +220,9 @@ async def tool_start_uc_merge_session(
         error_info = categorize_uc_merge_error(e)
 
         return create_error_response(
-            error_message=f"Failed to create UC merge session: {str(e)}",
+            error_message=f"Failed to create UC merge session: {type(e).__name__}",
             error_code=error_info["error_code"],
             category=error_info["category"],
             troubleshooting=error_info["troubleshooting"],
-            context={"uc_release": uc_release, "network_model": network_model},
             next_steps="Review the error and troubleshooting steps, then retry start_uc_merge_session()",
         )

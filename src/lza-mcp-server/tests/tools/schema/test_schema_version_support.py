@@ -122,7 +122,7 @@ class TestSchemaVersionSupport:
                 )
 
         assert result["success"] is False
-        assert "v99.99.99" in result["error"]
+        assert "not found" in result["error"].lower()
         assert "available_versions" in result
 
     @pytest.mark.asyncio
@@ -153,7 +153,7 @@ class TestSchemaVersionSupport:
                 )
 
         assert result["success"] is False
-        assert "v99.99.99" in result["error"]
+        assert "not found" in result["error"].lower()
         assert "available_versions" in result
 
     @pytest.mark.asyncio

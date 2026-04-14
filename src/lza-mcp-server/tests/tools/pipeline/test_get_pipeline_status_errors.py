@@ -110,7 +110,7 @@ class TestPipelineStatusErrors:
 
             assert result["success"] is False
             assert "PipelineExecutionNotFoundException" in result.get("error_code", "")
-            assert execution_id in result["error"]
+            assert "not found" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_generic_aws_error(self, mock_mcp_context):

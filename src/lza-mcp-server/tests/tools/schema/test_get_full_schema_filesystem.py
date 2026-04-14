@@ -36,7 +36,7 @@ class TestGetFullSchemaFilesystem:
 
         assert result["success"] is False
         assert "not found" in result["error"]
-        assert "v1.99.0" in result["message"]
+        assert "not available" in result["message"]
         assert "available_versions" in result
         assert "getDeployedLzaVersion" in result["hint"]
         ctx.error.assert_called()
@@ -94,7 +94,7 @@ class TestGetFullSchemaFilesystem:
         )
 
         assert result["success"] is False
-        assert "Combined schema file not found" in result["error"]
+        assert "Schema file not found" in result["error"]
         assert "combined.json" in result["message"]
         ctx.error.assert_called()
 

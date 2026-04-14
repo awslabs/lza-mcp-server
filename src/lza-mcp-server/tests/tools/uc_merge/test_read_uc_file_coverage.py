@@ -73,9 +73,6 @@ class TestReadUcFileCoverage:
             assert result["error_code"] == "ENCODING_ERROR"
             assert "Failed to decode file as UTF-8" in result["error"]
             assert "troubleshooting" in result
-            assert "context" in result
-            assert result["context"]["session_id"] == session_id
-            assert result["context"]["file_path"] == "test.yaml"
         finally:
             module.SessionManager = original_session_manager
 
@@ -120,9 +117,6 @@ class TestReadUcFileCoverage:
             assert result["error_code"] == "ACCESS_DENIED"
             assert "Permission denied" in result["error"]
             assert "troubleshooting" in result
-            assert "context" in result
-            assert result["context"]["session_id"] == session_id
-            assert result["context"]["file_path"] == "test.yaml"
         finally:
             module.SessionManager = original_session_manager
 
@@ -166,9 +160,5 @@ class TestReadUcFileCoverage:
             assert result["success"] is False
             assert "Failed to read file" in result["error"]
             assert "troubleshooting" in result
-            assert "context" in result
-            assert result["context"]["session_id"] == session_id
-            assert result["context"]["file_path"] == "test.yaml"
-            assert result["context"]["error_type"] == "RuntimeError"
         finally:
             module.SessionManager = original_session_manager
