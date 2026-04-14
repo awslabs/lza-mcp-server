@@ -101,24 +101,24 @@ def validate_path_security(
 
     # Check for path traversal sequences
     if ".." in file_path:
-        return (False, f"Path traversal detected in file path: {file_path}", None)
+        return (False, "Path traversal detected in file path", None)
 
     # Check for absolute paths
     path_obj = Path(file_path)
     if path_obj.is_absolute():
-        return (False, f"Absolute paths are not allowed: {file_path}", None)
+        return (False, "Absolute paths are not allowed", None)
 
     # Resolve the full path
     try:
         resolved_path = (base_directory / file_path).resolve()
-    except (OSError, ValueError) as e:
-        return (False, f"Invalid file path: {str(e)}", None)
+    except (OSError, ValueError):
+        return (False, "Invalid file path", None)
 
     # Verify the resolved path is within the base directory
     try:
         resolved_path.relative_to(base_directory.resolve())
     except ValueError:
-        return (False, f"Path is outside allowed directory boundary: {file_path}", None)
+        return (False, "Path is outside allowed directory boundary", None)
 
     return True, "", resolved_path
 
