@@ -64,8 +64,6 @@ class TestFileErrors:
         assert result["success"] is False
         assert result["error_code"] == "FILE_NOT_FOUND"
         assert result["category"] == ErrorCategory.FILE_NOT_FOUND
-        assert "context" in result
-        assert result["context"]["file_path"] == "nonexistent-file.yaml"
 
     @pytest.mark.asyncio
     async def test_path_traversal_attempt(self, temp_session, monkeypatch):

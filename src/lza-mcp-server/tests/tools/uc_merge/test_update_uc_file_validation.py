@@ -83,8 +83,7 @@ class TestInputValidation:
         assert result["success"] is False
         assert result["error_code"] == "INVALID_SESSION"
         assert result["category"] == ErrorCategory.VALIDATION
-        assert "context" in result
-        assert result["context"]["session_id"] == "nonexistent-session"
+        assert "context" not in result
 
     @pytest.mark.asyncio
     async def test_missing_file_path(self, temp_session, monkeypatch):

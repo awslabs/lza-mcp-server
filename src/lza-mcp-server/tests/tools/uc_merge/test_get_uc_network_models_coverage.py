@@ -137,9 +137,6 @@ class TestGetUCNetworkModelsCoverage:
         assert result["error_code"] == "UNEXPECTED_ERROR"
         assert "Unexpected error" in result["error"]
         assert "troubleshooting" in result
-        assert "context" in result
-        assert "error_type" in result["context"]
-        assert result["context"]["error_type"] == "RuntimeError"
         assert "next_steps" in result
 
     @pytest.mark.asyncio

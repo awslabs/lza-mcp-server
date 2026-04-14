@@ -56,7 +56,6 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
                 "Verify the session_id is correct",
                 "Check that the session has not been cleaned up",
             ],
-            context={"session_id": session_id},
             next_steps="Call start_uc_merge_session() to create a new session",
         )
 
@@ -64,14 +63,13 @@ def get_uc_network_customization_guide(session_id: str) -> Dict[str, Any]:
     metadata = session_manager.load_session_metadata(session_id)
     if not metadata or "network_model" not in metadata:
         return create_error_response(
-            error_message=f"Session '{session_id}' is missing network_model metadata",
+            error_message="Session is missing network_model metadata",
             error_code="INVALID_SESSION_METADATA",
             category=ErrorCategory.VALIDATION,
             troubleshooting=[
                 "Session metadata is corrupted or incomplete",
                 "Start a new session with start_uc_merge_session()",
             ],
-            context={"session_id": session_id},
             next_steps="Call start_uc_merge_session() to create a new session",
         )
 

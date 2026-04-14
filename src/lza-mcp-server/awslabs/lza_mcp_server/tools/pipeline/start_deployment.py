@@ -133,11 +133,10 @@ async def tool_start_deployment(
     if not is_valid:
         return format_error_response(
             error=f"Invalid qualifier: {validation_error}",
-            message=f"Qualifier '{qualifier}' does not meet format requirements",
+            message="Qualifier does not meet format requirements",
             troubleshooting=[
                 "Qualifiers can only contain letters, numbers, and hyphens",
                 "Run checkAwsConnectivity to get valid qualifiers",
-                f"Specific issue: {validation_error}",
             ],
         )
 
@@ -188,12 +187,11 @@ async def tool_start_deployment(
         neither_found = (pipeline_result is None) and (container_result is None)
         if neither_found:
             return format_error_response(
-                error=f"No deployment infrastructure found for qualifier '{qualifier}'",
-                message=f"Neither CodePipeline '{qualifier_pipeline_name}' nor "
-                f"SSM document '{ssm_document_name}' were found in region {AWS_REGION}",
+                error="No deployment infrastructure found for the specified qualifier",
+                message="Neither the CodePipeline nor the SSM Automation document were found",
                 troubleshooting=[
-                    f"Verify the qualifier '{qualifier}' is correct",
-                    f"Check that the deployment exists in region: {AWS_REGION}",
+                    "Verify the qualifier is correct",
+                    "Check that the deployment exists in your configured region",
                     "Run checkAwsConnectivity to detect available qualifiers",
                     "The deployment infrastructure may not have been provisioned yet",
                 ],
@@ -211,11 +209,11 @@ async def tool_start_deployment(
             )
 
         return format_error_response(
-            error=f"Failed to start deployment for qualifier '{qualifier}': {'; '.join(errors)}",
+            error=f"Failed to start deployment: {'; '.join(errors)}",
             message="Deployment infrastructure was found but could not be started",
             troubleshooting=[
                 "Check IAM permissions for codepipeline:StartPipelineExecution and/or ssm:StartAutomationExecution",
-                f"Verify the qualifier '{qualifier}' is correct",
+                "Verify the qualifier is correct",
                 "Review the specific error details above",
             ],
         )
@@ -270,12 +268,11 @@ async def _start_standard_pipeline(
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
-            message=f"Pipeline name '{pipeline_name}' does not meet AWS naming requirements",
+            message="Pipeline name does not meet AWS naming requirements",
             troubleshooting=[
                 "Pipeline names must be 1-100 characters long",
                 "Can only contain letters, numbers, periods, underscores, and hyphens",
                 "Cannot contain spaces or other special characters",
-                f"Specific issue: {validation_error}",
             ],
         )
 
@@ -292,14 +289,13 @@ async def _start_standard_pipeline(
         except ClientError as e:
             if e.response.get("Error", {}).get("Code") == "PipelineNotFoundException":
                 return format_error_response(
-                    error=f"Pipeline '{pipeline_name}' not found",
-                    message=f"The specified pipeline '{pipeline_name}' does not exist",
+                    error="Pipeline not found",
+                    message="The specified pipeline does not exist",
                     error_code="PipelineNotFoundException",
                     troubleshooting=[
-                        f"Verify the pipeline name '{pipeline_name}' is correct",
-                        f"Check that the pipeline exists in region: {AWS_REGION}",
+                        "Verify the pipeline name is correct",
+                        "Check that the pipeline exists in your configured region",
                         "Ensure you have permissions to access the pipeline",
-                        "Use AWS CLI: aws codepipeline list-pipelines to see available pipelines",
                     ],
                 )
             raise
@@ -367,14 +363,13 @@ async def _start_ssm_automation(
             error_code = e.response.get("Error", {}).get("Code", "")
             if error_code == "InvalidDocument":
                 return format_error_response(
-                    error=f"SSM document '{document_name}' not found",
-                    message=f"The SSM Automation document '{document_name}' does not exist",
+                    error="SSM Automation document not found",
+                    message="The SSM Automation document does not exist",
                     error_code="InvalidDocument",
                     troubleshooting=[
-                        f"Verify the qualifier '{qualifier}' is correct",
-                        f"Check that the SSM document exists in region: {AWS_REGION}",
+                        "Verify the qualifier is correct",
+                        "Check that the SSM document exists in your configured region",
                         "The container installer stack may not have been deployed for this qualifier",
-                        f"Use AWS CLI: aws ssm list-documents --filters Key=Name,Values={document_name}",
                     ],
                 )
             raise

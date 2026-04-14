@@ -220,7 +220,7 @@ async def test_start_session_uc_release_not_found(mock_ctx, tmp_path):
 
         assert result["success"] is False
         assert result["error_code"] == "UC_RELEASE_NOT_FOUND"
-        assert "v2.0.0" in result["error"]
+        assert "does not exist" in result["error"]
         assert "available_releases" in result["context"]
         assert "v1.0.0" in result["context"]["available_releases"]
         assert "get_uc_releases" in result["next_steps"]
@@ -250,7 +250,7 @@ async def test_start_session_network_model_not_found(mock_ctx, mock_uc_structure
 
         assert result["success"] is False
         assert result["error_code"] == "NETWORK_MODEL_NOT_FOUND"
-        assert "non-existent-model" in result["error"]
+        assert "does not exist" in result["error"]
         assert "available_models" in result["context"]
         assert "hub-and-spoke" in result["context"]["available_models"]
         assert "shared-vpc" in result["context"]["available_models"]
@@ -377,7 +377,7 @@ async def test_start_session_exception_handling(mock_ctx, mock_uc_structure):
         )
 
         assert result["success"] is False
-        assert "Disk full" in result["error"]
+        assert "OSError" in result["error"]
         assert "error_code" in result
         assert "troubleshooting" in result
         assert len(result["troubleshooting"]) > 0

@@ -232,24 +232,24 @@ async def tool_get_full_schema(
                         if os.path.isdir(os.path.join(schemas_base, d))
                     ]
 
-                error_message = f"LZA version '{lza_version}' not found"
+                error_message = "LZA version not found"
                 await ctx.error(error_message)
                 return {
                     "success": False,
                     "error": error_message,
-                    "message": f"The specified LZA version '{lza_version}' is not available.",
+                    "message": "The specified LZA version is not available.",
                     "available_versions": available_versions
                     if available_versions
                     else ["No versions found"],
                     "hint": "Call getDeployedLzaVersion() to get the correct version, or use listLzaSupportedVersions() to see all available versions",
                 }
             else:
-                error_message = f"Combined schema file not found for version '{lza_version}' at: {combined_schema_path}"
+                error_message = "Schema file not found for the specified version"
                 await ctx.error(error_message)
                 return {
                     "success": False,
                     "error": error_message,
-                    "message": f"Version directory exists but combined.json not found for '{lza_version}'",
+                    "message": "Version directory exists but combined.json not found",
                 }
 
         try:

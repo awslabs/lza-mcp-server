@@ -157,13 +157,13 @@ class SessionManager:
         if not self.session_exists(session_id):
             return (
                 False,
-                f"Session '{session_id}' does not exist",
+                "Session does not exist",
             )
 
         # Check if metadata exists
         metadata = self.load_session_metadata(session_id)
         if metadata is None:
-            return False, f"Session '{session_id}' is invalid (missing metadata)"
+            return False, "Session is invalid (missing metadata)"
 
         return True, ""
 

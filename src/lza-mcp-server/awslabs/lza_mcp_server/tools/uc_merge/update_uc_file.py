@@ -202,7 +202,6 @@ async def update_uc_file(
                 "Start a new session with start_uc_merge_session()",
                 "Verify the session_id is correct",
             ],
-            context={"session_id": session_id},
             next_steps="Call start_uc_merge_session() to create a new session",
         )
 
@@ -249,14 +248,13 @@ async def update_uc_file(
             error_code=error_info["error_code"],
             category=error_info["category"],
             troubleshooting=error_info["troubleshooting"],
-            context={"file_path": file_path, "session_id": session_id},
             next_steps="Provide a valid relative path within the session directory",
         )
 
     # Check if file exists
     if not resolved_path.exists():
         return create_error_response(
-            error_message=f"File not found: {file_path}",
+            error_message="File not found in session directory",
             error_code="FILE_NOT_FOUND",
             category=ErrorCategory.FILE_NOT_FOUND,
             troubleshooting=[
@@ -265,7 +263,6 @@ async def update_uc_file(
                 "Call get_uc_network_customization_guide() to see available files",
                 "Use read_uc_file() to verify file existence before updating",
             ],
-            context={"file_path": file_path, "session_id": session_id},
             next_steps="Verify the file path and retry update_uc_file()",
         )
 
@@ -279,9 +276,9 @@ async def update_uc_file(
         if yaml_data is None:
             yaml_data = {}
 
-    except yaml.YAMLError as e:
+    except yaml.YAMLError:
         return create_error_response(
-            error_message=f"Failed to parse YAML file: {str(e)}",
+            error_message="Failed to parse YAML file",
             error_code="YAML_PARSE_ERROR",
             category=ErrorCategory.CONFIGURATION,
             troubleshooting=[
@@ -290,12 +287,11 @@ async def update_uc_file(
                 "Ensure proper indentation and formatting",
                 "Use a YAML validator to check the file",
             ],
-            context={"file_path": file_path, "error": str(e)},
             next_steps="Fix YAML syntax errors in the file and retry",
         )
-    except OSError as e:
+    except OSError:
         return create_error_response(
-            error_message=f"Failed to read file: {str(e)}",
+            error_message="Failed to read file",
             error_code="FILE_READ_ERROR",
             category=ErrorCategory.FILE_OPERATION,
             troubleshooting=[
@@ -303,7 +299,6 @@ async def update_uc_file(
                 "Check file permissions",
                 "Ensure the file is not locked by another process",
             ],
-            context={"file_path": file_path, "error": str(e)},
             next_steps="Check file permissions and retry update_uc_file()",
         )
 
@@ -379,10 +374,7 @@ async def update_uc_file(
                 "Correct the invalid values and retry update_uc_file()",
             ],
             context={
-                "file_path": file_path,
-                "session_id": session_id,
                 "validation_errors": validation_errors,
-                "failed_updates": updates_applied,
             },
             next_steps="Review validation errors, correct the values, and retry update_uc_file()",
         )
@@ -395,7 +387,7 @@ async def update_uc_file(
         is_valid_yaml, yaml_error = validate_yaml_syntax(updated_yaml)
         if not is_valid_yaml:
             return create_error_response(
-                error_message=f"Generated YAML is invalid: {yaml_error}",
+                error_message="Generated YAML is invalid",
                 error_code="YAML_GENERATION_ERROR",
                 category=ErrorCategory.CONFIGURATION,
                 troubleshooting=[
@@ -404,13 +396,12 @@ async def update_uc_file(
                     "Try updating fewer fields at once",
                     "Contact support if the issue persists",
                 ],
-                context={"file_path": file_path, "error": yaml_error},
                 next_steps="Try updating fewer fields or contact support",
             )
 
-    except yaml.YAMLError as e:
+    except yaml.YAMLError:
         return create_error_response(
-            error_message=f"Failed to generate YAML: {str(e)}",
+            error_message="Failed to generate YAML",
             error_code="YAML_GENERATION_ERROR",
             category=ErrorCategory.CONFIGURATION,
             troubleshooting=[
@@ -418,7 +409,6 @@ async def update_uc_file(
                 "Check that all values are YAML-compatible types",
                 "Ensure no circular references in the data",
             ],
-            context={"file_path": file_path, "error": str(e)},
             next_steps="Review the updates and retry with valid YAML-compatible values",
         )
 
@@ -426,9 +416,9 @@ async def update_uc_file(
     try:
         with open(resolved_path, "w") as f:
             f.write(updated_yaml)
-    except OSError as e:
+    except OSError:
         return create_error_response(
-            error_message=f"Failed to write file: {str(e)}",
+            error_message="Failed to write file",
             error_code="FILE_WRITE_ERROR",
             category=ErrorCategory.FILE_OPERATION,
             troubleshooting=[
@@ -437,7 +427,6 @@ async def update_uc_file(
                 "Ensure sufficient disk space",
                 "Verify the file is not locked by another process",
             ],
-            context={"file_path": file_path, "error": str(e)},
             next_steps="Check file permissions and disk space, then retry",
         )
 

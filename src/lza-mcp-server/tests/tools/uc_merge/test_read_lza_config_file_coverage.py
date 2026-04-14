@@ -65,8 +65,6 @@ class TestReadLzaConfigFileCoverage:
         assert result["error_code"] == "ENCODING_ERROR"
         assert "Failed to decode file as UTF-8" in result["error"]
         assert "troubleshooting" in result
-        assert "context" in result
-        assert result["context"]["file_path"] == "test.yaml"
 
     @pytest.mark.asyncio
     async def test_permission_error(self, mock_ctx, tmp_path, monkeypatch):
@@ -100,8 +98,6 @@ class TestReadLzaConfigFileCoverage:
         assert result["error_code"] == "ACCESS_DENIED"
         assert "Permission denied" in result["error"]
         assert "troubleshooting" in result
-        assert "context" in result
-        assert result["context"]["file_path"] == "test.yaml"
 
     @pytest.mark.asyncio
     async def test_unexpected_error_reading_file(self, mock_ctx, tmp_path, monkeypatch):
@@ -134,9 +130,6 @@ class TestReadLzaConfigFileCoverage:
         assert result["success"] is False
         assert "Failed to read file" in result["error"]
         assert "troubleshooting" in result
-        assert "context" in result
-        assert result["context"]["file_path"] == "test.yaml"
-        assert result["context"]["error_type"] == "RuntimeError"
 
     @pytest.mark.asyncio
     async def test_outer_exception_handler(self, mock_ctx, tmp_path, monkeypatch):
@@ -164,5 +157,5 @@ class TestReadLzaConfigFileCoverage:
 
         assert result["success"] is False
         assert result["error_code"] == "UNEXPECTED_ERROR"
-        assert "Unexpected system failure" in result["error"]
+        assert "Unexpected error" in result["error"]
         assert "troubleshooting" in result

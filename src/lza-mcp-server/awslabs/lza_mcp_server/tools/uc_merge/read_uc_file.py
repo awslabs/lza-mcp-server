@@ -119,7 +119,6 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                     "Start a new session with start_uc_merge_session()",
                     "Ensure you have the session_id from the session creation response",
                 ],
-                context={"file_path": file_path},
                 next_steps="Call start_uc_merge_session() to create a session first.",
             )
 
@@ -138,7 +137,6 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                     "Check that the session has not been cleaned up",
                     "Ensure the session was created successfully",
                 ],
-                context={"session_id": session_id, "file_path": file_path},
                 next_steps="Start a new session with start_uc_merge_session() and use the returned session_id.",
             )
 
@@ -157,51 +155,35 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                 error_code=error_info["error_code"],
                 category=error_info["category"],
                 troubleshooting=error_info["troubleshooting"],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path,
-                    "session_path": str(session_path),
-                },
                 next_steps="Provide a valid relative path within the session directory.",
             )
 
         # Check if file exists
         if not resolved_path.exists():
             return create_error_response(
-                error_message=f"File not found: {file_path}",
+                error_message="File not found in session directory",
                 error_code="FILE_NOT_FOUND",
                 category=ErrorCategory.FILE_NOT_FOUND,
                 troubleshooting=[
-                    f"Verify the file path is correct: {file_path}",
+                    "Verify the file path is correct",
                     "Check that the file exists in the UC session directory",
                     "Use get_uc_network_customization_guide() to see available files",
                     "Ensure the session was created successfully with all files copied",
                 ],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path,
-                    "resolved_path": str(resolved_path),
-                    "session_path": str(session_path),
-                },
                 next_steps="Verify the file path and retry the operation.",
             )
 
         # Check if it's a file (not a directory)
         if not resolved_path.is_file():
             return create_error_response(
-                error_message=f"Path is not a file: {file_path}",
+                error_message="Path is not a file",
                 error_code="NOT_A_FILE",
                 category=ErrorCategory.FILE_OPERATION,
                 troubleshooting=[
-                    f"The path points to a directory, not a file: {file_path}",
+                    "The path points to a directory, not a file",
                     "Provide a path to a specific file",
                     "Use a file path like 'accounts-config.yaml' instead of a directory",
                 ],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path,
-                    "resolved_path": str(resolved_path),
-                },
                 next_steps="Provide a path to a file, not a directory.",
             )
 
@@ -229,9 +211,9 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                 next_steps=next_steps,
             )
 
-        except UnicodeDecodeError as e:
+        except UnicodeDecodeError:
             return create_error_response(
-                error_message=f"Failed to decode file as UTF-8: {str(e)}",
+                error_message="Failed to decode file as UTF-8",
                 error_code="ENCODING_ERROR",
                 category=ErrorCategory.FILE_OPERATION,
                 troubleshooting=[
@@ -240,16 +222,11 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                     "Check if the file is corrupted",
                     "Ensure the file was copied correctly to the session",
                 ],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path,
-                    "error": str(e),
-                },
                 next_steps="Verify the file is a valid text file and retry.",
             )
-        except PermissionError as e:
+        except PermissionError:
             return create_error_response(
-                error_message=f"Permission denied reading file: {str(e)}",
+                error_message="Permission denied reading file",
                 error_code="ACCESS_DENIED",
                 category=ErrorCategory.FILE_OPERATION,
                 troubleshooting=[
@@ -258,33 +235,22 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                     "Verify the file is not locked by another process",
                     "Check container permissions and volume mounts",
                 ],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path,
-                    "resolved_path": str(resolved_path),
-                },
                 next_steps="Check file permissions and retry.",
             )
         except Exception as e:
             error_info = categorize_uc_merge_error(e)
             return create_error_response(
-                error_message=f"Failed to read file: {str(e)}",
+                error_message=f"Failed to read file: {type(e).__name__}",
                 error_code=error_info["error_code"],
                 category=error_info["category"],
                 troubleshooting=error_info["troubleshooting"],
-                context={
-                    "session_id": session_id,
-                    "file_path": file_path,
-                    "resolved_path": str(resolved_path),
-                    "error_type": type(e).__name__,
-                },
                 next_steps="Check the error details and retry the operation.",
             )
 
     except Exception as e:
         logger.error(f"Unexpected error reading UC file: {str(e)}")
         return create_error_response(
-            error_message=f"Unexpected error reading file: {str(e)}",
+            error_message="Unexpected error reading file",
             error_code="UNEXPECTED_ERROR",
             category=ErrorCategory.FILE_OPERATION,
             troubleshooting=[
@@ -293,10 +259,5 @@ async def read_uc_file(ctx: Context, session_id: str, file_path: str) -> Dict[st
                 "Ensure sufficient system resources",
                 "Try creating a new session",
             ],
-            context={
-                "session_id": session_id,
-                "file_path": file_path,
-                "error_type": type(e).__name__,
-            },
             next_steps="Review the error and retry the operation.",
         )
