@@ -67,7 +67,7 @@ class TestPipelineErrorHandling:
         assert any(
             "pipeline name is correct" in step for step in result["troubleshooting"]
         )
-        assert any("AWS region" in step for step in result["troubleshooting"])
+        assert any("configured region" in step for step in result["troubleshooting"])
 
     def test_handle_pipeline_execution_not_found_error(self):
         """Test handling of PipelineExecutionNotFoundException."""
@@ -89,9 +89,7 @@ class TestPipelineErrorHandling:
         assert any(
             "execution ID is correct" in step for step in result["troubleshooting"]
         )
-        assert any(
-            "list-pipeline-executions" in step for step in result["troubleshooting"]
-        )
+        assert any("deleted or expired" in step for step in result["troubleshooting"])
 
     def test_handle_pipeline_execution_not_stoppable_error(self):
         """Test handling of PipelineExecutionNotStoppableException."""

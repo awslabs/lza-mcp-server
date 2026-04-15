@@ -177,6 +177,19 @@ class TestGetFullSchemaErrors:
         ctx.error.assert_called()
 
     @pytest.mark.asyncio
+    async def test_path_traversal_version_rejected(self):
+        """Test that path traversal in lza_version is rejected by format validation."""
+        ctx = AsyncMock()
+
+        result = await tool_get_full_schema(
+            ctx=ctx, lza_version="../../../etc", schema_path="test-schema.json"
+        )
+
+        assert result["success"] is False
+        assert "Invalid LZA version format" in result["message"]
+        ctx.error.assert_called()
+
+    @pytest.mark.asyncio
     async def test_none_schema_path(self):
         """Test error when schema_path is None."""
         ctx = AsyncMock()

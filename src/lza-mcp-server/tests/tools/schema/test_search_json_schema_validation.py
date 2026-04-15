@@ -52,16 +52,26 @@ class TestSearchJsonSchemaValidation:
 
     @pytest.mark.asyncio
     async def test_latest_version_rejected(self):
-        """Test that 'latest' version is explicitly rejected."""
+        """Test that 'latest' version is rejected by format validation."""
         ctx = AsyncMock()
         result = await tool_search_json_schema(
             ctx=ctx, lza_version="latest", search_terms=["test"]
         )
 
         assert result["success"] is False
-        assert "latest" in result["error"].lower()
-        assert "required_action" in result
-        assert "getDeployedLzaVersion" in result["required_action"]
+        assert "Invalid LZA version format" in result["message"]
+        ctx.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_path_traversal_version_rejected(self):
+        """Test that path traversal in lza_version is rejected by format validation."""
+        ctx = AsyncMock()
+        result = await tool_search_json_schema(
+            ctx=ctx, lza_version="../../../etc", search_terms=["test"]
+        )
+
+        assert result["success"] is False
+        assert "Invalid LZA version format" in result["message"]
         ctx.error.assert_called()
 
     @pytest.mark.asyncio

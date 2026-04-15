@@ -310,9 +310,8 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                 error_code=error_code,
                 troubleshooting=[
                     "Verify the pipeline name is correct",
-                    "Check that the pipeline exists in the specified AWS region",
+                    "Check that the pipeline exists in your configured region",
                     "Ensure you have permissions to access the pipeline",
-                    f"Current region: {AWS_REGION}",
                 ],
             )
 
@@ -348,7 +347,6 @@ def handle_aws_error(e: Exception, operation: str) -> Dict[str, Any]:
                     "Verify the execution ID is correct and exists",
                     "Check that the execution belongs to the specified pipeline",
                     "The execution may have been deleted or expired",
-                    "Use AWS CLI: aws codepipeline list-pipeline-executions to see available executions",
                 ],
             )
 

@@ -158,7 +158,7 @@ class TestSchemaVersionSupport:
 
     @pytest.mark.asyncio
     async def test_search_with_latest_version(self):
-        """Test that search rejects 'latest' as version and directs to getDeployedLzaVersion."""
+        """Test that search rejects 'latest' as version via format validation."""
         mock_context = MockContext()
         server = Mock()
         registered_tools = {}
@@ -181,15 +181,13 @@ class TestSchemaVersionSupport:
             search_terms=["test"],
         )
 
-        # Should reject 'latest' and provide guidance
+        # "latest" doesn't match vX.Y.Z format, rejected by validate_lza_version
         assert result["success"] is False
-        assert "latest" in result["error"].lower()
-        assert "getDeployedLzaVersion" in result["required_action"]
-        assert "example" in result
+        assert "Invalid LZA version format" in result["message"]
 
     @pytest.mark.asyncio
     async def test_get_schema_with_latest_version(self):
-        """Test that get_full_schema rejects 'latest' as version and directs to getDeployedLzaVersion."""
+        """Test that get_full_schema rejects 'latest' as version via format validation."""
         mock_context = MockContext()
         server = Mock()
         registered_tools = {}
@@ -212,11 +210,9 @@ class TestSchemaVersionSupport:
             schema_path="accounts-config.json",
         )
 
-        # Should reject 'latest' and provide guidance
+        # "latest" doesn't match vX.Y.Z format, rejected by validate_lza_version
         assert result["success"] is False
-        assert "latest" in result["error"].lower()
-        assert "getDeployedLzaVersion" in result["required_action"]
-        assert "example" in result
+        assert "Invalid LZA version format" in result["message"]
 
     @pytest.mark.asyncio
     async def test_search_result_includes_version(self):
