@@ -20,6 +20,7 @@ from mcp.server.fastmcp import Context
 from awslabs.lza_mcp_server.utils.input_validation import (
     validate_string_input,
     validate_integer_range,
+    validate_lza_version,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ async def tool_search_json_schema(
                 "success": False,
                 "error": validation_error,
                 "message": "Invalid LZA version format",
-                "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version. For example, if it returns 'v1.12.0', use lza_version='v1.12.0'",
             }
 
         if not lza_version:
@@ -103,7 +104,19 @@ async def tool_search_json_schema(
                 "success": False,
                 "error": error_message,
                 "message": "Please specify an LZA version (e.g., 'v1.12.0', 'v1.13.0')",
-                "hint": "Call getDeployedLzaVersion() first to get the correct version for your environment",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version. For example, if it returns 'v1.12.0', use lza_version='v1.12.0'",
+            }
+
+        # Validate LZA version format (prevents path traversal via version parameter)
+        # Security validation runs before business logic checks like "latest" rejection
+        is_valid, validation_error = validate_lza_version(lza_version)
+        if not is_valid:
+            await ctx.error(validation_error)
+            return {
+                "success": False,
+                "error": validation_error,
+                "message": "Invalid LZA version format",
+                "hint": "Call getDeployedLzaVersion() first to get the correct version. For example, if it returns 'v1.12.0', use lza_version='v1.12.0'",
             }
 
         # Validate search_terms
@@ -166,18 +179,6 @@ async def tool_search_json_schema(
                 "success": False,
                 "error": error_message,
                 "message": f"format_level must be one of: {', '.join(valid_format_levels)}",
-            }
-
-        # Reject "latest" to ensure version-specific searches
-        if lza_version.lower() == "latest":
-            error_message = "The 'latest' version is not allowed for schema searches"
-            await ctx.error(error_message)
-            return {
-                "success": False,
-                "error": error_message,
-                "message": "Schema searches must use a specific LZA version to ensure accuracy with your deployed environment.",
-                "required_action": "Call getDeployedLzaVersion() to get the currently deployed LZA version, then use that version string",
-                "example": "If getDeployedLzaVersion() returns 'v1.12.0', use lza_version='v1.12.0'",
             }
 
         # Use version-specific path (schema_path parameter removed)
