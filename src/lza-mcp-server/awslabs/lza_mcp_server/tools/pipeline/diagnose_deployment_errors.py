@@ -180,12 +180,11 @@ async def tool_diagnose_deployment_errors(
 
     if not sources_found:
         return format_error_response(
-            error=f"No deployment infrastructure found for qualifier '{qualifier}'",
-            message=f"Neither CodePipeline '{qualifier_pipeline_name}' nor "
-            f"log group '{log_group_name}' were found in region {AWS_REGION}",
+            error="No deployment infrastructure found for the specified qualifier",
+            message="Neither the CodePipeline nor the ECS log group were found",
             troubleshooting=[
-                f"Verify the qualifier '{qualifier}' is correct",
-                f"Check that the deployment exists in region: {AWS_REGION}",
+                "Verify the qualifier is correct",
+                "Check that the deployment exists in your configured region",
                 "Run checkAwsConnectivity to detect available qualifiers",
                 "The deployment may not have run yet",
             ],

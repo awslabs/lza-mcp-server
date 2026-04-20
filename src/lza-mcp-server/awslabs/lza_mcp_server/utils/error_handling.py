@@ -90,10 +90,10 @@ def format_error_response(
     else:
         # Default troubleshooting steps
         response["troubleshooting"] = [
-            "Ensure AWS credentials are configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)",
-            "Check if AWS_REGION is set correctly",
-            "Verify IAM permissions for CodePipeline operations",
-            "Confirm the pipeline name exists in the specified region",
+            "Ensure AWS credentials are configured",
+            "Verify your AWS region is set correctly",
+            "Verify IAM permissions for the requested operation",
+            "Confirm the resource exists in the specified region",
         ]
 
     return response
