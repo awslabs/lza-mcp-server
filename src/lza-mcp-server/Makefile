@@ -21,7 +21,7 @@ LZA_MIN_VERSION ?= v1.12.0
 LZA_MAX_VERSION ?=
 DOCKER_IMAGE_NAME ?= lza-mcp-server:local
 
-.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage clean-cache release lint format security-check type-check py-compile build
+.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage test-file clean-cache release lint format security-check type-check py-compile build
 
 # Default target
 help:
@@ -50,6 +50,7 @@ help:
 	@echo ""
 	@echo "Comprehensive Testing:"
 	@echo "  test               Run all tests with standard configuration"
+	@echo "  test-file          Run specific test file(s) (FILE=tests/path/to/test.py)"
 	@echo "  test-parallel      Run all tests with maximum parallelization"
 	@echo "  test-integration   Run integration tests"
 	@echo "  test-coverage      Run tests with coverage reporting"
@@ -291,6 +292,23 @@ smoke:
 		--tb=line \
 		-q \
 		--disable-warnings
+
+# Test specific file(s) by path
+# Usage: make test-file FILE=tests/utils/test_local_adapter.py
+#        make test-file FILE="tests/utils/test_local_adapter.py tests/utils/test_s3_adapter.py"
+#        make test-file FILE=tests/utils/test_s3_adapter.py COV=awslabs.lza_mcp_server.utils.s3_adapter
+test-file:
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Usage: make test-file FILE=tests/path/to/test_file.py"; \
+		echo "         make test-file FILE=tests/path/to/test.py COV=awslabs.module.name"; \
+		exit 1; \
+	fi
+	@echo "🎯 Testing: $(FILE)"
+	@poetry run pytest $(FILE) \
+		-v \
+		--tb=short \
+		$(if $(COV),--cov=$(COV) --cov-report=term-missing --cov-branch,) \
+		--override-ini="addopts="
 
 # Test specific module
 test-module:

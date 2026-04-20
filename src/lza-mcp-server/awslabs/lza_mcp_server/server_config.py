@@ -38,6 +38,24 @@ def is_uc_merge_enabled() -> bool:
     )
 
 
+def is_resource_tools_disabled() -> bool:
+    """Check if resource workaround tools should be disabled.
+
+    The ``listResources`` and ``readResource`` tools are registered by
+    default.  Set ``DISABLE_RESOURCE_TOOLS`` to ``true``, ``1``, or
+    ``yes`` to suppress them (e.g. when the MCP client supports native
+    resources).
+
+    Returns:
+        bool: True if resource tools should be disabled
+    """
+    return os.environ.get("DISABLE_RESOURCE_TOOLS", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+
 def is_instruction_logging_enabled() -> bool:
     """Check if instruction logging should be enabled.
 
@@ -78,18 +96,50 @@ def get_workflow_instructions() -> str:
     return load_instruction_content("workflow_instructions.md")
 
 
-def build_instructions(include_uc_merge: bool = None) -> str:
+def get_workspace_instructions() -> str:
+    """Get workspace instructions.
+
+    Returns:
+        str: Workspace instructions text
+    """
+    return load_instruction_content("workspace_instructions.md")
+
+
+def get_resource_instructions() -> str:
+    """Get resource instructions.
+
+    Returns:
+        str: Resource instructions text
+    """
+    return load_instruction_content("resource_instructions.md")
+
+
+def build_instructions(
+    include_uc_merge: bool | None = None,
+    include_workspaces: bool = True,
+    include_resources: bool | None = None,
+) -> str:
     """Build complete server instructions.
 
     Args:
         include_uc_merge: Whether to include UC Merge instructions.
                          If None, checks environment variable.
+        include_workspaces: Whether to include workspace instructions.
+                           Always True since workspaces are always active.
+        include_resources: Whether to include resource instructions.
+                          If None, True when resource tools are enabled
+                          OR when MCP native resources are registered
+                          (i.e. always, since native resources are always on).
 
     Returns:
         str: Complete instructions text
     """
     if include_uc_merge is None:
         include_uc_merge = is_uc_merge_enabled()
+    if include_resources is None:
+        # Resources are always available — either as native MCP resources
+        # or via the fallback listResources/readResource tools.
+        include_resources = True
 
     if is_guidance_disabled():
         return ""
@@ -98,6 +148,12 @@ def build_instructions(include_uc_merge: bool = None) -> str:
 
     if include_uc_merge:
         instructions += get_uc_merge_instructions()
+
+    if include_workspaces:
+        instructions += get_workspace_instructions()
+
+    if include_resources:
+        instructions += get_resource_instructions()
 
     instructions += get_workflow_instructions()
 

@@ -61,20 +61,13 @@ class TestMCPToolRegistration:
         return _make_mock_server()
 
     def test_config_tools_registration_with_fastmcp(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         registered_tools = mock_fastmcp_server.get_registered_tools()
 
-        assert len(registered_tools) == 6
+        assert len(registered_tools) == 3
         assert "getMinimumConfiguration" in registered_tools
         assert "getLzaConfiguration" in registered_tools
         assert "putLzaConfiguration" in registered_tools
-        assert "readLzaConfigFile" in registered_tools
-        assert "updateLzaConfigFile" in registered_tools
-        assert "createLzaConfigFile" in registered_tools
-
-        get_min = registered_tools["getMinimumConfiguration"]
-        assert callable(get_min["function"])
-        assert "minimal LZA configuration" in get_min["description"]
 
         get_lza = registered_tools["getLzaConfiguration"]
         assert callable(get_lza["function"])
@@ -86,7 +79,7 @@ class TestMCPToolRegistration:
 
     @pytest.mark.asyncio
     async def test_mcp_context_integration(self, mock_fastmcp_server, mock_mcp_context):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         registered_tools = mock_fastmcp_server.get_registered_tools()
         func = registered_tools["getMinimumConfiguration"]["function"]
 
@@ -104,7 +97,7 @@ class TestMCPToolRegistration:
 
     @pytest.mark.asyncio
     async def test_mcp_context_logging(self, mock_fastmcp_server, mock_mcp_context):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
             "function"
         ]
@@ -126,7 +119,7 @@ class TestMCPToolRegistration:
 
     @pytest.mark.asyncio
     async def test_concurrent_mcp_tool_execution(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
         get_min_func = tools["getMinimumConfiguration"]["function"]
         put_func = tools["putLzaConfiguration"]["function"]
@@ -144,7 +137,7 @@ class TestMCPToolRegistration:
 
                 results = await asyncio.gather(
                     get_min_func(contexts[0]),
-                    put_func(contexts[1]),
+                    put_func(contexts[1], "ws-123", ""),
                     get_min_func(contexts[2]),
                 )
                 assert len(results) == 3
@@ -166,7 +159,7 @@ class TestMCPErrorHandling:
     async def test_mcp_context_error_propagation(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
             "function"
         ]
@@ -182,7 +175,7 @@ class TestMCPErrorHandling:
     async def test_mcp_context_error_logging(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
             "function"
         ]
@@ -198,7 +191,7 @@ class TestMCPErrorHandling:
     async def test_mcp_tool_parameter_validation(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
         get_min_func = tools["getMinimumConfiguration"]["function"]
         put_func = tools["putLzaConfiguration"]["function"]
@@ -214,12 +207,12 @@ class TestMCPErrorHandling:
 
                 await get_min_func(mock_mcp_context)
                 await get_min_func(mock_mcp_context, "accounts")
-                await get_min_func(mock_mcp_context, "accounts", "/save/path")
+                await get_min_func(mock_mcp_context, "accounts", "abc123def456")
                 assert mock_get.call_count == 3
 
-                await put_func(mock_mcp_context)
-                await put_func(mock_mcp_context, "my-qualifier")
-                await put_func(mock_mcp_context, None, "./config")
+                await put_func(mock_mcp_context, "ws-123", "")
+                await put_func(mock_mcp_context, "ws-123", "", "my-qualifier")
+                await put_func(mock_mcp_context, "ws-123", "config")
                 assert mock_put.call_count == 3
 
 
@@ -234,7 +227,7 @@ class TestMCPToolMetadata:
         return _make_mock_server()
 
     def test_tool_descriptions_are_comprehensive(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
 
         get_min = tools["getMinimumConfiguration"]
@@ -247,7 +240,7 @@ class TestMCPToolMetadata:
         assert "s3" in put_lza["description"].lower()
 
     def test_tool_names_follow_convention(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         for name in mock_fastmcp_server.get_registered_tools():
             assert name[0].islower()
             assert "_" not in name
@@ -257,22 +250,16 @@ class TestMCPToolMetadata:
     async def test_tool_function_signatures(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
-
-        # getMinimumConfiguration
-        sig = inspect.signature(tools["getMinimumConfiguration"]["function"])
-        params = list(sig.parameters.keys())
-        assert params[0] == "ctx"
-        assert "config_type" in params
-        assert "save_to_directory" in params
 
         # putLzaConfiguration
         sig = inspect.signature(tools["putLzaConfiguration"]["function"])
         params = list(sig.parameters.keys())
         assert params[0] == "ctx"
+        assert "workspace_id" in params
+        assert "path" in params
         assert "qualifier" in params
-        assert "config_path" in params
         assert "bucket_name" in params
 
         # getLzaConfiguration
@@ -281,6 +268,8 @@ class TestMCPToolMetadata:
         assert params[0] == "ctx"
         assert "qualifier" in params
         assert "bucket_name" in params
+        assert "workspace_id" in params
+        assert "path" in params
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +286,7 @@ class TestMCPToolCompatibility:
     async def test_tool_return_value_serialization(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
             "function"
         ]
@@ -316,7 +305,7 @@ class TestMCPToolCompatibility:
     async def test_tool_async_compatibility(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         for name, info in mock_fastmcp_server.get_registered_tools().items():
             assert inspect.iscoroutinefunction(info["function"]), (
                 f"{name} should be async"
@@ -324,7 +313,7 @@ class TestMCPToolCompatibility:
 
     @pytest.mark.asyncio
     async def test_tool_context_requirement(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         for name, info in mock_fastmcp_server.get_registered_tools().items():
             with pytest.raises(TypeError):
                 await info["function"]()
@@ -333,7 +322,7 @@ class TestMCPToolCompatibility:
     async def test_tool_graceful_degradation(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
             "function"
         ]

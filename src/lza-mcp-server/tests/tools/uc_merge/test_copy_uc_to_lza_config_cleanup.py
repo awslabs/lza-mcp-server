@@ -12,140 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for copy_uc_to_lza_config cleanup operations."""
+"""Unit tests for copy_uc_to_lza_config workspace lifecycle (workspace-based).
+
+With the workspace-based implementation, session cleanup is no longer performed
+by copyUcToLzaConfig. Workspaces are managed separately. These tests verify
+that both workspaces remain intact after the copy operation.
+"""
+
+import os
+import tempfile
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from pathlib import Path
-import tempfile
+from unittest.mock import AsyncMock
 
 from awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config import (
     copy_uc_to_lza_config,
 )
+from awslabs.lza_mcp_server.utils.local_adapter import LocalAdapter
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceManager
 
 
-class TestCopyUcToLzaConfigCleanup:
-    """Test cleanup operations after successful copy."""
+def _make_wm(base_dir):
+    adapter = LocalAdapter(base_dir=base_dir)
+    return WorkspaceManager(storage=adapter)
 
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    async def test_session_cleanup_after_successful_copy(
-        self, mock_get_path, mock_session_manager_class
-    ):
-        """Test that session directory is cleaned up after successful copy."""
-        # Arrange
-        mock_ctx = AsyncMock()
 
-        with (
-            tempfile.TemporaryDirectory() as session_dir,
-            tempfile.TemporaryDirectory() as lza_dir,
-        ):
-            session_path = Path(session_dir)
-            lza_path = Path(lza_dir)
-
-            # Create test file
-            (session_path / "file1.yaml").write_text("content1")
-
-            mock_session_manager = Mock()
-            mock_session_manager.validate_session.return_value = (True, None)
-            mock_session_manager.get_session_path.return_value = session_path
-            mock_session_manager_class.return_value = mock_session_manager
-            mock_get_path.return_value = lza_path
-
-            # Act
-            result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
-
-            # Assert
-            assert result["success"] is True
-            assert result["session_cleaned_up"] is True
-            assert not session_path.exists()
+class TestCopyUcToLzaConfigWorkspaceLifecycle:
+    """Test that workspaces remain intact after copy."""
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    async def test_cleanup_failure_does_not_fail_operation(
-        self, mock_get_path, mock_session_manager_class
-    ):
-        """Test that cleanup failure does not fail the overall operation."""
-        # Arrange
+    async def test_uc_workspace_preserved_after_copy(self):
+        """Test that UC workspace is not deleted after successful copy."""
         mock_ctx = AsyncMock()
 
-        with (
-            tempfile.TemporaryDirectory() as session_dir,
-            tempfile.TemporaryDirectory() as lza_dir,
-        ):
-            session_path = Path(session_dir)
-            lza_path = Path(lza_dir)
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
 
-            # Create test file
-            (session_path / "file1.yaml").write_text("content1")
+            uc_ws = wm.create_workspace()
+            wm.write_file(uc_ws, "file1.yaml", b"content1")
 
-            mock_session_manager = Mock()
-            mock_session_manager.validate_session.return_value = (True, None)
-            mock_session_manager.get_session_path.return_value = session_path
-            mock_session_manager_class.return_value = mock_session_manager
-            mock_get_path.return_value = lza_path
+            lza_ws = wm.create_workspace()
 
-            # Simulate cleanup failure by making directory read-only after copy
-            # We'll patch rmtree to raise an error
-            with patch(
-                "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.shutil.rmtree"
-            ) as mock_rmtree:
-                mock_rmtree.side_effect = PermissionError("Cannot delete directory")
+            result = await copy_uc_to_lza_config(mock_ctx, uc_ws, lza_ws, wm)
 
-                # Act
-                result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
-
-            # Assert
             assert result["success"] is True
-            assert result["files_copied"] == 1
-            # Verify warning was logged
-            mock_ctx.warning.assert_called_once()
-            assert "Could not remove session directory" in str(
-                mock_ctx.warning.call_args
-            )
+            # UC workspace should still exist
+            uc_files = wm.list_files(uc_ws)
+            assert "file1.yaml" in uc_files
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.shutil.rmtree")
-    async def test_cleanup_logs_info_messages(
-        self, mock_rmtree, mock_get_path, mock_session_manager_class
-    ):
-        """Test that cleanup logs appropriate info messages."""
-        # Arrange
+    async def test_lza_workspace_preserved_after_copy(self):
+        """Test that LZA workspace retains existing files after copy."""
         mock_ctx = AsyncMock()
 
-        with (
-            tempfile.TemporaryDirectory() as session_dir,
-            tempfile.TemporaryDirectory() as lza_dir,
-        ):
-            session_path = Path(session_dir)
-            lza_path = Path(lza_dir)
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
 
-            # Create test file
-            (session_path / "file1.yaml").write_text("content1")
+            uc_ws = wm.create_workspace()
+            wm.write_file(uc_ws, "uc-file.yaml", b"uc content")
 
-            mock_session_manager = Mock()
-            mock_session_manager.validate_session.return_value = (True, None)
-            mock_session_manager.get_session_path.return_value = session_path
-            mock_session_manager_class.return_value = mock_session_manager
-            mock_get_path.return_value = lza_path
+            lza_ws = wm.create_workspace()
+            wm.write_file(lza_ws, "existing.yaml", b"existing content")
 
-            # Act
-            result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
+            result = await copy_uc_to_lza_config(mock_ctx, uc_ws, lza_ws, wm)
 
-            # Assert
             assert result["success"] is True
-
-            # Verify info messages were logged
-            info_calls = [str(call) for call in mock_ctx.info.call_args_list]
-            assert any("Cleaning up session directory" in call for call in info_calls)
-            assert any("Session directory removed" in call for call in info_calls)
+            lza_files = set(wm.list_files(lza_ws))
+            assert "existing.yaml" in lza_files
+            assert "uc-file.yaml" in lza_files

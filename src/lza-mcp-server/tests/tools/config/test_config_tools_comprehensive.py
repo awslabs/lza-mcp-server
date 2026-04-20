@@ -31,6 +31,7 @@ from awslabs.lza_mcp_server.tools.config.manage_config_tools import (
 from awslabs.lza_mcp_server.tools.config.get_minimum_configuration import (
     tool_get_minimum_configuration,
 )
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceManager
 
 
 def _make_mock_server():
@@ -137,7 +138,7 @@ class TestConfigToolsComprehensive:
         shutil.rmtree(temp_dir)
 
     def test_complete_tool_registration(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
 
         for name in (
@@ -152,12 +153,22 @@ class TestConfigToolsComprehensive:
     async def test_complete_minimum_configuration_workflow(
         self, mock_mcp_context, temp_complete_config_dir
     ):
+        mock_wm = Mock(spec=WorkspaceManager)
+        mock_wm.create_workspace.return_value = "abc123def456"
+        mock_wm.list_files.return_value = []
+        mock_wm.write_file.return_value = None
+
         with patch.dict(os.environ, {"LZA_MIN_CONFIG_DIR": temp_complete_config_dir}):
-            result = await tool_get_minimum_configuration(mock_mcp_context)
+            result = await tool_get_minimum_configuration(mock_mcp_context, mock_wm)
 
         assert "config_files" in result
         for cfg in ("accounts", "global", "organization", "network", "security", "iam"):
             assert cfg in result["config_files"]
+
+        assert result["workspace_id"] == "abc123def456"
+        assert result["workspace_created"] is True
+        assert "files_written" in result
+        assert len(result["files_written"]) >= 6
 
         instructions = result["instructions_for_assistant"]
         for field in (
@@ -174,7 +185,7 @@ class TestConfigToolsComprehensive:
     async def test_complete_error_handling_scenarios(
         self, mock_mcp_context, mock_fastmcp_server
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
         get_min_func = tools["getMinimumConfiguration"]["function"]
 
@@ -215,7 +226,7 @@ class TestConfigToolsComprehensive:
     async def test_complete_mcp_integration_workflow(
         self, mock_fastmcp_server, mock_mcp_context, temp_complete_config_dir
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
 
         get_min_func = tools["getMinimumConfiguration"]["function"]
@@ -230,7 +241,7 @@ class TestConfigToolsComprehensive:
     async def test_complete_async_compatibility(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         tools = mock_fastmcp_server.get_registered_tools()
 
         for name, info in tools.items():
@@ -249,7 +260,7 @@ class TestConfigToolsComprehensive:
             assert len(results) == 2
 
     def test_complete_tool_metadata_compliance(self, mock_fastmcp_server):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         for name, info in mock_fastmcp_server.get_registered_tools().items():
             assert name[0].islower()
             assert "_" not in name
@@ -261,7 +272,7 @@ class TestConfigToolsComprehensive:
     async def test_complete_json_serialization_compatibility(
         self, mock_fastmcp_server, mock_mcp_context
     ):
-        register_config_tools(mock_fastmcp_server)
+        register_config_tools(mock_fastmcp_server, Mock())
         func = mock_fastmcp_server.get_registered_tools()["getMinimumConfiguration"][
             "function"
         ]

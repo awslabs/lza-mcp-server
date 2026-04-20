@@ -45,34 +45,10 @@ def get_lza_config_base_path() -> Path:
     return Path(os.environ.get("LZA_CONFIG_BASE_PATH", _DEFAULT_LZA_CONFIG_BASE_PATH))
 
 
-# For backward compatibility, keep these as module-level variables
+# For backward compatibility, keep as module-level variables
 # but they will be stale if environment changes after import
 UC_BASE_PATH = get_uc_base_path()
 LZA_CONFIG_BASE_PATH = get_lza_config_base_path()
-
-# Module-level variable to store extracted LZA config path
-_extracted_lza_config_path: Path | None = None
-
-
-def set_extracted_lza_config_path(path: Path) -> None:
-    """Set the extracted LZA configuration path.
-
-    This should be called after getLzaConfiguration completes.
-
-    Args:
-        path: Path to extracted LZA configuration directory
-    """
-    global _extracted_lza_config_path
-    _extracted_lza_config_path = path
-
-
-def get_extracted_lza_config_path() -> Path | None:
-    """Get the extracted LZA configuration path.
-
-    Returns:
-        Path to extracted LZA configuration, or None if not set
-    """
-    return _extracted_lza_config_path
 
 
 def validate_path_security(

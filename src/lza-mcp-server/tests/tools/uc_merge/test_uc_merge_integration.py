@@ -17,10 +17,9 @@
 These tests verify the complete end-to-end UC merge workflow including:
 - Release discovery
 - Network model selection
-- Session creation
-- Configuration reading and validation
-- File updates
-- Configuration copying
+- Session creation (workspace-based)
+- Customization guide
+- Configuration copying (workspace-to-workspace)
 - Error recovery paths
 
 Requirements: All UC merge requirements (1.1-11.5)
@@ -41,17 +40,20 @@ from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models import (
 from awslabs.lza_mcp_server.tools.uc_merge.start_uc_merge_session import (
     tool_start_uc_merge_session,
 )
-from awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file import (
-    read_lza_config_file,
-)
-from awslabs.lza_mcp_server.tools.uc_merge.read_uc_file import read_uc_file
-from awslabs.lza_mcp_server.tools.uc_merge.update_uc_file import update_uc_file
 from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_customization_guide import (
     get_uc_network_customization_guide,
 )
 from awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config import (
     copy_uc_to_lza_config,
 )
+from awslabs.lza_mcp_server.utils.local_adapter import LocalAdapter
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceManager
+
+
+def _make_integration_wm(base_dir):
+    """Create a real WorkspaceManager backed by a local adapter for integration tests."""
+    adapter = LocalAdapter(base_dir=base_dir)
+    return WorkspaceManager(storage=adapter)
 
 
 @pytest.mark.integration
@@ -166,22 +168,12 @@ class TestUCMergeWorkflowIntegration:
         """Test complete UC merge workflow with hub-and-spoke model.
 
         Requirements: All (1.1-11.5)
-
-        This test verifies the end-to-end workflow by:
-        1. Discovering available UC releases
-        2. Getting network models for a release
-        3. Starting a merge session
-        4. Reading and validating configuration files
-        5. Updating configuration values
-        6. Copying UC config to LZA config
         """
         # Step 1: Discover available releases
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
             releases_result = await tool_get_uc_releases(mock_mcp_context)
 
-        assert releases_result["success"] is True, (
-            f"Failed to get releases: {releases_result.get('error', 'Unknown error')}"
-        )
+        assert releases_result["success"] is True
         assert len(releases_result["releases"]) > 0
         release_names = [r["name"] for r in releases_result["releases"]]
         assert "v1.0.0" in release_names
@@ -193,89 +185,60 @@ class TestUCMergeWorkflowIntegration:
                 mock_mcp_context, uc_release="v1.0.0"
             )
 
-        # Print error for debugging if it fails
-        if not models_result.get("success"):
-            print(f"Models result error: {models_result}")
-
-        assert models_result["success"] is True, (
-            f"Failed to get models: {models_result.get('error', 'Unknown error')}"
-        )
+        assert models_result["success"] is True
         assert "hub-and-spoke" in models_result["available_models"]
         assert "next_steps" in models_result
 
-        # For integration testing, we verify the workflow completes successfully
-        # without testing every single field in detail (that's covered by unit tests)
-        print(f"✓ Successfully discovered {len(releases_result['releases'])} releases")
-        print(
-            f"✓ Successfully discovered {len(models_result['available_models'])} network models"
-        )
-        print("✓ Integration test workflow completed successfully")
-
-        # Step 3: Start merge session
+        # Step 3: Start merge session (creates workspace)
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
+            wm = _make_integration_wm(os.path.join(mock_lza_config, "workspaces"))
+            session_result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v1.0.0",
+                network_model="hub-and-spoke",
+                workspace_manager=wm,
+            )
 
         assert session_result["success"] is True
-        session_id = session_result["session_id"]
+        uc_workspace_id = session_result["workspace_id"]
 
-        # Step 7: Update UC configuration file
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            update_result = await update_uc_file(
-                session_id=session_id,
-                file_path="replacements-config.yaml",
-                updates={
-                    "globalReplacements.HomeRegionIngressCidr": "10.10.0.0/24",
-                    "globalReplacements.HomeRegionEgressCidr": "10.10.1.0/24",
-                },
-            )
-
-        assert update_result["success"] is True
-        assert "updates_applied" in update_result
-        assert len(update_result["updates_applied"]) == 2
-
-        # Step 8: Copy UC to LZA config
-        # Set the extracted LZA config path for copy operation
-        from awslabs.lza_mcp_server.tools.uc_merge.common import (
-            set_extracted_lza_config_path,
+        # Step 4: Get customization guide (workspace-based)
+        guide_result = get_uc_network_customization_guide(
+            workspace_id=uc_workspace_id, workspace_manager=wm
         )
+        assert guide_result["success"] is True
+        assert guide_result["network_model"] == "hub-and-spoke"
 
-        set_extracted_lza_config_path(Path(mock_lza_config))
+        # Step 5: Copy UC to LZA config (workspace-to-workspace)
+        lza_ws = wm.create_workspace()
+        for cfg_name in [
+            "accounts-config.yaml",
+            "global-config.yaml",
+            "network-config.yaml",
+            "iam-config.yaml",
+        ]:
+            cfg_path = Path(mock_lza_config) / cfg_name
+            if cfg_path.exists():
+                wm.write_file(lza_ws, cfg_name, cfg_path.read_bytes())
 
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            copy_result = await copy_uc_to_lza_config(
-                mock_mcp_context, session_id=session_id
-            )
+        copy_result = await copy_uc_to_lza_config(
+            mock_mcp_context, uc_workspace_id, lza_ws, wm
+        )
 
         assert copy_result["success"] is True
         assert copy_result["files_copied"] > 0
         assert "next_steps" in copy_result
+        assert "putLzaConfiguration" in copy_result["next_steps"]
 
-        # Verify files were copied
-        lza_accounts = Path(mock_lza_config) / "accounts-config.yaml"
-        assert lza_accounts.exists()
-
-        # Verify updated content is in copied file
-        lza_replacements = Path(mock_lza_config) / "replacements-config.yaml"
-        if lza_replacements.exists():
-            content = yaml.safe_load(lza_replacements.read_text())
-            assert (
-                content["globalReplacements"]["HomeRegionIngressCidr"] == "10.10.0.0/24"
-            )
+        # Verify files were copied to LZA workspace
+        lza_files = wm.list_files(lza_ws)
+        assert "accounts-config.yaml" in lza_files
 
     @pytest.mark.asyncio
     async def test_complete_uc_merge_workflow_shared_vpc(
         self, mock_mcp_context, mock_uc_repo, mock_lza_config
     ):
-        """Test complete UC merge workflow with shared-vpc model.
-
-        Requirements: All (1.1-11.5)
-        """
-        # Step 1: Get network models
+        """Test complete UC merge workflow with shared-vpc model."""
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
             models_result = await tool_get_uc_network_models(
                 mock_mcp_context, uc_release="v1.0.0"
@@ -284,40 +247,30 @@ class TestUCMergeWorkflowIntegration:
         assert models_result["success"] is True
         assert "shared-vpc" in models_result["available_models"]
 
-        # Step 2: Start session with shared-vpc
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="shared-vpc",
-                )
+            wm = _make_integration_wm(os.path.join(mock_lza_config, "workspaces"))
+            session_result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v1.0.0",
+                network_model="shared-vpc",
+                workspace_manager=wm,
+            )
 
         assert session_result["success"] is True
         assert session_result["network_model"] == "shared-vpc"
 
-        session_id = session_result["session_id"]
+        uc_workspace_id = session_result["workspace_id"]
 
-        # Step 3: Get customization guide for shared-vpc
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            guide_result = get_uc_network_customization_guide(session_id=session_id)
-
+        guide_result = get_uc_network_customization_guide(
+            workspace_id=uc_workspace_id, workspace_manager=wm
+        )
         assert guide_result["success"] is True
         assert guide_result["network_model"] == "shared-vpc"
 
-        # Step 4: Complete the workflow
-        # Set the extracted LZA config path for copy operation
-        from awslabs.lza_mcp_server.tools.uc_merge.common import (
-            set_extracted_lza_config_path,
+        lza_ws = wm.create_workspace()
+        copy_result = await copy_uc_to_lza_config(
+            mock_mcp_context, uc_workspace_id, lza_ws, wm
         )
-
-        set_extracted_lza_config_path(Path(mock_lza_config))
-
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            copy_result = await copy_uc_to_lza_config(
-                mock_mcp_context, session_id=session_id
-            )
-
         assert copy_result["success"] is True
         assert copy_result["files_copied"] > 0
 
@@ -325,21 +278,15 @@ class TestUCMergeWorkflowIntegration:
     async def test_uc_merge_with_different_releases(
         self, mock_mcp_context, mock_uc_repo, mock_lza_config
     ):
-        """Test UC merge workflow with multiple release versions.
-
-        Requirements: 1.1, 1.2, 2.1
-        """
-        # Create additional release version
+        """Test UC merge workflow with multiple release versions."""
         v2_dir = Path(mock_uc_repo) / "v2.0.0"
         v2_dir.mkdir()
-
         model_dir = v2_dir / "hub-and-spoke"
         model_dir.mkdir()
         (model_dir / "accounts-config.yaml").write_text(
             yaml.dump({"mandatoryAccounts": []})
         )
 
-        # Step 1: Discover releases
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
             releases_result = await tool_get_uc_releases(mock_mcp_context)
 
@@ -348,17 +295,16 @@ class TestUCMergeWorkflowIntegration:
         release_names = [r["name"] for r in releases_result["releases"]]
         assert "v1.0.0" in release_names
         assert "v2.0.0" in release_names
-        # Should be in descending order (newest first)
         assert releases_result["releases"][0]["name"] == "v2.0.0"
 
-        # Step 2: Start session with v2.0.0
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v2.0.0",
-                    network_model="hub-and-spoke",
-                )
+            wm = _make_integration_wm(os.path.join(mock_lza_config, "workspaces"))
+            session_result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v2.0.0",
+                network_model="hub-and-spoke",
+                workspace_manager=wm,
+            )
 
         assert session_result["success"] is True
         assert session_result["uc_release"] == "v2.0.0"
@@ -367,17 +313,15 @@ class TestUCMergeWorkflowIntegration:
     async def test_error_recovery_invalid_network_model(
         self, mock_mcp_context, mock_uc_repo, mock_lza_config
     ):
-        """Test error recovery when invalid network model is selected.
-
-        Requirements: 2.2, 2.4
-        """
+        """Test error recovery when invalid network model is selected."""
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="invalid-model",
-                )
+            wm = _make_integration_wm(os.path.join(mock_lza_config, "workspaces"))
+            result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v1.0.0",
+                network_model="invalid-model",
+                workspace_manager=wm,
+            )
 
         assert result["success"] is False
         assert "error" in result
@@ -389,280 +333,57 @@ class TestUCMergeWorkflowIntegration:
     async def test_error_recovery_missing_parameters(
         self, mock_mcp_context, mock_uc_repo
     ):
-        """Test error recovery when required parameters are missing.
-
-        Requirements: 2.2, 2.10, 5.2, 6.2, 8.2, 9.2
-        """
-        # Test missing uc_release
+        """Test error recovery when required parameters are missing."""
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
             result = await tool_get_uc_network_models(mock_mcp_context, uc_release=None)
 
         assert result["success"] is False
         assert "error" in result
 
-        # Test missing session_id for read_uc_file
-        result = await read_uc_file(
-            mock_mcp_context, session_id=None, file_path="test.yaml"
-        )
-
-        assert result["success"] is False
-        assert "error" in result
-
-        # Test missing session_id for update_uc_file
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_uc_repo}):
-            result = await update_uc_file(
-                session_id=None,
-                file_path="test.yaml",
-                updates={},
-            )
-
-        assert result["success"] is False
-        assert "error" in result
-
-    @pytest.mark.asyncio
-    async def test_error_recovery_path_traversal(
-        self, mock_mcp_context, mock_uc_repo, mock_lza_config
-    ):
-        """Test error recovery for path traversal attempts.
-
-        Requirements: 3.2, 6.3, 8.5
-        """
-        # Create session first
-        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
-
-        session_id = session_result["session_id"]
-
-        # Test path traversal in read_uc_file
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            result = await read_uc_file(
-                mock_mcp_context,
-                session_id=session_id,
-                file_path="../../../etc/passwd",
-            )
-
-        assert result["success"] is False
-        assert "PATH_TRAVERSAL" in result.get("error_code", "")
-
-        # Test path traversal in update_uc_file (must provide valid updates to reach path check)
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            result = await update_uc_file(
-                session_id=session_id,
-                file_path="../../sensitive.yaml",
-                updates={"test": "value"},  # Valid updates to pass initial validation
-            )
-
-        assert result["success"] is False
-        assert "PATH_TRAVERSAL" in result.get("error_code", "")
-
-    @pytest.mark.asyncio
-    async def test_error_recovery_invalid_yaml_update(
-        self, mock_mcp_context, mock_uc_repo, mock_lza_config
-    ):
-        """Test error recovery when YAML update fails validation.
-
-        Requirements: 8.6, 8.7, 8.8, 8.9
-        """
-        # Create session
-        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
-
-        session_id = session_result["session_id"]
-
-        # Test invalid CIDR format
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            result = await update_uc_file(
-                session_id=session_id,
-                file_path="replacements-config.yaml",
-                updates={
-                    "globalReplacements.HomeRegionIngressCidr": "10.0.0/8",  # Invalid CIDR
-                },
-            )
-
-        # Should either fail or include validation errors
-        if not result["success"]:
-            assert "error" in result
-        else:
-            assert "validation_errors" in result
-            if result["validation_errors"]:
-                assert any("CIDR" in str(err) for err in result["validation_errors"])
-
-    @pytest.mark.asyncio
-    async def test_error_recovery_non_fresh_installation(
-        self, mock_mcp_context, mock_lza_config
-    ):
-        """Test error recovery when LZA installation is not fresh.
-
-        Requirements: 4.1, 4.4
-        """
-        # Create retrieved-config directory structure
-        retrieved_dir = Path(mock_lza_config) / "retrieved-config"
-        retrieved_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create non-fresh LZA config with workload accounts
-        non_fresh_config = retrieved_dir / "accounts-config.yaml"
-        non_fresh_config.write_text(
-            yaml.dump(
-                {
-                    "mandatoryAccounts": [
-                        {"name": "Management", "email": "mgmt@test.com"},
-                    ],
-                    "workloadAccounts": [
-                        {"name": "Production", "email": "prod@test.com"},
-                        {"name": "Development", "email": "dev@test.com"},
-                    ],
-                }
-            )
-        )
-
-        # Read the config
-        with patch(
-            "awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file.LZA_CONFIG_BASE_PATH",
-            Path(mock_lza_config),
-        ):
-            result = await read_lza_config_file(
-                mock_mcp_context, file_path="accounts-config.yaml"
-            )
-
-        assert result["success"] is True
-        content = yaml.safe_load(result["content"])
-
-        # Validation should detect non-empty workloadAccounts
-        assert len(content["workloadAccounts"]) > 0
-
     @pytest.mark.asyncio
     async def test_session_cleanup_on_new_session(
         self, mock_mcp_context, mock_uc_repo, mock_lza_config
     ):
-        """Test that previous sessions are cleaned up when new session is created.
-
-        Requirements: 2.11
-        """
-        import time
-
-        # Create first session
+        """Test that workspaces are independent (no cleanup on new session)."""
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session1_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
+            wm = _make_integration_wm(os.path.join(mock_lza_config, "workspaces"))
+            session1_result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v1.0.0",
+                network_model="hub-and-spoke",
+                workspace_manager=wm,
+            )
 
         assert session1_result["success"] is True
-        session1_path = session1_result["session_path"]
+        workspace1_id = session1_result["workspace_id"]
 
-        # Verify first session exists
-        assert os.path.exists(session1_path)
-
-        # Wait to ensure different timestamp for session ID
-        time.sleep(1.1)
-
-        # Create second session
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session2_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="shared-vpc",
-                )
+            session2_result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v1.0.0",
+                network_model="shared-vpc",
+                workspace_manager=wm,
+            )
 
         assert session2_result["success"] is True
-        session2_path = session2_result["session_path"]
+        workspace2_id = session2_result["workspace_id"]
 
-        # Verify second session exists
-        assert os.path.exists(session2_path)
-
-        # First session should be cleaned up
-        assert not os.path.exists(session1_path)
-
-    @pytest.mark.asyncio
-    async def test_multiple_file_updates_in_session(
-        self, mock_mcp_context, mock_uc_repo, mock_lza_config
-    ):
-        """Test multiple file updates within the same session.
-
-        Requirements: 8.1, 8.10, 8.11
-        """
-        # Create session
-        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
-
-        session_id = session_result["session_id"]
-
-        # Update replacements-config.yaml
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            update1_result = await update_uc_file(
-                session_id=session_id,
-                file_path="replacements-config.yaml",
-                updates={
-                    "globalReplacements.HomeRegionIngressCidr": "10.20.0.0/24",
-                },
-            )
-
-        assert update1_result["success"] is True
-
-        # Update accounts-config.yaml
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            update2_result = await update_uc_file(
-                session_id=session_id,
-                file_path="accounts-config.yaml",
-                updates={
-                    "workloadAccounts[0].email": "updated-network@example.com",
-                },
-            )
-
-        assert update2_result["success"] is True
-
-        # Verify both updates persist
-        session_path = Path(session_result["session_path"])
-        replacements_file = session_path / "replacements-config.yaml"
-        accounts_file = session_path / "accounts-config.yaml"
-
-        if replacements_file.exists():
-            replacements_content = yaml.safe_load(replacements_file.read_text())
-            assert (
-                replacements_content["globalReplacements"]["HomeRegionIngressCidr"]
-                == "10.20.0.0/24"
-            )
-
-        if accounts_file.exists():
-            accounts_content = yaml.safe_load(accounts_file.read_text())
-            assert (
-                accounts_content["workloadAccounts"][0]["email"]
-                == "updated-network@example.com"
-            )
+        assert workspace1_id != workspace2_id
+        files1 = wm.list_files(workspace1_id)
+        files2 = wm.list_files(workspace2_id)
+        assert len(files1) > 0
+        assert len(files2) > 0
 
     @pytest.mark.asyncio
     async def test_workflow_guidance_next_steps(
         self, mock_mcp_context, mock_uc_repo, mock_lza_config
     ):
-        """Test that all tools provide next_steps guidance.
-
-        Requirements: 10.1, 10.2, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11, 10.12
-        """
-        # Test get_uc_releases next_steps
+        """Test that all tools provide next_steps guidance."""
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
             releases_result = await tool_get_uc_releases(mock_mcp_context)
         assert "next_steps" in releases_result
         assert len(releases_result["next_steps"]) > 0
 
-        # Test get_uc_network_models next_steps
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
             models_result = await tool_get_uc_network_models(
                 mock_mcp_context, uc_release="v1.0.0"
@@ -670,121 +391,31 @@ class TestUCMergeWorkflowIntegration:
         assert "next_steps" in models_result
         assert "present" in models_result["next_steps"].lower()
 
-        # Test start_uc_merge_session next_steps
         with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
+            wm = _make_integration_wm(os.path.join(mock_lza_config, "workspaces"))
+            session_result = await tool_start_uc_merge_session(
+                mock_mcp_context,
+                uc_release="v1.0.0",
+                network_model="hub-and-spoke",
+                workspace_manager=wm,
+            )
         assert "next_steps" in session_result
         assert "getLzaConfiguration" in session_result["next_steps"]
 
-        session_id = session_result["session_id"]
+        uc_workspace_id = session_result["workspace_id"]
 
-        # Test read_lza_config_file next_steps
-        # Create retrieved-config directory structure for this test
-        retrieved_dir = Path(mock_lza_config) / "retrieved-config"
-        retrieved_dir.mkdir(parents=True, exist_ok=True)
-        (retrieved_dir / "accounts-config.yaml").write_text(
-            yaml.dump({"mandatoryAccounts": [], "workloadAccounts": []})
+        guide_result = get_uc_network_customization_guide(
+            workspace_id=uc_workspace_id, workspace_manager=wm
         )
-
-        with patch(
-            "awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file.LZA_CONFIG_BASE_PATH",
-            Path(mock_lza_config),
-        ):
-            lza_result = await read_lza_config_file(
-                mock_mcp_context, file_path="accounts-config.yaml"
-            )
-        assert "next_steps" in lza_result
-
-        # Test get_uc_network_customization_guide next_steps
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            guide_result = get_uc_network_customization_guide(session_id=session_id)
         assert "next_steps" in guide_result
-        assert (
-            "readUcFile" in guide_result["next_steps"]
-        )  # Uses camelCase in MCP tool names
+        assert "readResource" in guide_result["next_steps"]
 
-        # Test read_uc_file next_steps
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            uc_result = await read_uc_file(
-                mock_mcp_context,
-                session_id=session_id,
-                file_path="replacements-config.yaml",
-            )
-        assert "next_steps" in uc_result
-
-        # Test update_uc_file next_steps
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            update_result = await update_uc_file(
-                session_id=session_id,
-                file_path="replacements-config.yaml",
-                updates={"globalReplacements.HomeRegionIngressCidr": "10.30.0.0/24"},
-            )
-        assert "next_steps" in update_result
-
-        # Test copy_uc_to_lza_config next_steps
-        # Create the LZA config directory structure that copy expects
-        lza_dest_dir = Path(mock_lza_config).parent / "lza-config" / "retrieved-config"
-        lza_dest_dir.mkdir(parents=True, exist_ok=True)
-
-        # Import and set the extracted LZA config path
-        from awslabs.lza_mcp_server.tools.uc_merge.common import (
-            set_extracted_lza_config_path,
+        lza_ws = wm.create_workspace()
+        copy_result = await copy_uc_to_lza_config(
+            mock_mcp_context, uc_workspace_id, lza_ws, wm
         )
-
-        set_extracted_lza_config_path(lza_dest_dir)
-
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            copy_result = await copy_uc_to_lza_config(
-                mock_mcp_context, session_id=session_id
-            )
         assert "next_steps" in copy_result
         assert "putLzaConfiguration" in copy_result["next_steps"]
-
-    @pytest.mark.asyncio
-    async def test_file_not_found_error_handling(
-        self, mock_mcp_context, mock_uc_repo, mock_lza_config
-    ):
-        """Test error handling when files are not found.
-
-        Requirements: 3.5, 6.6, 8.4
-        """
-        # Create session
-        with patch.dict(os.environ, {"LZA_UC_BASE_PATH": mock_uc_repo}):
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-                session_result = await tool_start_uc_merge_session(
-                    mock_mcp_context,
-                    uc_release="v1.0.0",
-                    network_model="hub-and-spoke",
-                )
-
-        session_id = session_result["session_id"]
-
-        # Test reading non-existent UC file
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            result = await read_uc_file(
-                mock_mcp_context,
-                session_id=session_id,
-                file_path="non-existent-file.yaml",
-            )
-
-        assert result["success"] is False
-        assert "FILE_NOT_FOUND" in result.get("error_code", "")
-
-        # Test updating non-existent file (must provide valid updates)
-        with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": mock_lza_config}):
-            result = await update_uc_file(
-                session_id=session_id,
-                file_path="non-existent-file.yaml",
-                updates={"test": "value"},  # Valid updates to pass initial validation
-            )
-
-        assert result["success"] is False
-        assert "FILE_NOT_FOUND" in result.get("error_code", "")
 
 
 @pytest.mark.integration
@@ -809,42 +440,6 @@ class TestUCMergeEdgeCases:
             shutil.rmtree(temp_dir)
 
     @pytest.mark.asyncio
-    async def test_large_configuration_files(self, mock_mcp_context):
-        """Test handling of large configuration files."""
-        temp_dir = tempfile.mkdtemp()
-        lza_config = Path(temp_dir) / "lza-config"
-        lza_config.mkdir()
-
-        # Create retrieved-config directory structure
-        retrieved_dir = lza_config / "retrieved-config"
-        retrieved_dir.mkdir()
-
-        try:
-            # Create a large config file (simulate large deployment)
-            large_config = {
-                "mandatoryAccounts": [
-                    {"name": f"Account{i}", "email": f"account{i}@test.com"}
-                    for i in range(100)
-                ]
-            }
-
-            (retrieved_dir / "accounts-config.yaml").write_text(yaml.dump(large_config))
-
-            with patch(
-                "awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file.LZA_CONFIG_BASE_PATH",
-                lza_config,
-            ):
-                result = await read_lza_config_file(
-                    mock_mcp_context, file_path="accounts-config.yaml"
-                )
-
-            assert result["success"] is True
-            assert "content" in result
-            assert len(result["content"]) > 1000  # Should be a large file
-        finally:
-            shutil.rmtree(temp_dir)
-
-    @pytest.mark.asyncio
     async def test_special_characters_in_file_paths(self, mock_mcp_context):
         """Test handling of special characters in file paths."""
         temp_dir = tempfile.mkdtemp()
@@ -854,76 +449,63 @@ class TestUCMergeEdgeCases:
         model_dir.mkdir(parents=True)
 
         try:
-            # Create file with spaces in name
             (model_dir / "config file.yaml").write_text(yaml.dump({"test": "value"}))
 
             with patch.dict(os.environ, {"LZA_UC_BASE_PATH": str(uc_repo)}):
-                with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                    session_result = await tool_start_uc_merge_session(
-                        mock_mcp_context,
-                        uc_release="v1.0.0",
-                        network_model="hub-and-spoke",
-                    )
+                wm = _make_integration_wm(os.path.join(temp_dir, "workspaces"))
+                session_result = await tool_start_uc_merge_session(
+                    mock_mcp_context,
+                    uc_release="v1.0.0",
+                    network_model="hub-and-spoke",
+                    workspace_manager=wm,
+                )
 
             assert session_result["success"] is True
 
-            # Try to read file with space in name
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                result = await read_uc_file(
-                    mock_mcp_context,
-                    session_id=session_result["session_id"],
-                    file_path="config file.yaml",
-                )
-
-            # Should handle the file (success or appropriate error)
-            assert "success" in result
+            # Verify file with space in name is in workspace
+            files = wm.list_files(session_result["workspace_id"])
+            assert "config file.yaml" in files
         finally:
             shutil.rmtree(temp_dir)
 
     @pytest.mark.asyncio
     async def test_concurrent_session_operations(self, mock_mcp_context):
         """Test that session operations are isolated from each other."""
-        import time
-
         temp_dir = tempfile.mkdtemp()
         uc_repo = Path(temp_dir) / "lza-uc"
         v1_dir = uc_repo / "v1.0.0"
 
         try:
-            # Create two network models
             for model in ["hub-and-spoke", "shared-vpc"]:
                 model_dir = v1_dir / model
                 model_dir.mkdir(parents=True)
                 (model_dir / "test.yaml").write_text(yaml.dump({"model": model}))
 
-            # Create two sessions
+            wm = _make_integration_wm(os.path.join(temp_dir, "workspaces"))
             with patch.dict(os.environ, {"LZA_UC_BASE_PATH": str(uc_repo)}):
-                with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                    session1 = await tool_start_uc_merge_session(
-                        mock_mcp_context,
-                        uc_release="v1.0.0",
-                        network_model="hub-and-spoke",
-                    )
+                session1 = await tool_start_uc_merge_session(
+                    mock_mcp_context,
+                    uc_release="v1.0.0",
+                    network_model="hub-and-spoke",
+                    workspace_manager=wm,
+                )
 
-            # Wait to ensure different timestamp for session ID
-            time.sleep(1.1)
-
-            # Second session should clean up first
             with patch.dict(os.environ, {"LZA_UC_BASE_PATH": str(uc_repo)}):
-                with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                    session2 = await tool_start_uc_merge_session(
-                        mock_mcp_context,
-                        uc_release="v1.0.0",
-                        network_model="shared-vpc",
-                    )
+                session2 = await tool_start_uc_merge_session(
+                    mock_mcp_context,
+                    uc_release="v1.0.0",
+                    network_model="shared-vpc",
+                    workspace_manager=wm,
+                )
 
             assert session1["success"] is True
             assert session2["success"] is True
-            assert session1["session_id"] != session2["session_id"]
+            assert session1["workspace_id"] != session2["workspace_id"]
 
-            # First session should be cleaned up
-            assert not os.path.exists(session1["session_path"])
-            assert os.path.exists(session2["session_path"])
+            files1 = wm.list_files(session1["workspace_id"])
+            files2 = wm.list_files(session2["workspace_id"])
+            assert len(files1) > 0
+            assert len(files2) > 0
         finally:
             shutil.rmtree(temp_dir)
 
@@ -945,24 +527,24 @@ class TestUCMergePerformance:
         model_dir.mkdir(parents=True)
 
         try:
-            # Create multiple files to copy
             for i in range(20):
                 (model_dir / f"config-{i}.yaml").write_text(yaml.dump({"index": i}))
 
             start_time = time.time()
 
             with patch.dict(os.environ, {"LZA_UC_BASE_PATH": str(uc_repo)}):
-                with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                    result = await tool_start_uc_merge_session(
-                        mock_mcp_context,
-                        uc_release="v1.0.0",
-                        network_model="hub-and-spoke",
-                    )
+                wm = _make_integration_wm(os.path.join(temp_dir, "workspaces"))
+                result = await tool_start_uc_merge_session(
+                    mock_mcp_context,
+                    uc_release="v1.0.0",
+                    network_model="hub-and-spoke",
+                    workspace_manager=wm,
+                )
 
             elapsed_time = time.time() - start_time
 
             assert result["success"] is True
-            assert elapsed_time < 5.0  # Should complete in less than 5 seconds
+            assert elapsed_time < 5.0
             assert result["files_copied"] == 20
         finally:
             shutil.rmtree(temp_dir)
@@ -974,44 +556,33 @@ class TestUCMergePerformance:
 
         temp_dir = tempfile.mkdtemp()
         uc_repo = Path(temp_dir) / "lza-uc"
-        lza_config = Path(temp_dir) / "lza-config"
         v1_dir = uc_repo / "v1.0.0"
         model_dir = v1_dir / "hub-and-spoke"
         model_dir.mkdir(parents=True)
-        lza_config.mkdir()
 
         try:
-            # Create files
             for i in range(10):
                 (model_dir / f"config-{i}.yaml").write_text(yaml.dump({"index": i}))
 
-            # Create session
             with patch.dict(os.environ, {"LZA_UC_BASE_PATH": str(uc_repo)}):
-                with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                    session_result = await tool_start_uc_merge_session(
-                        mock_mcp_context,
-                        uc_release="v1.0.0",
-                        network_model="hub-and-spoke",
-                    )
+                wm = _make_integration_wm(os.path.join(temp_dir, "workspaces"))
+                session_result = await tool_start_uc_merge_session(
+                    mock_mcp_context,
+                    uc_release="v1.0.0",
+                    network_model="hub-and-spoke",
+                    workspace_manager=wm,
+                )
 
             start_time = time.time()
 
-            # Copy to LZA config
-            # Set the extracted LZA config path for copy operation
-            from awslabs.lza_mcp_server.tools.uc_merge.common import (
-                set_extracted_lza_config_path,
+            lza_ws = wm.create_workspace()
+            result = await copy_uc_to_lza_config(
+                mock_mcp_context, session_result["workspace_id"], lza_ws, wm
             )
-
-            set_extracted_lza_config_path(Path(str(lza_config)))
-
-            with patch.dict(os.environ, {"LZA_CONFIG_BASE_PATH": temp_dir}):
-                result = await copy_uc_to_lza_config(
-                    mock_mcp_context, session_id=session_result["session_id"]
-                )
 
             elapsed_time = time.time() - start_time
 
             assert result["success"] is True
-            assert elapsed_time < 3.0  # Should complete in less than 3 seconds
+            assert elapsed_time < 3.0
         finally:
             shutil.rmtree(temp_dir)

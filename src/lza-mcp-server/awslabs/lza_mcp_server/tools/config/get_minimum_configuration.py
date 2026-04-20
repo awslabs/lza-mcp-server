@@ -20,7 +20,10 @@ from typing import Dict, Any, Optional
 from mcp.server.fastmcp import Context
 from awslabs.lza_mcp_server.utils.input_validation import (
     validate_string_input,
-    validate_file_path,
+)
+from awslabs.lza_mcp_server.utils.workspace_manager import (
+    WorkspaceManager,
+    WorkspaceNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,10 +31,11 @@ logger = logging.getLogger(__name__)
 
 async def tool_get_minimum_configuration(
     ctx: Context,
+    workspace_manager: WorkspaceManager,
     config_type: Optional[str] = None,
-    save_to_directory: Optional[str] = None,
+    workspace_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Generate complete minimum viable LZA configurations with all required components.
+    """Generate complete minimum viable LZA configurations and extract them into a workspace.
 
     Creates a set of baseline LZA configuration files that include all the minimum required
     settings for a successful LZA deployment. These configurations serve as a starting point
@@ -52,36 +56,21 @@ async def tool_get_minimum_configuration(
     - Account names and organizational units should match your requirements
 
     Args:
-        config_type (str, optional): Optional specific configuration type to generate (accounts, global, iam, network, organization, security). If not provided, generates all configuration files
-        save_to_directory (str, optional): Directory path where configuration files should be saved. If provided, files will be written to disk automatically
+        ctx: MCP context for logging.
+        workspace_manager: WorkspaceManager instance for workspace operations.
+        config_type (str, optional): Optional specific configuration type to generate
+            (accounts, global, iam, network, organization, security). If not provided,
+            generates all configuration files.
+        workspace_id (str, optional): Workspace to extract configuration into. If omitted,
+            a new workspace is created automatically.
 
     Returns:
-        Dictionary containing the complete configuration files and instructions for customization
-
-    Examples:
-
-    Generate all configuration files:
-    ```python
-    # Generate complete LZA configuration set
-    result = await getMinimumConfiguration()
-
-    if "config_files" in result:
-        configs = result["config_files"]
-        print(f"✅ Generated {len(configs)} configuration files:")
-        for config_name in configs.keys():
-            print(f"  - {config_name}-config.yaml")
-
-        # The assistant should now ask for customization details
-        print("\\n⚠️ IMPORTANT: Please provide:")
-        print("1. Email addresses for Management, LogArchive, and Audit accounts")
-        print("2. Your preferred AWS home region")
-    ```
-    Most common usage - generate all required configuration files
+        Dictionary containing workspace_id, workspace_created flag, files written,
+        the configuration files dict, and instructions for customization.
     """
     await ctx.info(
         "Generating minimum configuration"
         + (f" for {config_type}" if config_type else "")
-        + (f" to {save_to_directory}" if save_to_directory else "")
     )
 
     # Validate config_type if provided
@@ -94,15 +83,18 @@ async def tool_get_minimum_configuration(
             await ctx.error(error_message)
             return {"error": error_message}
 
-    # Validate save_to_directory if provided
-    if save_to_directory:
-        is_valid, validation_error = validate_file_path(
-            save_to_directory, allow_absolute=True
-        )
-        if not is_valid:
-            error_message = f"Invalid save_to_directory: {validation_error}"
+    # Resolve or create workspace
+    workspace_created = False
+    if workspace_id:
+        try:
+            workspace_manager.list_files(workspace_id, ctx)
+        except WorkspaceNotFoundError:
+            error_message = "Workspace not found"
             await ctx.error(error_message)
             return {"error": error_message}
+    else:
+        workspace_id = workspace_manager.create_workspace(ctx)
+        workspace_created = True
 
     # Define the path to the minimum configuration files
     min_config_dir = os.environ.get(
@@ -165,6 +157,26 @@ async def tool_get_minimum_configuration(
     else:
         result["config_files"] = configs
 
+    # Write config files into the workspace
+    files_written = []
+    for name, content in result["config_files"].items():
+        file_name = f"{name}-config.yaml"
+        workspace_manager.write_file(
+            workspace_id,
+            file_name,
+            yaml.dump(content, default_flow_style=False).encode(),
+            ctx,
+        )
+        files_written.append(file_name)
+
+    await ctx.info(
+        f"Wrote {len(files_written)} configuration files to workspace {workspace_id}"
+    )
+
+    result["workspace_id"] = workspace_id
+    result["workspace_created"] = workspace_created
+    result["files_written"] = files_written
+
     # Add instructions for the AI assistant
     result["instructions_for_assistant"] = {
         "message": "IMPORTANT: These configuration files must be saved as individual YAML files to create a working LZA deployment.",
@@ -179,40 +191,5 @@ async def tool_get_minimum_configuration(
         "user_guidance": "AFTER getting this information, then modify the configuration files with the user's values BEFORE saving them.",
         "explain_to_user": "Explain that personalized email addresses and regions are REQUIRED for a successful deployment. Using placeholder values will cause deployment failures.",
     }
-
-    # Save to directory if requested
-    if save_to_directory:
-        try:
-            # Create directory if it doesn't exist
-            os.makedirs(save_to_directory, exist_ok=True)
-
-            saved_files = []
-
-            # Save each config file
-            for name, content in result["config_files"].items():
-                file_path = os.path.join(save_to_directory, f"{name}-config.yaml")
-                with open(file_path, "w", encoding="utf-8") as f:
-                    yaml.dump(content, f, default_flow_style=False)
-                saved_files.append(file_path)
-
-            result["saved_to_directory"] = save_to_directory
-            result["saved_files"] = saved_files
-
-            await ctx.info(
-                f"Saved {len(saved_files)} configuration files to {save_to_directory}"
-            )
-
-            # Add success message for the assistant
-            result["instructions_for_assistant"]["files_saved"] = True
-            result["instructions_for_assistant"]["message"] += (
-                f" Files have been saved to {save_to_directory}."
-            )
-            result["instructions_for_assistant"]["required_action"] = (
-                "Inform the user that the files have been saved and explain how to customize them for their environment."
-            )
-        except Exception as e:
-            error_message = f"Error saving configuration files: {str(e)}"
-            await ctx.error(error_message)
-            result["error"] = error_message
 
     return result

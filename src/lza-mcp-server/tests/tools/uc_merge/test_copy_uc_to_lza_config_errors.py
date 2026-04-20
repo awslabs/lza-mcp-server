@@ -12,170 +12,92 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for copy_uc_to_lza_config error handling."""
+"""Unit tests for copy_uc_to_lza_config error handling (workspace-based)."""
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from pathlib import Path
-import tempfile
+from unittest.mock import AsyncMock, MagicMock
 
 from awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config import (
     copy_uc_to_lza_config,
 )
+from awslabs.lza_mcp_server.utils.workspace_manager import (
+    WorkspaceStorageError,
+)
 
 
 class TestCopyUcToLzaConfigErrors:
-    """Test error handling for copy operations."""
+    """Test error handling for workspace-based copy operations."""
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.shutil.copy2")
-    async def test_permission_error_during_copy(
-        self, mock_copy2, mock_get_path, mock_session_manager_class
-    ):
-        """Test handling of permission errors during copy."""
-        # Arrange
+    async def test_storage_error_during_list(self):
+        """Test handling of storage errors when listing UC workspace files."""
         mock_ctx = AsyncMock()
+        mock_wm = MagicMock()
+        mock_wm.list_files.side_effect = WorkspaceStorageError("Storage failure")
 
-        with (
-            tempfile.TemporaryDirectory() as session_dir,
-            tempfile.TemporaryDirectory() as lza_dir,
-        ):
-            session_path = Path(session_dir)
-            lza_path = Path(lza_dir)
+        result = await copy_uc_to_lza_config(
+            mock_ctx, "aabbccddeeff", "112233445566", mock_wm
+        )
 
-            # Create test file
-            (session_path / "file1.yaml").write_text("content1")
-
-            mock_session_manager = Mock()
-            mock_session_manager.validate_session.return_value = (True, None)
-            mock_session_manager.get_session_path.return_value = session_path
-            mock_session_manager_class.return_value = mock_session_manager
-            mock_get_path.return_value = lza_path
-
-            # Simulate permission error
-            mock_copy2.side_effect = PermissionError("Permission denied")
-
-            # Act
-            result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
-
-            # Assert
-            assert result["success"] is False
-            assert result["error_code"] == "ACCESS_DENIED"
-            assert "Permission denied" in result["error"]
-            assert result["category"] == "file_operation"
-            assert "file system permissions" in result["troubleshooting"][0]
-
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.shutil.copy2")
-    async def test_os_error_during_copy(
-        self, mock_copy2, mock_get_path, mock_session_manager_class
-    ):
-        """Test handling of OS errors during copy."""
-        # Arrange
-        mock_ctx = AsyncMock()
-
-        with (
-            tempfile.TemporaryDirectory() as session_dir,
-            tempfile.TemporaryDirectory() as lza_dir,
-        ):
-            session_path = Path(session_dir)
-            lza_path = Path(lza_dir)
-
-            # Create test file
-            (session_path / "file1.yaml").write_text("content1")
-
-            mock_session_manager = Mock()
-            mock_session_manager.validate_session.return_value = (True, None)
-            mock_session_manager.get_session_path.return_value = session_path
-            mock_session_manager_class.return_value = mock_session_manager
-            mock_get_path.return_value = lza_path
-
-            # Simulate OS error
-            mock_copy2.side_effect = OSError("Disk full")
-
-            # Act
-            result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
-
-            # Assert
-            assert result["success"] is False
-            assert result["error_code"] == "FILE_OPERATION_ERROR"
-            assert "File system error" in result["error"]
-            assert "Disk full" in result["error"]
-            assert result["category"] == "file_operation"
-            assert "disk space" in result["troubleshooting"][0]
-
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.shutil.copy2")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.categorize_uc_merge_error"
-    )
-    async def test_generic_exception_during_copy(
-        self, mock_categorize, mock_copy2, mock_get_path, mock_session_manager_class
-    ):
-        """Test handling of generic exceptions during copy."""
-        # Arrange
-        mock_ctx = AsyncMock()
-
-        with (
-            tempfile.TemporaryDirectory() as session_dir,
-            tempfile.TemporaryDirectory() as lza_dir,
-        ):
-            session_path = Path(session_dir)
-            lza_path = Path(lza_dir)
-
-            # Create test file
-            (session_path / "file1.yaml").write_text("content1")
-
-            mock_session_manager = Mock()
-            mock_session_manager.validate_session.return_value = (True, None)
-            mock_session_manager.get_session_path.return_value = session_path
-            mock_session_manager_class.return_value = mock_session_manager
-            mock_get_path.return_value = lza_path
-
-            # Simulate generic exception
-            mock_copy2.side_effect = ValueError("Unexpected error")
-            mock_categorize.return_value = {
-                "error_code": "UNEXPECTED_ERROR",
-                "category": "FILE_OPERATION",
-                "troubleshooting": ["Check system logs"],
-            }
-
-            # Act
-            result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
-
-            # Assert
-            assert result["success"] is False
-            assert result["error_code"] == "UNEXPECTED_ERROR"
-            assert "Failed to copy files" in result["error"]
-            assert "Unexpected error" in result["error"]
-
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    async def test_unexpected_error_in_outer_try_block(
-        self, mock_session_manager_class
-    ):
-        """Test handling of unexpected errors in outer try block."""
-        # Arrange
-        mock_ctx = AsyncMock()
-        mock_session_manager_class.side_effect = RuntimeError("Unexpected error")
-
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, "test-session-id")
-
-        # Assert
         assert result["success"] is False
-        assert result["error_code"] == "UNEXPECTED_ERROR"
-        assert "Unexpected error during copy operation" in result["error"]
-        assert result["category"] == "file_operation"
+
+    @pytest.mark.asyncio
+    async def test_read_error_skips_file(self):
+        """Test that read errors for individual files are skipped gracefully."""
+        mock_ctx = AsyncMock()
+        mock_wm = MagicMock()
+
+        # First call lists UC files, second call lists LZA files
+        mock_wm.list_files.side_effect = [
+            ["file1.yaml", "file2.yaml"],
+            ["existing.yaml"],
+        ]
+        # First read fails, second succeeds
+        mock_wm.read_file.side_effect = [
+            WorkspaceStorageError("Read failed"),
+            b"content2",
+        ]
+
+        result = await copy_uc_to_lza_config(
+            mock_ctx, "aabbccddeeff", "112233445566", mock_wm
+        )
+
+        assert result["success"] is True
+        assert result["files_copied"] == 1
+
+    @pytest.mark.asyncio
+    async def test_write_error_skips_file(self):
+        """Test that write errors for individual files are skipped gracefully."""
+        mock_ctx = AsyncMock()
+        mock_wm = MagicMock()
+
+        mock_wm.list_files.side_effect = [
+            ["file1.yaml", "file2.yaml"],
+            ["existing.yaml"],
+        ]
+        mock_wm.read_file.side_effect = [b"content1", b"content2"]
+        mock_wm.write_file.side_effect = [
+            WorkspaceStorageError("Write failed"),
+            None,
+        ]
+
+        result = await copy_uc_to_lza_config(
+            mock_ctx, "aabbccddeeff", "112233445566", mock_wm
+        )
+
+        assert result["success"] is True
+        assert result["files_copied"] == 1
+
+    @pytest.mark.asyncio
+    async def test_unexpected_error_in_outer_try_block(self):
+        """Test handling of unexpected errors in outer try block."""
+        mock_ctx = AsyncMock()
+        mock_wm = MagicMock()
+        mock_wm.list_files.side_effect = RuntimeError("Unexpected error")
+
+        result = await copy_uc_to_lza_config(
+            mock_ctx, "aabbccddeeff", "112233445566", mock_wm
+        )
+
+        assert result["success"] is False
+        assert "Unexpected error" in result["error"]

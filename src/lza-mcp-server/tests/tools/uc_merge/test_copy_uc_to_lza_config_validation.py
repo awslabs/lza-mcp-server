@@ -12,161 +12,95 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for copy_uc_to_lza_config validation."""
+"""Unit tests for copy_uc_to_lza_config validation (workspace-based)."""
+
+import os
+import tempfile
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from pathlib import Path
+from unittest.mock import AsyncMock
 
 from awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config import (
     copy_uc_to_lza_config,
 )
+from awslabs.lza_mcp_server.utils.local_adapter import LocalAdapter
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceManager
+
+
+def _make_wm(base_dir):
+    adapter = LocalAdapter(base_dir=base_dir)
+    return WorkspaceManager(storage=adapter)
 
 
 class TestCopyUcToLzaConfigValidation:
     """Test validation logic for copy_uc_to_lza_config."""
 
     @pytest.mark.asyncio
-    async def test_missing_session_id(self):
-        """Test error when session_id is not provided."""
-        # Arrange
+    async def test_missing_uc_workspace_id(self):
+        """Test error when uc_workspace_id is not provided."""
         mock_ctx = AsyncMock()
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
+            lza_ws = wm.create_workspace()
 
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, "")
+            result = await copy_uc_to_lza_config(mock_ctx, "", lza_ws, wm)
 
-        # Assert
-        assert result["success"] is False
-        assert result["error_code"] == "MISSING_SESSION_ID"
-        assert "Session ID is required" in result["error"]
-        assert result["category"] == "validation"
-        assert "start_uc_merge_session()" in result["next_steps"]
+            assert result["success"] is False
+            assert result["error_code"] == "MISSING_WORKSPACE_ID"
+            assert "UC workspace ID is required" in result["error"]
+            assert result["category"] == "validation"
 
     @pytest.mark.asyncio
-    async def test_missing_session_id_none(self):
-        """Test error when session_id is None."""
-        # Arrange
+    async def test_missing_uc_workspace_id_none(self):
+        """Test error when uc_workspace_id is None."""
         mock_ctx = AsyncMock()
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
+            lza_ws = wm.create_workspace()
 
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, None)
+            result = await copy_uc_to_lza_config(mock_ctx, None, lza_ws, wm)
 
-        # Assert
-        assert result["success"] is False
-        assert result["error_code"] == "MISSING_SESSION_ID"
-        assert "Session ID is required" in result["error"]
+            assert result["success"] is False
+            assert result["error_code"] == "MISSING_WORKSPACE_ID"
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    async def test_invalid_session(self, mock_session_manager_class):
-        """Test error when session is invalid."""
-        # Arrange
+    async def test_missing_lza_workspace_id(self):
+        """Test error when lza_workspace_id is not provided."""
         mock_ctx = AsyncMock()
-        mock_session_manager = Mock()
-        mock_session_manager.validate_session.return_value = (
-            False,
-            "Session not found",
-        )
-        mock_session_manager_class.return_value = mock_session_manager
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
+            uc_ws = wm.create_workspace()
 
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, "invalid-session-id")
+            result = await copy_uc_to_lza_config(mock_ctx, uc_ws, "", wm)
 
-        # Assert
-        assert result["success"] is False
-        assert result["error_code"] == "INVALID_SESSION"
-        assert "Session not found" in result["error"]
-        assert result["category"] == "validation"
-        assert "invalid-session-id" in result["context"]["session_id"]
+            assert result["success"] is False
+            assert result["error_code"] == "MISSING_WORKSPACE_ID"
+            assert "LZA workspace ID is required" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    async def test_lza_config_path_not_found(
-        self, mock_get_path, mock_session_manager_class
-    ):
-        """Test error when LZA config path is None."""
-        # Arrange
+    async def test_uc_workspace_not_found(self):
+        """Test error when UC workspace does not exist."""
         mock_ctx = AsyncMock()
-        mock_session_manager = Mock()
-        mock_session_manager.validate_session.return_value = (True, None)
-        mock_session_manager.get_session_path.return_value = Path("/tmp/session")
-        mock_session_manager_class.return_value = mock_session_manager
-        mock_get_path.return_value = None
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
+            lza_ws = wm.create_workspace()
 
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, "valid-session-id")
+            result = await copy_uc_to_lza_config(mock_ctx, "aabbccddeeff", lza_ws, wm)
 
-        # Assert
-        assert result["success"] is False
-        assert result["error_code"] == "LZA_CONFIG_NOT_FOUND"
-        assert "LZA configuration directory not found" in result["error"]
-        assert "getLzaConfiguration()" in result["next_steps"]
+            assert result["success"] is False
+            assert result["error_code"] == "WORKSPACE_NOT_FOUND"
+            assert "UC workspace" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    async def test_lza_config_directory_does_not_exist(
-        self, mock_get_path, mock_session_manager_class
-    ):
-        """Test error when LZA config directory does not exist."""
-        # Arrange
+    async def test_lza_workspace_not_found(self):
+        """Test error when LZA workspace does not exist."""
         mock_ctx = AsyncMock()
-        mock_session_manager = Mock()
-        mock_session_manager.validate_session.return_value = (True, None)
-        mock_session_manager.get_session_path.return_value = Path("/tmp/session")
-        mock_session_manager_class.return_value = mock_session_manager
+        with tempfile.TemporaryDirectory() as td:
+            wm = _make_wm(os.path.join(td, "workspaces"))
+            uc_ws = wm.create_workspace()
 
-        mock_lza_path = Mock(spec=Path)
-        mock_lza_path.exists.return_value = False
-        mock_lza_path.__str__ = Mock(return_value="/tmp/lza-config")
-        mock_get_path.return_value = mock_lza_path
+            result = await copy_uc_to_lza_config(mock_ctx, uc_ws, "aabbccddeeff", wm)
 
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, "valid-session-id")
-
-        # Assert
-        assert result["success"] is False
-        assert result["error_code"] == "LZA_CONFIG_NOT_FOUND"
-        assert "does not exist" in result["error"]
-        assert result["category"] == "file_not_found"
-        assert "/tmp/lza-config" in result["context"]["lza_config_path"]
-
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.SessionManager")
-    @patch(
-        "awslabs.lza_mcp_server.tools.uc_merge.copy_uc_to_lza_config.get_extracted_lza_config_path"
-    )
-    async def test_session_directory_does_not_exist(
-        self, mock_get_path, mock_session_manager_class
-    ):
-        """Test error when session directory does not exist."""
-        # Arrange
-        mock_ctx = AsyncMock()
-
-        mock_session_path = Mock(spec=Path)
-        mock_session_path.exists.return_value = False
-        mock_session_path.__str__ = Mock(return_value="/tmp/session")
-
-        mock_session_manager = Mock()
-        mock_session_manager.validate_session.return_value = (True, None)
-        mock_session_manager.get_session_path.return_value = mock_session_path
-        mock_session_manager_class.return_value = mock_session_manager
-
-        mock_lza_path = Mock(spec=Path)
-        mock_lza_path.exists.return_value = True
-        mock_get_path.return_value = mock_lza_path
-
-        # Act
-        result = await copy_uc_to_lza_config(mock_ctx, "valid-session-id")
-
-        # Assert
-        assert result["success"] is False
-        assert result["error_code"] == "SESSION_NOT_FOUND"
-        assert "Session directory does not exist" in result["error"]
-        assert result["category"] == "file_not_found"
-        assert "/tmp/session" in result["context"]["session_path"]
+            assert result["success"] is False
+            assert result["error_code"] == "WORKSPACE_NOT_FOUND"
+            assert "LZA workspace" in result["error"]

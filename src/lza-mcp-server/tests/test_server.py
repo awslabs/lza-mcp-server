@@ -80,6 +80,7 @@ class TestMain:
     """Test main server entry point."""
 
     @patch("awslabs.lza_mcp_server.server.register_all_components")
+    @patch("awslabs.lza_mcp_server.server.is_resource_tools_disabled")
     @patch("awslabs.lza_mcp_server.server.is_uc_merge_enabled")
     @patch("awslabs.lza_mcp_server.server.create_mcp_server")
     @patch("awslabs.lza_mcp_server.server.validate_schema_integrity")
@@ -94,12 +95,14 @@ class TestMain:
         mock_validate_schema,
         mock_create_server,
         mock_is_uc_enabled,
+        mock_is_resource_tools_disabled,
         mock_register_components,
     ):
         """Test successful main execution flow."""
         mock_schema_dir = Path("/test/schemas")
         mock_get_schema_dir.return_value = mock_schema_dir
         mock_is_uc_enabled.return_value = False
+        mock_is_resource_tools_disabled.return_value = False
         mock_server = Mock()
         mock_create_server.return_value = mock_server
 
@@ -114,10 +117,12 @@ class TestMain:
         )
         mock_create_server.assert_called_once()
         mock_is_uc_enabled.assert_called_once()
-        mock_register_components.assert_called_once_with(mock_server, False)
+        mock_is_resource_tools_disabled.assert_called_once()
+        mock_register_components.assert_called_once_with(mock_server, False, False)
         mock_server.run.assert_called_once()
 
     @patch("awslabs.lza_mcp_server.server.register_all_components")
+    @patch("awslabs.lza_mcp_server.server.is_resource_tools_disabled")
     @patch("awslabs.lza_mcp_server.server.is_uc_merge_enabled")
     @patch("awslabs.lza_mcp_server.server.create_mcp_server")
     @patch("awslabs.lza_mcp_server.server.validate_schema_integrity")
@@ -130,17 +135,19 @@ class TestMain:
         mock_validate_schema,
         mock_create_server,
         mock_is_uc_enabled,
+        mock_is_resource_tools_disabled,
         mock_register_components,
     ):
         """Test main with UC Merge enabled."""
         mock_get_schema_dir.return_value = Path("/test/schemas")
         mock_is_uc_enabled.return_value = True
+        mock_is_resource_tools_disabled.return_value = False
         mock_server = Mock()
         mock_create_server.return_value = mock_server
 
         main()
 
-        mock_register_components.assert_called_once_with(mock_server, True)
+        mock_register_components.assert_called_once_with(mock_server, True, False)
 
     @patch("awslabs.lza_mcp_server.server.logger")
     @patch("awslabs.lza_mcp_server.server.validate_schema_integrity")
@@ -164,13 +171,17 @@ class TestMain:
             with patch(
                 "awslabs.lza_mcp_server.server.is_uc_merge_enabled"
             ) as mock_is_uc_enabled:
-                with patch("awslabs.lza_mcp_server.server.register_all_components"):
-                    mock_server = Mock()
-                    mock_create_server.return_value = mock_server
-                    mock_is_uc_enabled.return_value = False
+                with patch(
+                    "awslabs.lza_mcp_server.server.is_resource_tools_disabled"
+                ) as mock_is_resource_tools_disabled:
+                    with patch("awslabs.lza_mcp_server.server.register_all_components"):
+                        mock_server = Mock()
+                        mock_create_server.return_value = mock_server
+                        mock_is_uc_enabled.return_value = False
+                        mock_is_resource_tools_disabled.return_value = False
 
-                    # Should log warning but not raise
-                    main()
+                        # Should log warning but not raise
+                        main()
 
         mock_logger.warning.assert_called_once_with(
             "Schema integrity validation module not available"
@@ -198,6 +209,7 @@ class TestMain:
         assert "Schema integrity validation failed" in str(mock_logger.error.call_args)
 
     @patch("awslabs.lza_mcp_server.server.register_all_components")
+    @patch("awslabs.lza_mcp_server.server.is_resource_tools_disabled")
     @patch("awslabs.lza_mcp_server.server.is_uc_merge_enabled")
     @patch("awslabs.lza_mcp_server.server.create_mcp_server")
     @patch("awslabs.lza_mcp_server.server.validate_schema_integrity")
@@ -210,6 +222,7 @@ class TestMain:
         mock_validate_schema,
         mock_create_server,
         mock_is_uc_enabled,
+        mock_is_resource_tools_disabled,
         mock_register_components,
     ):
         """Test main executes steps in correct order."""
@@ -233,6 +246,10 @@ class TestMain:
             call_order.append("is_uc_enabled"),
             False,
         )[1]
+        mock_is_resource_tools_disabled.side_effect = lambda: (
+            call_order.append("is_resource_tools_disabled"),
+            False,
+        )[1]
         mock_register_components.side_effect = lambda *args, **kwargs: (
             call_order.append("register_components")
         )
@@ -245,6 +262,7 @@ class TestMain:
             "validate_schema",
             "create_server",
             "is_uc_enabled",
+            "is_resource_tools_disabled",
             "register_components",
         ]
         assert call_order == expected_order

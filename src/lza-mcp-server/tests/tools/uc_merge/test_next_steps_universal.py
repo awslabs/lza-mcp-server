@@ -24,7 +24,7 @@ workflow guidance for agents using these tools.
 
 import pytest
 import os
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from awslabs.lza_mcp_server.tools.uc_merge.get_uc_releases import tool_get_uc_releases
 from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models import (
@@ -33,11 +33,6 @@ from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_models import (
 from awslabs.lza_mcp_server.tools.uc_merge.start_uc_merge_session import (
     tool_start_uc_merge_session,
 )
-from awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file import (
-    read_lza_config_file,
-)
-from awslabs.lza_mcp_server.tools.uc_merge.read_uc_file import read_uc_file
-from awslabs.lza_mcp_server.tools.uc_merge.update_uc_file import update_uc_file
 from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_customization_guide import (
     get_uc_network_customization_guide,
 )
@@ -137,73 +132,39 @@ async def test_get_uc_network_models_error_includes_next_steps(mock_ctx):
 @pytest.mark.asyncio
 async def test_start_uc_merge_session_error_includes_next_steps(mock_ctx):
     """Verify start_uc_merge_session includes next_steps on error (missing parameters)."""
-    result = await tool_start_uc_merge_session(mock_ctx, "", "")
+    from unittest.mock import MagicMock
+
+    wm = MagicMock()
+    result = await tool_start_uc_merge_session(mock_ctx, "", "", workspace_manager=wm)
     assert "next_steps" in result
     assert isinstance(result["next_steps"], str)
     assert len(result["next_steps"]) > 0
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_read_lza_config_file_error_includes_next_steps(mock_ctx):
-    """Verify read_lza_config_file includes next_steps on error (no config path set)."""
-    result = await read_lza_config_file(mock_ctx, "accounts-config.yaml")
-    assert "next_steps" in result
-    assert isinstance(result["next_steps"], str)
-    assert len(result["next_steps"]) > 0
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_read_uc_file_error_includes_next_steps(mock_ctx):
-    """Verify read_uc_file includes next_steps on error (missing session_id)."""
-    result = await read_uc_file(mock_ctx, "", "accounts-config.yaml")
-    assert "next_steps" in result
-    assert isinstance(result["next_steps"], str)
-    assert len(result["next_steps"]) > 0
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_update_uc_file_error_includes_next_steps(tmp_path):
-    """Verify update_uc_file includes next_steps on error (missing session_id)."""
-    # Mock SessionManager to use tmp_path
-    from awslabs.lza_mcp_server.tools.uc_merge.session_manager import SessionManager
-
-    with patch.object(
-        SessionManager,
-        "__init__",
-        lambda self: setattr(self, "base_session_dir", tmp_path) or None,
-    ):
-        result = await update_uc_file("", "replacements-config.yaml", {"test": "value"})
-        assert "next_steps" in result
-        assert isinstance(result["next_steps"], str)
-        assert len(result["next_steps"]) > 0
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_uc_network_customization_guide_error_includes_next_steps(tmp_path):
-    """Verify get_uc_network_customization_guide includes next_steps on error (missing session_id)."""
-    # Mock SessionManager to use tmp_path
-    from awslabs.lza_mcp_server.tools.uc_merge.session_manager import SessionManager
+    """Verify get_uc_network_customization_guide includes next_steps on error (missing workspace)."""
+    from unittest.mock import MagicMock
+    from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceNotFoundError
 
-    with patch.object(
-        SessionManager,
-        "__init__",
-        lambda self: setattr(self, "base_session_dir", tmp_path) or None,
-    ):
-        result = get_uc_network_customization_guide("")
-        assert "next_steps" in result
-        assert isinstance(result["next_steps"], str)
-        assert len(result["next_steps"]) > 0
+    mock_wm = MagicMock()
+    mock_wm.read_file.side_effect = WorkspaceNotFoundError("Workspace '' not found")
+
+    result = get_uc_network_customization_guide("", mock_wm)
+    assert "next_steps" in result
+    assert isinstance(result["next_steps"], str)
+    assert len(result["next_steps"]) > 0
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_copy_uc_to_lza_config_error_includes_next_steps(mock_ctx):
-    """Verify copy_uc_to_lza_config includes next_steps on error (missing session_id)."""
-    result = await copy_uc_to_lza_config(mock_ctx, "")
+    """Verify copy_uc_to_lza_config includes next_steps on error (missing workspace_id)."""
+    from unittest.mock import MagicMock
+
+    mock_wm = MagicMock()
+    result = await copy_uc_to_lza_config(mock_ctx, "", "lza-ws-id", mock_wm)
     assert "next_steps" in result
     assert isinstance(result["next_steps"], str)
     assert len(result["next_steps"]) > 0

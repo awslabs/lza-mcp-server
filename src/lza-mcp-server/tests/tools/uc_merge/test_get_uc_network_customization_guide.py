@@ -12,211 +12,118 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for get_uc_network_customization_guide tool."""
+"""Unit tests for get_uc_network_customization_guide tool.
+
+Updated to use WorkspaceManager-based API (workspace_id instead of session_id).
+"""
 
 import json
 import pytest
+from unittest.mock import MagicMock
 
 from awslabs.lza_mcp_server.tools.uc_merge.get_uc_network_customization_guide import (
     get_uc_network_customization_guide,
     _scan_configuration_files,
     _is_policy_directory,
 )
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceNotFoundError
 
 
 @pytest.mark.unit
 class TestGetUcNetworkCustomizationGuide:
     """Unit tests for get_uc_network_customization_guide."""
 
-    def test_with_valid_session(self, tmp_path):
-        """Test with valid session."""
-        # Create session directory
-        session_id = "uc-session-20250127-143022"
-        session_path = tmp_path / session_id
-        session_path.mkdir(parents=True)
+    def _make_mock_wm(self, metadata=None, file_list=None):
+        """Create a mock WorkspaceManager."""
+        wm = MagicMock()
+        if metadata is not None:
+            wm.read_file.return_value = json.dumps(metadata).encode("utf-8")
+        if file_list is not None:
+            wm.list_files.return_value = file_list
+        return wm
 
-        # Create metadata file
+    def test_with_valid_session(self):
+        """Test with valid workspace containing session metadata and files."""
         metadata = {
-            "session_id": session_id,
             "network_model": "hub-and-spoke",
             "uc_release": "v1.0.0",
             "created_at": "2025-01-27T14:30:22",
         }
-        metadata_file = session_path / ".session_metadata.json"
-        with open(metadata_file, "w") as f:
-            json.dump(metadata, f)
+        file_list = [
+            ".session_metadata.json",
+            "accounts-config.yaml",
+            "global-config.yaml",
+            "network-config.yaml",
+            "iam-policies/boundary.json",
+            "service-control-policies/scp.json",
+            "ssm-documents/doc.yaml",
+        ]
+        wm = self._make_mock_wm(metadata=metadata, file_list=file_list)
 
-        # Create some config files
-        (session_path / "accounts-config.yaml").write_text("test: data")
-        (session_path / "global-config.yaml").write_text("test: data")
-        (session_path / "network-config.yaml").write_text("test: data")
+        result = get_uc_network_customization_guide("abc123def456", wm)
 
-        # Create policy directories
-        (session_path / "iam-policies").mkdir()
-        (session_path / "service-control-policies").mkdir()
+        assert result["success"] is True
+        assert result["workspace_id"] == "abc123def456"
+        assert result["network_model"] == "hub-and-spoke"
+        assert "configuration_files" in result
+        assert "next_steps" in result
 
-        # Create supporting directories
-        (session_path / "ssm-documents").mkdir()
+        config_files = result["configuration_files"]
+        assert "config_files" in config_files
+        assert "policy_directories" in config_files
+        assert "supporting_directories" in config_files
 
-        # Patch SessionManager to use tmp_path
-        from awslabs.lza_mcp_server.tools.uc_merge import (
-            get_uc_network_customization_guide as guide_module,
+        assert "accounts-config.yaml" in config_files["config_files"]
+        assert "global-config.yaml" in config_files["config_files"]
+        assert "network-config.yaml" in config_files["config_files"]
+
+        assert "iam-policies" in config_files["policy_directories"]
+        assert "service-control-policies" in config_files["policy_directories"]
+
+        assert "ssm-documents" in config_files["supporting_directories"]
+
+    def test_error_when_session_id_missing(self):
+        """Test error when workspace does not exist (empty ID)."""
+        wm = MagicMock()
+        wm.read_file.side_effect = WorkspaceNotFoundError("Workspace '' not found")
+
+        result = get_uc_network_customization_guide("", wm)
+
+        assert result["success"] is False
+        assert result["error_code"] == "WORKSPACE_NOT_FOUND"
+
+    def test_error_when_session_invalid(self):
+        """Test error when workspace does not exist."""
+        wm = MagicMock()
+        wm.read_file.side_effect = WorkspaceNotFoundError(
+            "Workspace 'abc123def456' not found"
         )
 
-        original_session_manager = guide_module.SessionManager
+        result = get_uc_network_customization_guide("abc123def456", wm)
 
-        class MockSessionManager:
-            def __init__(self):
-                self.base_session_dir = tmp_path
+        assert result["success"] is False
+        assert result["error_code"] == "WORKSPACE_NOT_FOUND"
+        assert "not found" in result["error"]
 
-            def get_session_path(self, session_id):
-                return tmp_path / session_id
+    def test_file_discovery(self):
+        """Test file discovery and classification from workspace file list."""
+        file_list = [
+            "accounts-config.yaml",
+            "global-config.yaml",
+            "network-config.yaml",
+            "iam-config.yaml",
+            "organization-config.yaml",
+            "security-config.yaml",
+            "replacements-config.yaml",
+            "backup-policies/policy1.json",
+            "iam-policies/boundary.json",
+            "service-control-policies/scp.json",
+            "tagging-policies/tag.json",
+            "ssm-documents/doc.yaml",
+            "dynamic-partitioning/config.json",
+        ]
 
-            def session_exists(self, session_id):
-                return (tmp_path / session_id).exists()
-
-            def validate_session(self, session_id):
-                if not self.session_exists(session_id):
-                    return False, f"Session '{session_id}' does not exist"
-                metadata_file = (
-                    self.get_session_path(session_id) / ".session_metadata.json"
-                )
-                if not metadata_file.exists():
-                    return (
-                        False,
-                        f"Session '{session_id}' is invalid (missing metadata)",
-                    )
-                return True, ""
-
-            def load_session_metadata(self, session_id):
-                metadata_file = (
-                    self.get_session_path(session_id) / ".session_metadata.json"
-                )
-                if not metadata_file.exists():
-                    return None
-                with open(metadata_file, "r") as f:
-                    return json.load(f)
-
-        guide_module.SessionManager = MockSessionManager
-
-        try:
-            result = get_uc_network_customization_guide(session_id)
-
-            assert result["success"] is True
-            assert result["session_id"] == session_id
-            assert result["network_model"] == "hub-and-spoke"
-            assert "configuration_files" in result
-            assert "next_steps" in result
-
-            # Check configuration files
-            config_files = result["configuration_files"]
-            assert "config_files" in config_files
-            assert "policy_directories" in config_files
-            assert "supporting_directories" in config_files
-
-            assert "accounts-config.yaml" in config_files["config_files"]
-            assert "global-config.yaml" in config_files["config_files"]
-            assert "network-config.yaml" in config_files["config_files"]
-
-            assert "iam-policies" in config_files["policy_directories"]
-            assert "service-control-policies" in config_files["policy_directories"]
-
-            assert "ssm-documents" in config_files["supporting_directories"]
-        finally:
-            guide_module.SessionManager = original_session_manager
-
-    def test_error_when_session_id_missing(self, tmp_path):
-        """Test error when session_id is missing."""
-        # Patch SessionManager to use tmp_path
-        from awslabs.lza_mcp_server.tools.uc_merge import (
-            get_uc_network_customization_guide as guide_module,
-        )
-
-        original_session_manager = guide_module.SessionManager
-
-        class MockSessionManager:
-            def __init__(self):
-                self.base_session_dir = tmp_path
-
-            def validate_session(self, session_id):
-                if not session_id:
-                    return False, "Session ID cannot be empty"
-                return (
-                    False,
-                    f"Session '{session_id}' does not exist",
-                )
-
-        guide_module.SessionManager = MockSessionManager
-
-        try:
-            result = get_uc_network_customization_guide("")
-
-            assert result["success"] is False
-            assert result["error_code"] == "INVALID_SESSION"
-            assert "Session ID cannot be empty" in result["error"]
-        finally:
-            guide_module.SessionManager = original_session_manager
-
-    def test_error_when_session_invalid(self, tmp_path):
-        """Test error when session is invalid."""
-        session_id = "uc-session-invalid"
-
-        # Patch SessionManager to use tmp_path
-        from awslabs.lza_mcp_server.tools.uc_merge import (
-            get_uc_network_customization_guide as guide_module,
-        )
-
-        original_session_manager = guide_module.SessionManager
-
-        class MockSessionManager:
-            def __init__(self):
-                self.base_session_dir = tmp_path
-
-            def validate_session(self, session_id):
-                return (
-                    False,
-                    f"Session '{session_id}' does not exist",
-                )
-
-        guide_module.SessionManager = MockSessionManager
-
-        try:
-            result = get_uc_network_customization_guide(session_id)
-
-            assert result["success"] is False
-            assert result["error_code"] == "INVALID_SESSION"
-            assert "does not exist" in result["error"]
-        finally:
-            guide_module.SessionManager = original_session_manager
-
-    def test_file_discovery(self, tmp_path):
-        """Test file discovery in session directory."""
-        session_path = tmp_path / "test-session"
-        session_path.mkdir()
-
-        # Create various files and directories
-        (session_path / "accounts-config.yaml").write_text("test")
-        (session_path / "global-config.yaml").write_text("test")
-        (session_path / "network-config.yaml").write_text("test")
-        (session_path / "iam-config.yaml").write_text("test")
-        (session_path / "organization-config.yaml").write_text("test")
-        (session_path / "security-config.yaml").write_text("test")
-        (session_path / "replacements-config.yaml").write_text("test")
-
-        # Create policy directories (will be detected by name patterns)
-        (session_path / "backup-policies").mkdir()
-        (session_path / "iam-policies").mkdir()
-        (session_path / "service-control-policies").mkdir()
-        (session_path / "tagging-policies").mkdir()
-
-        # Create supporting directories (non-policy directories)
-        (session_path / "ssm-documents").mkdir()
-        (session_path / "dynamic-partitioning").mkdir()
-
-        # Create hidden directory (should be ignored)
-        (session_path / ".hidden").mkdir()
-
-        result = _scan_configuration_files(session_path)
+        result = _scan_configuration_files(file_list)
 
         assert "config_files" in result
         assert "policy_directories" in result
@@ -232,7 +139,7 @@ class TestGetUcNetworkCustomizationGuide:
         assert "security-config.yaml" in result["config_files"]
         assert "replacements-config.yaml" in result["config_files"]
 
-        # Check policy directories (dynamically detected by name patterns)
+        # Check policy directories
         assert len(result["policy_directories"]) == 4
         assert "backup-policies" in result["policy_directories"]
         assert "iam-policies" in result["policy_directories"]
@@ -243,10 +150,6 @@ class TestGetUcNetworkCustomizationGuide:
         assert len(result["supporting_directories"]) == 2
         assert "ssm-documents" in result["supporting_directories"]
         assert "dynamic-partitioning" in result["supporting_directories"]
-
-        # Verify hidden directory is not included
-        assert ".hidden" not in result["policy_directories"]
-        assert ".hidden" not in result["supporting_directories"]
 
     def test_is_policy_directory(self):
         """Test policy directory detection logic."""
@@ -268,114 +171,36 @@ class TestGetUcNetworkCustomizationGuide:
         assert _is_policy_directory("custom-configs") is False
         assert _is_policy_directory("templates") is False
 
-    def test_shared_vpc_model_settings(self, tmp_path):
+    def test_shared_vpc_model_settings(self):
         """Test model-specific settings for shared-vpc."""
-        # Create session directory
-        session_id = "uc-session-20250127-143022"
-        session_path = tmp_path / session_id
-        session_path.mkdir(parents=True)
-
-        # Create metadata file with shared-vpc model
         metadata = {
-            "session_id": session_id,
             "network_model": "shared-vpc",
             "uc_release": "v1.0.0",
             "created_at": "2025-01-27T14:30:22",
         }
-        metadata_file = session_path / ".session_metadata.json"
-        with open(metadata_file, "w") as f:
-            json.dump(metadata, f)
+        file_list = [".session_metadata.json"]
+        wm = self._make_mock_wm(metadata=metadata, file_list=file_list)
 
-        # Patch SessionManager
-        from awslabs.lza_mcp_server.tools.uc_merge import (
-            get_uc_network_customization_guide as guide_module,
-        )
+        result = get_uc_network_customization_guide("abc123def456", wm)
 
-        original_session_manager = guide_module.SessionManager
+        assert result["success"] is True
+        assert result["network_model"] == "shared-vpc"
+        assert "configuration_files" in result
+        assert "next_steps" in result
 
-        class MockSessionManager:
-            def __init__(self):
-                self.base_session_dir = tmp_path
-
-            def get_session_path(self, session_id):
-                return tmp_path / session_id
-
-            def session_exists(self, session_id):
-                return (tmp_path / session_id).exists()
-
-            def validate_session(self, session_id):
-                if not self.session_exists(session_id):
-                    return False, f"Session '{session_id}' does not exist"
-                return True, ""
-
-            def load_session_metadata(self, session_id):
-                metadata_file = (
-                    self.get_session_path(session_id) / ".session_metadata.json"
-                )
-                if not metadata_file.exists():
-                    return None
-                with open(metadata_file, "r") as f:
-                    return json.load(f)
-
-        guide_module.SessionManager = MockSessionManager
-
-        try:
-            result = get_uc_network_customization_guide(session_id)
-
-            assert result["success"] is True
-            assert result["network_model"] == "shared-vpc"
-            assert "configuration_files" in result
-            assert "next_steps" in result
-        finally:
-            guide_module.SessionManager = original_session_manager
-
-    def test_error_when_metadata_missing_network_model(self, tmp_path):
+    def test_error_when_metadata_missing_network_model(self):
         """Test error when session metadata exists but lacks network_model key."""
-        session_id = "uc-session-20250127-143022"
-        session_path = tmp_path / session_id
-        session_path.mkdir(parents=True)
+        metadata = {"uc_release": "v1.0.0"}
+        wm = self._make_mock_wm(metadata=metadata, file_list=[])
 
-        # Metadata without network_model
-        import json as _json
+        result = get_uc_network_customization_guide("abc123def456", wm)
 
-        metadata_file = session_path / ".session_metadata.json"
-        with open(metadata_file, "w") as f:
-            _json.dump({"session_id": session_id, "uc_release": "v1.0.0"}, f)
+        assert result["success"] is False
+        assert result["error_code"] == "INVALID_SESSION_METADATA"
 
-        from awslabs.lza_mcp_server.tools.uc_merge import (
-            get_uc_network_customization_guide as guide_module,
-        )
-
-        original = guide_module.SessionManager
-
-        class MockSessionManager:
-            def __init__(self):
-                self.base_session_dir = tmp_path
-
-            def get_session_path(self, sid):
-                return tmp_path / sid
-
-            def validate_session(self, sid):
-                return True, ""
-
-            def load_session_metadata(self, sid):
-                p = tmp_path / sid / ".session_metadata.json"
-                if not p.exists():
-                    return None
-                with open(p) as f:
-                    return _json.load(f)
-
-        guide_module.SessionManager = MockSessionManager
-        try:
-            result = get_uc_network_customization_guide(session_id)
-            assert result["success"] is False
-            assert result["error_code"] == "INVALID_SESSION_METADATA"
-        finally:
-            guide_module.SessionManager = original
-
-    def test_scan_configuration_files_nonexistent_path(self, tmp_path):
-        """_scan_configuration_files returns empty lists for nonexistent path."""
-        result = _scan_configuration_files(tmp_path / "does-not-exist")
+    def test_scan_configuration_files_empty_list(self):
+        """_scan_configuration_files returns empty lists for empty input."""
+        result = _scan_configuration_files([])
         assert result["config_files"] == []
         assert result["policy_directories"] == []
         assert result["supporting_directories"] == []
