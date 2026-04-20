@@ -32,17 +32,24 @@ class TestToolRegistration:
         mcp.tool = Mock(side_effect=lambda **kwargs: lambda func: func)
         return mcp
 
-    def test_register_uc_merge_tools_basic(self, mock_mcp):
-        """Test basic tool registration."""
-        register_uc_merge_tools(mock_mcp)
+    @pytest.fixture
+    def mock_workspace_manager(self):
+        """Create a mock WorkspaceManager instance."""
+        return Mock()
 
-        # Verify tool decorator was called for each tool (8 tools total)
-        assert mock_mcp.tool.call_count == 8
+    def test_register_uc_merge_tools_basic(self, mock_mcp, mock_workspace_manager):
+        """Test basic tool registration."""
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
+
+        # Verify tool decorator was called for each tool (6 tools total)
+        assert mock_mcp.tool.call_count == 6
 
     @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.logger")
-    def test_register_uc_merge_tools_logging(self, mock_logger, mock_mcp):
+    def test_register_uc_merge_tools_logging(
+        self, mock_logger, mock_mcp, mock_workspace_manager
+    ):
         """Test that registration logs success message."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         # Verify success logging
         mock_logger.info.assert_called_once()
@@ -52,6 +59,11 @@ class TestToolRegistration:
 
 class TestToolFunctionWrappers:
     """Test the tool function wrappers created during registration."""
+
+    @pytest.fixture
+    def mock_workspace_manager(self):
+        """Create a mock WorkspaceManager instance."""
+        return Mock()
 
     @pytest.fixture
     def mock_mcp(self):
@@ -75,26 +87,34 @@ class TestToolFunctionWrappers:
     @patch(
         "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.validate_lza_for_uc_merge"
     )
-    async def test_validate_lza_for_uc_merge_wrapper(self, mock_validate, mock_mcp):
+    async def test_validate_lza_for_uc_merge_wrapper(
+        self, mock_validate, mock_mcp, mock_workspace_manager
+    ):
         """Test validateLzaForUcMerge wrapper function."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         validate_func = mock_mcp.registered_tools["validateLzaForUcMerge"]
         mock_validate.return_value = {"success": True, "is_fresh": True}
 
         mock_ctx = Mock()
-        result = await validate_func(mock_ctx)
+        result = await validate_func(
+            mock_ctx, workspace_id="abc123abc123", path="config"
+        )
 
-        mock_validate.assert_called_once_with(mock_ctx)
+        mock_validate.assert_called_once_with(
+            mock_ctx, "abc123abc123", "config", mock_workspace_manager
+        )
         assert result == {"success": True, "is_fresh": True}
 
     @pytest.mark.asyncio
     @patch(
         "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.tool_get_uc_releases"
     )
-    async def test_get_uc_releases_wrapper(self, mock_get_releases, mock_mcp):
+    async def test_get_uc_releases_wrapper(
+        self, mock_get_releases, mock_mcp, mock_workspace_manager
+    ):
         """Test get_uc_releases wrapper function."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         releases_func = mock_mcp.registered_tools["get_uc_releases"]
         mock_get_releases.return_value = {
@@ -113,9 +133,11 @@ class TestToolFunctionWrappers:
     @patch(
         "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.tool_get_uc_network_models"
     )
-    async def test_get_uc_network_models_wrapper(self, mock_get_models, mock_mcp):
+    async def test_get_uc_network_models_wrapper(
+        self, mock_get_models, mock_mcp, mock_workspace_manager
+    ):
         """Test get_uc_network_models wrapper function."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         models_func = mock_mcp.registered_tools["get_uc_network_models"]
         mock_get_models.return_value = {
@@ -133,51 +155,35 @@ class TestToolFunctionWrappers:
     @patch(
         "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.tool_start_uc_merge_session"
     )
-    async def test_start_uc_merge_session_wrapper(self, mock_start_session, mock_mcp):
+    async def test_start_uc_merge_session_wrapper(
+        self, mock_start_session, mock_mcp, mock_workspace_manager
+    ):
         """Test start_uc_merge_session wrapper function."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         session_func = mock_mcp.registered_tools["start_uc_merge_session"]
         mock_start_session.return_value = {
             "success": True,
-            "session_id": "uc-session-123",
+            "workspace_id": "abcdef123456",
         }
 
         mock_ctx = Mock()
         result = await session_func(mock_ctx, "v1.0.0", "hub-and-spoke")
 
-        mock_start_session.assert_called_once_with(mock_ctx, "v1.0.0", "hub-and-spoke")
-        assert result["session_id"] == "uc-session-123"
-
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.read_uc_file")
-    async def test_read_uc_file_wrapper(self, mock_read_uc, mock_mcp):
-        """Test readUcFile wrapper function."""
-        register_uc_merge_tools(mock_mcp)
-
-        read_func = mock_mcp.registered_tools["readUcFile"]
-        mock_read_uc.return_value = {
-            "success": True,
-            "content": "replacements: {}",
-        }
-
-        mock_ctx = Mock()
-        result = await read_func(mock_ctx, "uc-session-123", "replacements-config.yaml")
-
-        mock_read_uc.assert_called_once_with(
-            mock_ctx, "uc-session-123", "replacements-config.yaml"
+        mock_start_session.assert_called_once_with(
+            mock_ctx, "v1.0.0", "hub-and-spoke", mock_workspace_manager
         )
-        assert result["success"] is True
+        assert result["workspace_id"] == "abcdef123456"
 
     @pytest.mark.asyncio
     @patch(
         "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.get_uc_network_customization_guide"
     )
     async def test_get_uc_network_customization_guide_wrapper(
-        self, mock_get_guide, mock_mcp
+        self, mock_get_guide, mock_mcp, mock_workspace_manager
     ):
         """Test getUcNetworkCustomizationGuide wrapper function."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         guide_func = mock_mcp.registered_tools["getUcNetworkCustomizationGuide"]
         mock_get_guide.return_value = {
@@ -188,39 +194,18 @@ class TestToolFunctionWrappers:
         mock_ctx = Mock()
         result = await guide_func(mock_ctx, "uc-session-123")
 
-        mock_get_guide.assert_called_once_with("uc-session-123")
+        mock_get_guide.assert_called_once_with("uc-session-123", mock_workspace_manager)
         assert result["network_model"] == "hub-and-spoke"
-
-    @pytest.mark.asyncio
-    @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.update_uc_file")
-    async def test_update_uc_file_wrapper(self, mock_update, mock_mcp):
-        """Test updateUcFile wrapper function."""
-        register_uc_merge_tools(mock_mcp)
-
-        update_func = mock_mcp.registered_tools["updateUcFile"]
-        mock_update.return_value = {
-            "success": True,
-            "updates_applied": {"HomeRegionIngressCidr": "10.0.0.0/16"},
-        }
-
-        mock_ctx = Mock()
-        updates = {"HomeRegionIngressCidr": "10.0.0.0/16"}
-        result = await update_func(
-            mock_ctx, "uc-session-123", "replacements-config.yaml", updates
-        )
-
-        mock_update.assert_called_once_with(
-            "uc-session-123", "replacements-config.yaml", updates
-        )
-        assert result["success"] is True
 
     @pytest.mark.asyncio
     @patch(
         "awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.copy_uc_to_lza_config"
     )
-    async def test_copy_uc_to_lza_config_wrapper(self, mock_copy, mock_mcp):
+    async def test_copy_uc_to_lza_config_wrapper(
+        self, mock_copy, mock_mcp, mock_workspace_manager
+    ):
         """Test copyUcToLzaConfig wrapper function."""
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         copy_func = mock_mcp.registered_tools["copyUcToLzaConfig"]
         mock_copy.return_value = {
@@ -229,9 +214,15 @@ class TestToolFunctionWrappers:
         }
 
         mock_ctx = Mock()
-        result = await copy_func(mock_ctx, "uc-session-123")
+        result = await copy_func(mock_ctx, "uc-workspace-123", "lza-workspace-456")
 
-        mock_copy.assert_called_once_with(mock_ctx, "uc-session-123")
+        mock_copy.assert_called_once_with(
+            mock_ctx,
+            "uc-workspace-123",
+            "lza-workspace-456",
+            mock_workspace_manager,
+            "",
+        )
         assert result["files_copied"] == 15
 
 
@@ -242,21 +233,23 @@ class TestToolRegistrationEdgeCases:
         """Test registering tools multiple times."""
         mock_mcp = Mock()
         mock_mcp.tool = Mock(side_effect=lambda **kwargs: lambda func: func)
+        mock_workspace_manager = Mock()
 
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
         first_call_count = mock_mcp.tool.call_count
 
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
         second_call_count = mock_mcp.tool.call_count
 
-        # Should register tools both times (8 tools each)
-        assert first_call_count == 8
-        assert second_call_count == 16
+        # Should register tools both times (6 tools each)
+        assert first_call_count == 6
+        assert second_call_count == 12
 
     def test_register_uc_merge_tools_with_none_mcp(self):
         """Test registering tools with None MCP instance."""
+        mock_workspace_manager = Mock()
         with pytest.raises(AttributeError):
-            register_uc_merge_tools(None)
+            register_uc_merge_tools(None, mock_workspace_manager)
 
     def test_register_uc_merge_tools_preserves_function_names(self):
         """Test that registered functions preserve their names."""
@@ -271,8 +264,9 @@ class TestToolRegistrationEdgeCases:
 
         mock_mcp = Mock()
         mock_mcp.tool = tool_decorator
+        mock_workspace_manager = Mock()
 
-        register_uc_merge_tools(mock_mcp)
+        register_uc_merge_tools(mock_mcp, mock_workspace_manager)
 
         # Verify all expected function names are preserved
         expected_tools = [
@@ -280,9 +274,7 @@ class TestToolRegistrationEdgeCases:
             "get_uc_releases",
             "get_uc_network_models",
             "start_uc_merge_session",
-            "readUcFile",
             "getUcNetworkCustomizationGuide",
-            "updateUcFile",
             "copyUcToLzaConfig",
         ]
 
@@ -319,7 +311,8 @@ class TestToolRegistrationIntegration:
 
     def test_all_tools_registered_correctly(self, mock_mcp_with_tracking):
         """Test that all tools are registered with correct metadata."""
-        register_uc_merge_tools(mock_mcp_with_tracking)
+        mock_workspace_manager = Mock()
+        register_uc_merge_tools(mock_mcp_with_tracking, mock_workspace_manager)
 
         # Verify all expected tools are registered
         expected_tools = [
@@ -327,9 +320,7 @@ class TestToolRegistrationIntegration:
             "get_uc_releases",
             "get_uc_network_models",
             "start_uc_merge_session",
-            "readUcFile",
             "getUcNetworkCustomizationGuide",
-            "updateUcFile",
             "copyUcToLzaConfig",
         ]
 
@@ -341,11 +332,12 @@ class TestToolRegistrationIntegration:
 
     def test_tool_registration_count(self, mock_mcp_with_tracking):
         """Test that correct number of tools are registered."""
-        register_uc_merge_tools(mock_mcp_with_tracking)
+        mock_workspace_manager = Mock()
+        register_uc_merge_tools(mock_mcp_with_tracking, mock_workspace_manager)
 
-        # Should have exactly 8 tools
-        assert len(mock_mcp_with_tracking.tools) == 8
-        assert mock_mcp_with_tracking.tool_call_count == 8
+        # Should have exactly 6 tools
+        assert len(mock_mcp_with_tracking.tools) == 6
+        assert mock_mcp_with_tracking.tool_call_count == 6
 
     @patch("awslabs.lza_mcp_server.tools.uc_merge.manage_uc_merge_tools.logger")
     def test_registration_error_handling(self, mock_logger):
@@ -355,6 +347,6 @@ class TestToolRegistrationIntegration:
 
         # Registration should raise the exception
         with pytest.raises(Exception) as exc_info:
-            register_uc_merge_tools(mock_mcp)
+            register_uc_merge_tools(mock_mcp, Mock())
 
         assert "Registration failed" in str(exc_info.value)

@@ -28,25 +28,17 @@ from awslabs.lza_mcp_server.tools.config.get_lza_configuration import (
 from awslabs.lza_mcp_server.tools.config.put_lza_configuration import (
     tool_put_lza_configuration,
 )
-from awslabs.lza_mcp_server.tools.uc_merge.read_lza_config_file import (
-    read_lza_config_file,
-)
-from awslabs.lza_mcp_server.tools.config.update_lza_config_file import (
-    update_lza_config_file,
-)
-from awslabs.lza_mcp_server.tools.config.create_lza_config_file import (
-    create_lza_config_file,
-)
 from awslabs.lza_mcp_server.utils.guidance_toggle import (
     strip_llm_guidance,
     tool_description,
 )
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceManager
 from .descriptions import DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
 
-def register_config_tools(mcp):
+def register_config_tools(mcp, workspace_manager: WorkspaceManager):
     """Register configuration-related MCP tools."""
 
     @mcp.tool(
@@ -56,13 +48,15 @@ def register_config_tools(mcp):
     async def get_minimum_configuration(
         ctx: Context,
         config_type: Optional[str] = None,
-        save_to_directory: Optional[str] = None,
+        workspace_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         return strip_llm_guidance(
-            await tool_get_minimum_configuration(ctx, config_type, save_to_directory)
+            await tool_get_minimum_configuration(
+                ctx, workspace_manager, config_type, workspace_id
+            )
         )
 
-    lza_config_retrieval = LzaConfigRetrieval()
+    lza_config_retrieval = LzaConfigRetrieval(workspace_manager)
 
     @mcp.tool(
         name="getLzaConfiguration",
@@ -72,8 +66,10 @@ def register_config_tools(mcp):
         ctx: Context,
         qualifier: Optional[str] = None,
         bucket_name: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        path: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieve LZA configuration from S3.
+        """Retrieve LZA configuration from S3 into a workspace.
 
         For standard deployments (no qualifier):
           - Bucket: aws-accelerator-config-{account_id}-{region}
@@ -86,9 +82,13 @@ def register_config_tools(mcp):
         Args:
             qualifier: Accelerator Qualifier for external pipeline deployments.
             bucket_name: Explicit bucket name override.
+            workspace_id: Optional workspace ID. A new workspace is created if omitted.
+            path: Optional relative path within the workspace to extract into.
         """
         return strip_llm_guidance(
-            await lza_config_retrieval.get_configuration(ctx, qualifier, bucket_name)
+            await lza_config_retrieval.get_configuration(
+                ctx, qualifier, bucket_name, workspace_id, path
+            )
         )
 
     @mcp.tool(
@@ -97,11 +97,12 @@ def register_config_tools(mcp):
     )  # nosemgrep: useless-inner-function
     async def put_lza_configuration(
         ctx: Context,
+        workspace_id: str,
+        path: str,
         qualifier: Optional[str] = None,
-        config_path: Optional[str] = None,
         bucket_name: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Upload LZA configuration to S3.
+        """Upload LZA configuration from a workspace to S3.
 
         For standard deployments (no qualifier):
           - Bucket: aws-accelerator-config-{account_id}-{region}
@@ -112,71 +113,14 @@ def register_config_tools(mcp):
           - Key: lza/aws-accelerator-config.zip
 
         Args:
+            workspace_id: Workspace containing the configuration files.
+            path: Relative path within the workspace where config files reside.
             qualifier: Accelerator Qualifier for external pipeline deployments.
-            config_path: Optional container-relative path. Leave empty to auto-detect.
             bucket_name: Explicit bucket name override.
         """
         return strip_llm_guidance(
-            await tool_put_lza_configuration(ctx, qualifier, config_path, bucket_name)
-        )
-
-    @mcp.tool(
-        name="readLzaConfigFile",
-        description=tool_description(**DESCRIPTIONS["readLzaConfigFile"]),
-    )  # nosemgrep: useless-inner-function
-    async def readLzaConfigFile(ctx: Context, file_path: str):
-        """Read a configuration file from the extracted LZA configuration.
-
-        This tool reads files from the LZA configuration directory that was
-        extracted via getLzaConfiguration(). It validates paths for security
-        and provides context-aware guidance based on the file being read.
-
-        Common files to review:
-        - accounts-config.yaml: Account structure and emails
-        - global-config.yaml: Global settings including homeRegion
-        - network-config.yaml: Network configuration
-        - iam-config.yaml: IAM configuration
-
-        Args:
-            file_path: Relative path to file (e.g., "accounts-config.yaml"). Required parameter.
-
-        Returns:
-            Dictionary with file content, metadata, and next steps guidance
-        """
-        return strip_llm_guidance(await read_lza_config_file(ctx, file_path))
-
-    @mcp.tool(
-        name="updateLzaConfigFile",
-        description=tool_description(**DESCRIPTIONS["updateLzaConfigFile"]),
-    )  # nosemgrep: useless-inner-function
-    async def update_lza_config_file_tool(
-        ctx: Context,
-        file_path: str,
-        updates: Optional[Dict[str, Any]] = None,
-        insert_path: Optional[str] = None,
-        insert_value: Optional[Dict[str, Any]] = None,
-        delete_path: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        return strip_llm_guidance(
-            await update_lza_config_file(
-                ctx, file_path, updates, insert_path, insert_value, delete_path
-            )
-        )
-
-    @mcp.tool(
-        name="createLzaConfigFile",
-        description=tool_description(**DESCRIPTIONS["createLzaConfigFile"]),
-    )  # nosemgrep: useless-inner-function
-    async def create_lza_config_file_tool(
-        ctx: Context,
-        file_path: str,
-        content: Dict[str, Any],
-        overwrite: bool = False,
-        json_indent: Optional[Any] = None,
-    ) -> Dict[str, Any]:
-        return strip_llm_guidance(
-            await create_lza_config_file(
-                ctx, file_path, content, overwrite, json_indent
+            await tool_put_lza_configuration(
+                ctx, workspace_manager, workspace_id, path, qualifier, bucket_name
             )
         )
 

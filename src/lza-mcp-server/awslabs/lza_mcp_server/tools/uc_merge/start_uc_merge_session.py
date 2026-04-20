@@ -14,9 +14,17 @@
 
 """Start UC merge session tool implementation."""
 
+import json
+from datetime import datetime
 from typing import Dict, Any
 
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
+from awslabs.lza_mcp_server.utils.workspace_manager import (
+    WorkspaceManager,
+    WorkspaceNotFoundError,
+    WorkspaceStorageError,
+    WorkspaceValidationError,
+)
 from .common import (
     get_uc_release_path,
     get_uc_network_model_path,
@@ -25,17 +33,16 @@ from .common import (
     categorize_uc_merge_error,
 )
 from .validation import validate_network_model, validate_uc_release
-from .session_manager import SessionManager
 
 
 async def tool_start_uc_merge_session(
-    ctx, uc_release: str, network_model: str
+    ctx, uc_release: str, network_model: str, workspace_manager: WorkspaceManager
 ) -> Dict[str, Any]:
     """Start a new UC merge session with the selected release and network model.
 
-    Creates a session directory with a fresh copy of the UC configuration
-    for the specified network model. The session_id must be passed to
-    subsequent UC merge tools (read_uc_file, update_uc_file, copy_uc_to_lza_config).
+    Creates a workspace with a fresh copy of the UC configuration
+    for the specified network model. The workspace_id must be passed to
+    subsequent UC merge tools (getUcNetworkCustomizationGuide, copyUcToLzaConfig).
 
     This ensures each merge session works with pristine UC files and doesn't
     interfere with other sessions.
@@ -44,6 +51,7 @@ async def tool_start_uc_merge_session(
         ctx: MCP context for logging
         uc_release: UC release version (e.g., "v1.0.0"). Required parameter.
         network_model: Network model name (e.g., "hub-and-spoke", "shared-vpc"). Required parameter.
+        workspace_manager: WorkspaceManager instance for file operations.
 
     Returns:
         Dictionary with session information or error details
@@ -170,48 +178,77 @@ async def tool_start_uc_merge_session(
             next_steps="Call get_uc_network_models() to discover available network models",
         )
 
-    # Create session
+    # Create workspace and copy UC files
     try:
-        session_manager = SessionManager()
+        # Create a new workspace
+        workspace_id = workspace_manager.create_workspace()
+        await ctx.info(f"Created workspace: {workspace_id}")
 
-        # Generate unique session ID
-        session_id = session_manager.generate_session_id()
-        await ctx.info(f"Generated session ID: {session_id}")
+        # Copy UC files to workspace preserving directory structure
+        files_copied = 0
+        for item in network_model_path.rglob("*"):
+            if item.is_file():
+                relative_path = str(item.relative_to(network_model_path))
+                content = item.read_bytes()
+                workspace_manager.write_file(workspace_id, relative_path, content)
+                files_copied += 1
 
-        # Create session directory
-        session_path = session_manager.create_session_directory(session_id)
-        await ctx.info(f"Created session directory: {session_path}")
+        await ctx.info(f"Copied {files_copied} files to workspace")
 
-        # Copy UC files to session
-        files_copied = session_manager.copy_files_to_session(
-            session_id=session_id,
-            source_dir=network_model_path,
-            preserve_structure=True,
-        )
-        await ctx.info(f"Copied {files_copied} files to session")
-
-        # Save session metadata
-        session_manager.save_session_metadata(
-            session_id=session_id, network_model=network_model, uc_release=uc_release
+        # Store session metadata
+        metadata = {
+            "network_model": network_model,
+            "uc_release": uc_release,
+            "created_at": datetime.now().isoformat(),
+        }
+        workspace_manager.write_file(
+            workspace_id,
+            ".session_metadata.json",
+            json.dumps(metadata, indent=2).encode(),
         )
         await ctx.info("Saved session metadata")
 
-        # Clean up previous sessions
-        cleaned_count = session_manager.cleanup_previous_sessions(
-            keep_session_id=session_id
-        )
-        if cleaned_count > 0:
-            await ctx.info(f"Cleaned up {cleaned_count} previous session(s)")
-
         return create_success_response(
             data={
-                "session_id": session_id,
-                "session_path": str(session_path),
+                "workspace_id": workspace_id,
                 "uc_release": uc_release,
                 "network_model": network_model,
                 "files_copied": files_copied,
             },
             next_steps=f"Session created successfully with {network_model} configuration. REQUIRED: You must now call getLzaConfiguration() to retrieve the current LZA configuration, then call validateLzaForUcMerge() to ensure compatibility before proceeding with customization.",
+        )
+
+    except (WorkspaceNotFoundError, WorkspaceValidationError) as e:
+        await ctx.error(f"Workspace error during UC merge session creation: {str(e)}")
+        error_code = (
+            "WORKSPACE_NOT_FOUND"
+            if isinstance(e, WorkspaceNotFoundError)
+            else "WORKSPACE_VALIDATION_ERROR"
+        )
+        return create_error_response(
+            error_message=f"Workspace error: {str(e)}",
+            error_code=error_code,
+            category=ErrorCategory.VALIDATION,
+            troubleshooting=[
+                "Workspace operation failed",
+                "Check workspace configuration",
+                "Retry start_uc_merge_session()",
+            ],
+            next_steps="Review the error and retry start_uc_merge_session()",
+        )
+
+    except WorkspaceStorageError as e:
+        await ctx.error(f"Storage error during UC merge session creation: {str(e)}")
+        return create_error_response(
+            error_message=f"Storage error: {str(e)}",
+            error_code="WORKSPACE_STORAGE_ERROR",
+            category=ErrorCategory.FILE_OPERATION,
+            troubleshooting=[
+                "Storage operation failed",
+                "Check storage adapter configuration",
+                "Verify disk space and permissions",
+            ],
+            next_steps="Review the error and retry start_uc_merge_session()",
         )
 
     except Exception as e:

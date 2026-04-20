@@ -12,285 +12,193 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Copy UC configuration from session directory to LZA configuration directory."""
+"""Copy UC configuration from UC workspace to LZA workspace."""
 
 import logging
-import shutil
+import posixpath
 from typing import Dict, Any
 
 from mcp.server.fastmcp import Context
 
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
+from awslabs.lza_mcp_server.utils.workspace_manager import (
+    WorkspaceManager,
+    WorkspaceNotFoundError,
+    WorkspaceStorageError,
+    WorkspaceValidationError,
+)
 from .common import (
-    get_extracted_lza_config_path,
     create_error_response,
     create_success_response,
     categorize_uc_merge_error,
 )
-from .session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
 
-async def copy_uc_to_lza_config(ctx: Context, session_id: str) -> Dict[str, Any]:
-    """Copy UC configuration from session directory to extracted LZA configuration directory.
+async def copy_uc_to_lza_config(
+    ctx: Context,
+    uc_workspace_id: str,
+    lza_workspace_id: str,
+    workspace_manager: WorkspaceManager,
+    path: str = "",
+) -> Dict[str, Any]:
+    """Copy UC configuration from UC workspace to LZA workspace.
 
-    This tool merges UC files with the existing LZA configuration by copying all
-    files from the session directory to the LZA configuration directory. Files are
-    overwritten as needed, and directory structure is preserved.
-
-    After this operation completes, call putLzaConfiguration() WITHOUT any path
-    parameter to upload the merged configuration.
+    Reads all files from the UC workspace and writes them to the LZA workspace,
+    preserving directory structure. Skips .session_metadata.json. Supports an
+    optional path prefix for the LZA workspace destination.
 
     Args:
         ctx: MCP context for logging
-        session_id: Session identifier from start_uc_merge_session()
+        uc_workspace_id: Workspace ID containing UC configuration
+        lza_workspace_id: Workspace ID containing LZA configuration
+        workspace_manager: WorkspaceManager instance for file operations
+        path: Optional path prefix for LZA workspace destination
 
     Returns:
-        Dictionary with copy operation results:
-        {
-            "success": bool,
-            "session_id": str,
-            "files_copied": int,
-            "directories_created": int,
-            "source": str,
-            "destination": str,
-            "next_steps": str
-        }
+        Dictionary with copy operation results
     """
     try:
         await ctx.info(
-            f"Copying UC configuration from session {session_id} to LZA config"
+            f"Copying UC configuration from workspace {uc_workspace_id} "
+            f"to LZA workspace {lza_workspace_id}"
         )
 
-        # Validate session_id is provided
-        if not session_id:
+        # Validate uc_workspace_id is provided
+        if not uc_workspace_id:
             return create_error_response(
-                error_message="Session ID is required",
-                error_code="MISSING_SESSION_ID",
+                error_message="UC workspace ID is required",
+                error_code="MISSING_WORKSPACE_ID",
                 category=ErrorCategory.VALIDATION,
                 troubleshooting=[
-                    "Provide a session_id parameter",
+                    "Provide a uc_workspace_id parameter",
                     "Start a new session with start_uc_merge_session()",
-                    "Ensure you have the session_id from the session creation response",
+                    "Ensure you have the workspace_id from the session creation response",
                 ],
-                next_steps="Call start_uc_merge_session() to create a session first.",
+                next_steps="Call start_uc_merge_session() to create a UC workspace first.",
             )
 
-        # Validate session exists
-        session_manager = SessionManager()
-        is_valid, error_message = session_manager.validate_session(session_id)
-
-        if not is_valid:
+        # Validate lza_workspace_id is provided
+        if not lza_workspace_id:
             return create_error_response(
-                error_message=error_message,
-                error_code="INVALID_SESSION",
+                error_message="LZA workspace ID is required",
+                error_code="MISSING_WORKSPACE_ID",
                 category=ErrorCategory.VALIDATION,
                 troubleshooting=[
-                    "Verify the session_id is correct",
-                    "Start a new session with start_uc_merge_session()",
-                    "Check that the session has not been cleaned up",
-                    "Ensure the session was created successfully",
+                    "Provide a lza_workspace_id parameter",
+                    "Call getLzaConfiguration() to create an LZA workspace",
+                    "Ensure you have the workspace_id from getLzaConfiguration response",
                 ],
-                context={"session_id": session_id},
-                next_steps="Start a new session with start_uc_merge_session() and use the returned session_id.",
-            )
-
-        # Get session directory
-        session_path = session_manager.get_session_path(session_id)
-
-        # Get extracted LZA config path
-        lza_config_path = get_extracted_lza_config_path()
-
-        if lza_config_path is None:
-            return create_error_response(
-                error_message="LZA configuration directory not found",
-                error_code="LZA_CONFIG_NOT_FOUND",
-                category=ErrorCategory.VALIDATION,
-                troubleshooting=[
-                    "Call getLzaConfiguration() first to retrieve the LZA configuration",
-                    "Ensure getLzaConfiguration() completed successfully",
-                    "Verify the extracted configuration path was set correctly",
-                ],
-                context={"session_id": session_id},
                 next_steps="Call getLzaConfiguration() to retrieve the LZA configuration first.",
             )
 
-        # Verify LZA config directory exists
-        if not lza_config_path.exists():
+        # List files in UC workspace
+        try:
+            uc_files = workspace_manager.list_files(uc_workspace_id)
+        except WorkspaceNotFoundError:
             return create_error_response(
-                error_message=f"LZA configuration directory does not exist: {lza_config_path}",
-                error_code="LZA_CONFIG_NOT_FOUND",
+                error_message="UC workspace not found",
+                error_code="WORKSPACE_NOT_FOUND",
                 category=ErrorCategory.FILE_NOT_FOUND,
                 troubleshooting=[
-                    "Call getLzaConfiguration() to retrieve the LZA configuration",
-                    "Verify the configuration was extracted successfully",
-                    "Check that the directory was not deleted",
+                    "Verify the uc_workspace_id is correct",
+                    "Start a new session with start_uc_merge_session()",
+                    "Ensure the workspace has not been deleted",
                 ],
-                context={
-                    "session_id": session_id,
-                    "lza_config_path": str(lza_config_path),
-                },
+                next_steps="Call start_uc_merge_session() to create a new UC workspace.",
+            )
+
+        # Verify LZA workspace exists by listing files (will raise if not found)
+        try:
+            workspace_manager.list_files(lza_workspace_id)
+        except WorkspaceNotFoundError:
+            return create_error_response(
+                error_message="LZA workspace not found",
+                error_code="WORKSPACE_NOT_FOUND",
+                category=ErrorCategory.FILE_NOT_FOUND,
+                troubleshooting=[
+                    "Verify the lza_workspace_id is correct",
+                    "Call getLzaConfiguration() to create an LZA workspace",
+                    "Ensure the workspace has not been deleted",
+                ],
+                context={"lza_workspace_id": lza_workspace_id},
                 next_steps="Call getLzaConfiguration() to retrieve the LZA configuration.",
             )
 
-        # Verify session directory exists and has files
-        if not session_path.exists():
-            return create_error_response(
-                error_message=f"Session directory does not exist: {session_path}",
-                error_code="SESSION_NOT_FOUND",
-                category=ErrorCategory.FILE_NOT_FOUND,
-                troubleshooting=[
-                    "Verify the session_id is correct",
-                    "Check that the session has not been cleaned up",
-                    "Start a new session with start_uc_merge_session()",
-                ],
-                context={"session_id": session_id, "session_path": str(session_path)},
-                next_steps="Start a new session with start_uc_merge_session().",
-            )
-
-        # Count files and directories before copying
+        # Copy files from UC workspace to LZA workspace
         files_copied = 0
-        directories_created = 0
+        directories_created: set[str] = set()
 
-        await ctx.info(f"Copying files from {session_path} to {lza_config_path}")
+        for file_path in uc_files:
+            # Skip metadata files
+            if file_path == ".session_metadata.json":
+                continue
 
-        # Copy all files from session to LZA config, preserving structure
-        try:
-            for item in session_path.rglob("*"):
-                # Skip metadata files
-                if item.name == ".session_metadata.json":
-                    continue
-
-                # Calculate relative path
-                relative_path = item.relative_to(session_path)
-                dest_path = lza_config_path / relative_path
-
-                if item.is_dir():
-                    # Create directory if it doesn't exist
-                    if not dest_path.exists():
-                        dest_path.mkdir(parents=True, exist_ok=True)
-                        directories_created += 1
-                        await ctx.info(f"Created directory: {relative_path}")
-                elif item.is_file():
-                    # Ensure parent directory exists
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    # Copy file (overwrite if exists)
-                    shutil.copy2(item, dest_path)
-                    files_copied += 1
-
-                    if files_copied % 10 == 0:
-                        await ctx.info(f"Copied {files_copied} files...")
-
-            await ctx.info(
-                f"Successfully copied {files_copied} files and created "
-                f"{directories_created} directories from session {session_id}"
-            )
-
-            # Clean up session directory after successful merge
-            # The UC configuration has been merged into LZA config, so session is no longer needed
+            # Read file from UC workspace
             try:
-                await ctx.info(f"Cleaning up session directory: {session_id}")
-                shutil.rmtree(session_path)
-                logger.info(f"Cleaned up session directory: {session_path}")
-                await ctx.info(f"Session directory removed: {session_id}")
-            except Exception as cleanup_error:
-                # Log warning but don't fail the operation
+                content = workspace_manager.read_file(uc_workspace_id, file_path)
+            except (WorkspaceNotFoundError, WorkspaceStorageError) as e:
                 logger.warning(
-                    f"Failed to clean up session directory {session_id}: {str(cleanup_error)}"
+                    f"Failed to read file '{file_path}' from UC workspace: {e}"
                 )
-                await ctx.warning(
-                    f"Could not remove session directory (non-critical): {str(cleanup_error)}"
+                continue
+
+            # Determine destination path with optional prefix
+            if path:
+                dest_path = posixpath.join(path, file_path)
+            else:
+                dest_path = file_path
+
+            # Track directories created
+            parent_dir = posixpath.dirname(dest_path)
+            if parent_dir:
+                directories_created.add(parent_dir)
+
+            # Write file to LZA workspace
+            try:
+                workspace_manager.write_file(lza_workspace_id, dest_path, content)
+                files_copied += 1
+
+                if files_copied % 10 == 0:
+                    await ctx.info(f"Copied {files_copied} files...")
+            except (WorkspaceValidationError, WorkspaceStorageError) as e:
+                logger.warning(
+                    f"Failed to write file '{dest_path}' to LZA workspace: {e}"
                 )
+                continue
 
-            return create_success_response(
-                data={
-                    "session_id": session_id,
-                    "files_copied": files_copied,
-                    "directories_created": directories_created,
-                    "source": str(session_path),
-                    "destination": str(lza_config_path),
-                    "session_cleaned_up": not session_path.exists(),
-                },
-                next_steps=(
-                    "UC configuration merged successfully. Session directory has been cleaned up. "
-                    "Call putLzaConfiguration() WITHOUT any path parameter "
-                    "to upload the merged configuration."
-                ),
-            )
+        await ctx.info(
+            f"Successfully copied {files_copied} files from UC workspace "
+            f"{uc_workspace_id} to LZA workspace {lza_workspace_id}"
+        )
 
-        except PermissionError as e:
-            return create_error_response(
-                error_message=f"Permission denied during copy operation: {str(e)}",
-                error_code="ACCESS_DENIED",
-                category=ErrorCategory.FILE_OPERATION,
-                troubleshooting=[
-                    "Check file system permissions",
-                    "Ensure the user has write access to the LZA configuration directory",
-                    "Verify no files are locked by another process",
-                    "Check container permissions and volume mounts",
-                ],
-                context={
-                    "session_id": session_id,
-                    "source": str(session_path),
-                    "destination": str(lza_config_path),
-                    "files_copied": files_copied,
-                    "directories_created": directories_created,
-                },
-                next_steps="Check file permissions and retry the operation.",
-            )
-        except OSError as e:
-            return create_error_response(
-                error_message=f"File system error during copy operation: {str(e)}",
-                error_code="FILE_OPERATION_ERROR",
-                category=ErrorCategory.FILE_OPERATION,
-                troubleshooting=[
-                    "Check available disk space",
-                    "Verify file system is not read-only",
-                    "Ensure no files are corrupted",
-                    "Check system logs for more details",
-                ],
-                context={
-                    "session_id": session_id,
-                    "source": str(session_path),
-                    "destination": str(lza_config_path),
-                    "files_copied": files_copied,
-                    "directories_created": directories_created,
-                    "error_type": type(e).__name__,
-                },
-                next_steps="Check the error details and retry the operation.",
-            )
-        except Exception as e:
-            error_info = categorize_uc_merge_error(e)
-            return create_error_response(
-                error_message=f"Failed to copy files: {str(e)}",
-                error_code=error_info["error_code"],
-                category=error_info["category"],
-                troubleshooting=error_info["troubleshooting"],
-                context={
-                    "session_id": session_id,
-                    "source": str(session_path),
-                    "destination": str(lza_config_path),
-                    "files_copied": files_copied,
-                    "directories_created": directories_created,
-                    "error_type": type(e).__name__,
-                },
-                next_steps="Check the error details and retry the operation.",
-            )
+        return create_success_response(
+            data={
+                "uc_workspace_id": uc_workspace_id,
+                "lza_workspace_id": lza_workspace_id,
+                "files_copied": files_copied,
+                "directories_created": len(directories_created),
+            },
+            next_steps=(
+                "UC configuration merged successfully. "
+                f"Call putLzaConfiguration(workspace_id='{lza_workspace_id}') "
+                "to upload the merged configuration."
+            ),
+        )
 
     except Exception as e:
         logger.error(f"Unexpected error copying UC to LZA config: {str(e)}")
+        error_info = categorize_uc_merge_error(e)
         return create_error_response(
             error_message=f"Unexpected error during copy operation: {str(e)}",
-            error_code="UNEXPECTED_ERROR",
-            category=ErrorCategory.FILE_OPERATION,
-            troubleshooting=[
-                "Check system logs for more details",
-                "Verify both session and LZA config directories are accessible",
-                "Ensure sufficient system resources",
-                "Try creating a new session",
-            ],
-            context={"session_id": session_id, "error_type": type(e).__name__},
+            error_code=error_info["error_code"],
+            category=error_info["category"],
+            troubleshooting=error_info["troubleshooting"],
+            context={
+                "uc_workspace_id": uc_workspace_id,
+                "lza_workspace_id": lza_workspace_id,
+                "error_type": type(e).__name__,
+            },
             next_steps="Review the error and retry the operation.",
         )

@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Additional coverage tests for validate_lza_for_uc_merge tool."""
+"""Additional coverage tests for validate_lza_for_uc_merge tool (workspace-based)."""
 
 import pytest
-from unittest.mock import AsyncMock
 import yaml
+from unittest.mock import AsyncMock, MagicMock
 
 from awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge import (
     validate_lza_for_uc_merge,
 )
+from awslabs.lza_mcp_server.utils.workspace_manager import WorkspaceNotFoundError
 
 
 @pytest.fixture
@@ -63,6 +64,19 @@ def minimal_iam_config():
     }
 
 
+def _make_wm(file_map):
+    """Create a mock WorkspaceManager that returns bytes from file_map."""
+    wm = MagicMock()
+
+    def read_file(ws_id, path, context=None):
+        if path in file_map:
+            return file_map[path]
+        raise WorkspaceNotFoundError(f"File '{path}' not found in workspace '{ws_id}'")
+
+    wm.read_file = MagicMock(side_effect=read_file)
+    return wm
+
+
 @pytest.mark.unit
 @pytest.mark.uc_merge
 class TestValidateLzaForUcMergeCoverage:
@@ -70,38 +84,19 @@ class TestValidateLzaForUcMergeCoverage:
 
     @pytest.mark.asyncio
     async def test_accounts_config_parse_error(
-        self,
-        mock_ctx,
-        tmp_path,
-        minimal_network_config,
-        minimal_iam_config,
-        monkeypatch,
+        self, mock_ctx, minimal_network_config, minimal_iam_config
     ):
-        """Test handling of accounts config parse error.
-
-        Covers lines 116-117, 122: Exception handling when parsing accounts config
-        """
-        # Setup test directory
-        config_dir = tmp_path / "retrieved-config"
-        config_dir.mkdir(parents=True)
-
-        # Create invalid YAML file
-        (config_dir / "accounts-config.yaml").write_text("invalid: yaml: content: [")
-        (config_dir / "network-config.yaml").write_text(
-            yaml.dump(minimal_network_config)
-        )
-        (config_dir / "iam-config.yaml").write_text(yaml.dump(minimal_iam_config))
-
-        # Patch the base path
-        monkeypatch.setattr(
-            "awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge.LZA_CONFIG_BASE_PATH",
-            tmp_path,
+        """Test handling of accounts config parse error."""
+        wm = _make_wm(
+            {
+                "accounts-config.yaml": b"invalid: yaml: content: [",
+                "network-config.yaml": yaml.dump(minimal_network_config).encode(),
+                "iam-config.yaml": yaml.dump(minimal_iam_config).encode(),
+            }
         )
 
-        # Run validation
-        result = await validate_lza_for_uc_merge(mock_ctx)
+        result = await validate_lza_for_uc_merge(mock_ctx, "abcdef123456", "", wm)
 
-        # Assertions
         assert result["success"] is False
         assert result["error_code"] == "NOT_FRESH_INSTALLATION"
         assert "accounts" in result["context"]["failed_checks"]
@@ -110,33 +105,19 @@ class TestValidateLzaForUcMergeCoverage:
 
     @pytest.mark.asyncio
     async def test_network_config_parse_error(
-        self, mock_ctx, tmp_path, fresh_accounts_config, minimal_iam_config, monkeypatch
+        self, mock_ctx, fresh_accounts_config, minimal_iam_config
     ):
-        """Test handling of network config parse error.
-
-        Covers lines 143-144, 149: Exception handling when parsing network config
-        """
-        # Setup test directory
-        config_dir = tmp_path / "retrieved-config"
-        config_dir.mkdir(parents=True)
-
-        # Create config files with invalid network YAML
-        (config_dir / "accounts-config.yaml").write_text(
-            yaml.dump(fresh_accounts_config)
-        )
-        (config_dir / "network-config.yaml").write_text("invalid: yaml: content: [")
-        (config_dir / "iam-config.yaml").write_text(yaml.dump(minimal_iam_config))
-
-        # Patch the base path
-        monkeypatch.setattr(
-            "awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge.LZA_CONFIG_BASE_PATH",
-            tmp_path,
+        """Test handling of network config parse error."""
+        wm = _make_wm(
+            {
+                "accounts-config.yaml": yaml.dump(fresh_accounts_config).encode(),
+                "network-config.yaml": b"invalid: yaml: content: [",
+                "iam-config.yaml": yaml.dump(minimal_iam_config).encode(),
+            }
         )
 
-        # Run validation
-        result = await validate_lza_for_uc_merge(mock_ctx)
+        result = await validate_lza_for_uc_merge(mock_ctx, "abcdef123456", "", wm)
 
-        # Assertions
         assert result["success"] is False
         assert result["error_code"] == "NOT_FRESH_INSTALLATION"
         assert "network" in result["context"]["failed_checks"]
@@ -145,40 +126,19 @@ class TestValidateLzaForUcMergeCoverage:
 
     @pytest.mark.asyncio
     async def test_iam_config_parse_error(
-        self,
-        mock_ctx,
-        tmp_path,
-        fresh_accounts_config,
-        minimal_network_config,
-        monkeypatch,
+        self, mock_ctx, fresh_accounts_config, minimal_network_config
     ):
-        """Test handling of IAM config parse error.
-
-        Covers lines 170-171, 176: Exception handling when parsing IAM config
-        """
-        # Setup test directory
-        config_dir = tmp_path / "retrieved-config"
-        config_dir.mkdir(parents=True)
-
-        # Create config files with invalid IAM YAML
-        (config_dir / "accounts-config.yaml").write_text(
-            yaml.dump(fresh_accounts_config)
-        )
-        (config_dir / "network-config.yaml").write_text(
-            yaml.dump(minimal_network_config)
-        )
-        (config_dir / "iam-config.yaml").write_text("invalid: yaml: content: [")
-
-        # Patch the base path
-        monkeypatch.setattr(
-            "awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge.LZA_CONFIG_BASE_PATH",
-            tmp_path,
+        """Test handling of IAM config parse error."""
+        wm = _make_wm(
+            {
+                "accounts-config.yaml": yaml.dump(fresh_accounts_config).encode(),
+                "network-config.yaml": yaml.dump(minimal_network_config).encode(),
+                "iam-config.yaml": b"invalid: yaml: content: [",
+            }
         )
 
-        # Run validation
-        result = await validate_lza_for_uc_merge(mock_ctx)
+        result = await validate_lza_for_uc_merge(mock_ctx, "abcdef123456", "", wm)
 
-        # Assertions
         assert result["success"] is False
         assert result["error_code"] == "NOT_FRESH_INSTALLATION"
         assert "iam" in result["context"]["failed_checks"]
@@ -187,100 +147,51 @@ class TestValidateLzaForUcMergeCoverage:
 
     @pytest.mark.asyncio
     async def test_missing_network_config_file(
-        self, mock_ctx, tmp_path, fresh_accounts_config, minimal_iam_config, monkeypatch
+        self, mock_ctx, fresh_accounts_config, minimal_iam_config
     ):
         """Test validation fails when network-config.yaml is missing."""
-        # Setup test directory without network-config.yaml
-        config_dir = tmp_path / "retrieved-config"
-        config_dir.mkdir(parents=True)
-
-        (config_dir / "accounts-config.yaml").write_text(
-            yaml.dump(fresh_accounts_config)
-        )
-        (config_dir / "iam-config.yaml").write_text(yaml.dump(minimal_iam_config))
-
-        # Patch the base path
-        monkeypatch.setattr(
-            "awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge.LZA_CONFIG_BASE_PATH",
-            tmp_path,
+        wm = _make_wm(
+            {
+                "accounts-config.yaml": yaml.dump(fresh_accounts_config).encode(),
+                "iam-config.yaml": yaml.dump(minimal_iam_config).encode(),
+            }
         )
 
-        # Run validation
-        result = await validate_lza_for_uc_merge(mock_ctx)
+        result = await validate_lza_for_uc_merge(mock_ctx, "abcdef123456", "", wm)
 
-        # Assertions
         assert result["success"] is False
         assert result["error_code"] == "FILE_NOT_FOUND"
         assert "network-config.yaml" in result["error"]
 
     @pytest.mark.asyncio
     async def test_missing_iam_config_file(
-        self,
-        mock_ctx,
-        tmp_path,
-        fresh_accounts_config,
-        minimal_network_config,
-        monkeypatch,
+        self, mock_ctx, fresh_accounts_config, minimal_network_config
     ):
         """Test validation fails when iam-config.yaml is missing."""
-        # Setup test directory without iam-config.yaml
-        config_dir = tmp_path / "retrieved-config"
-        config_dir.mkdir(parents=True)
-
-        (config_dir / "accounts-config.yaml").write_text(
-            yaml.dump(fresh_accounts_config)
-        )
-        (config_dir / "network-config.yaml").write_text(
-            yaml.dump(minimal_network_config)
+        wm = _make_wm(
+            {
+                "accounts-config.yaml": yaml.dump(fresh_accounts_config).encode(),
+                "network-config.yaml": yaml.dump(minimal_network_config).encode(),
+            }
         )
 
-        # Patch the base path
-        monkeypatch.setattr(
-            "awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge.LZA_CONFIG_BASE_PATH",
-            tmp_path,
-        )
+        result = await validate_lza_for_uc_merge(mock_ctx, "abcdef123456", "", wm)
 
-        # Run validation
-        result = await validate_lza_for_uc_merge(mock_ctx)
-
-        # Assertions
         assert result["success"] is False
         assert result["error_code"] == "FILE_NOT_FOUND"
         assert "iam-config.yaml" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_unexpected_error_during_validation(
-        self, mock_ctx, tmp_path, monkeypatch
-    ):
-        """Test handling of unexpected errors during validation.
-
-        Covers lines 208-221: General exception handling
-        """
-        # Setup test directory
-        config_dir = tmp_path / "retrieved-config"
-        config_dir.mkdir(parents=True)
-
-        # Patch the base path
-        monkeypatch.setattr(
-            "awslabs.lza_mcp_server.tools.uc_merge.validate_lza_for_uc_merge.LZA_CONFIG_BASE_PATH",
-            tmp_path,
+    async def test_unexpected_error_during_validation(self, mock_ctx):
+        """Test handling of unexpected errors during validation."""
+        wm = MagicMock()
+        # Make ctx.info raise to trigger the outer exception handler
+        mock_ctx.info = AsyncMock(
+            side_effect=RuntimeError("Unexpected filesystem error")
         )
 
-        # Mock Path.exists to raise an exception
-        from pathlib import Path
-        from unittest.mock import patch
+        result = await validate_lza_for_uc_merge(mock_ctx, "abcdef123456", "", wm)
 
-        def mock_exists(self):
-            # Let the first check pass (base_directory.exists())
-            if str(self).endswith("retrieved-config"):
-                return True
-            # Raise exception on subsequent checks
-            raise RuntimeError("Unexpected filesystem error")
-
-        with patch.object(Path, "exists", mock_exists):
-            result = await validate_lza_for_uc_merge(mock_ctx)
-
-        # Assertions
         assert result["success"] is False
         assert result["error_code"] == "UNEXPECTED_ERROR"
         assert "Unexpected error" in result["error"]

@@ -42,6 +42,7 @@ RUN apt-get update && \
     curl \
     git \
     unzip \
+    zip \
     ca-certificates \
     jq && \
     rm -rf /var/lib/apt/lists/*
@@ -139,6 +140,7 @@ ENV PYTHONPATH="/app:/app/deps"
 ENV FASTMCP_LOG_LEVEL="INFO"
 ENV AWS_DEFAULT_REGION="us-east-1"
 ENV LZA_MIN_CONFIG_DIR="/app/lza-minimum-configuration"
+ENV WORKSPACE_DIR="/tmp/workspaces"
 
 # Set working directory
 WORKDIR /app

@@ -17,7 +17,11 @@
 import logging
 from mcp.server.fastmcp import FastMCP
 
-from .server_config import build_instructions, is_uc_merge_enabled
+from .server_config import (
+    build_instructions,
+    is_resource_tools_disabled,
+    is_uc_merge_enabled,
+)
 from .server_registry import register_all_components
 from .server_startup import (
     configure_logging,
@@ -66,7 +70,8 @@ def main():
 
     # Register all components
     enable_uc_merge = is_uc_merge_enabled()
-    register_all_components(mcp, enable_uc_merge)
+    disable_resource_tools = is_resource_tools_disabled()
+    register_all_components(mcp, enable_uc_merge, disable_resource_tools)
 
     # Run the server
     mcp.run()

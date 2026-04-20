@@ -16,4 +16,14 @@ When working with LZA schemas, use this recommended workflow:
 
 Alternatively, use `listLzaSupportedVersions` to see all available schema versions.
 
+### UC Merge Workflow
+1. `getLzaConfiguration` — retrieve LZA config into a workspace (returns workspace_id)
+2. `validateLzaForUcMerge(workspace_id)` — verify the installation is fresh
+3. `get_uc_releases` — discover available UC versions
+4. `get_uc_network_models` — select a network model
+5. `start_uc_merge_session` — create a UC workspace (returns workspace_id)
+6. Customize via `readResource` / `writeWorkspaceFile` on the UC workspace
+7. `copyUcToLzaConfig(uc_workspace_id, lza_workspace_id)` — merge UC into LZA workspace
+8. `putLzaConfiguration` — upload the merged configuration
+
 For detailed usage instructions, see the individual tool documentation.

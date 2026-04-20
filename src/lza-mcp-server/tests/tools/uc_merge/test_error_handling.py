@@ -648,20 +648,6 @@ class TestCommonPathHelpers:
             path = get_uc_network_model_path("v1.0.0", "hub-and-spoke")
             assert str(path) == "/uc/v1.0.0/hub-and-spoke"
 
-    def test_set_and_get_extracted_path(self):
-        from awslabs.lza_mcp_server.tools.uc_merge.common import (
-            set_extracted_lza_config_path,
-            get_extracted_lza_config_path,
-        )
-        from pathlib import Path
-
-        set_extracted_lza_config_path(Path("/test/path"))
-        assert get_extracted_lza_config_path() == Path("/test/path")
-
-        # Reset
-        set_extracted_lza_config_path(None)
-        assert get_extracted_lza_config_path() is None
-
 
 class TestCategorizeAbsolutePathError:
     """Test the 'absolute not allowed' branch in categorize_uc_merge_error."""

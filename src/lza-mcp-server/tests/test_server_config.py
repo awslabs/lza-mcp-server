@@ -20,6 +20,7 @@ from awslabs.lza_mcp_server.server_config import (
     get_uc_merge_instructions,
     get_workflow_instructions,
     is_instruction_logging_enabled,
+    is_resource_tools_disabled,
     is_uc_merge_enabled,
 )
 
@@ -74,6 +75,35 @@ class TestIsUcMergeEnabled:
         """Test UC Merge disabled with invalid value."""
         monkeypatch.setenv("ENABLE_UC_MERGE", "invalid")
         assert is_uc_merge_enabled() is False
+
+
+class TestIsResourceToolsDisabled:
+    """Test resource tools disabled detection."""
+
+    def test_enabled_by_default(self, monkeypatch):
+        """Test resource tools enabled by default (DISABLE_RESOURCE_TOOLS defaults to false)."""
+        monkeypatch.delenv("DISABLE_RESOURCE_TOOLS", raising=False)
+        assert is_resource_tools_disabled() is False
+
+    def test_disabled_with_true(self, monkeypatch):
+        """Test resource tools disabled with 'true'."""
+        monkeypatch.setenv("DISABLE_RESOURCE_TOOLS", "true")
+        assert is_resource_tools_disabled() is True
+
+    def test_enabled_with_false(self, monkeypatch):
+        """Test resource tools enabled with 'false'."""
+        monkeypatch.setenv("DISABLE_RESOURCE_TOOLS", "false")
+        assert is_resource_tools_disabled() is False
+
+    def test_disabled_with_1(self, monkeypatch):
+        """Test resource tools disabled with '1'."""
+        monkeypatch.setenv("DISABLE_RESOURCE_TOOLS", "1")
+        assert is_resource_tools_disabled() is True
+
+    def test_enabled_with_0(self, monkeypatch):
+        """Test resource tools enabled with '0'."""
+        monkeypatch.setenv("DISABLE_RESOURCE_TOOLS", "0")
+        assert is_resource_tools_disabled() is False
 
 
 class TestIsInstructionLoggingEnabled:
@@ -193,10 +223,11 @@ class TestGetUcMergeInstructions:
         assert "get_uc_releases" in result
         assert "get_uc_network_models" in result
         assert "start_uc_merge_session" in result
-        assert "readUcFile" in result
-        assert "updateUcFile" in result
         assert "getUcNetworkCustomizationGuide" in result
         assert "copyUcToLzaConfig" in result
+        # Dropped tools should NOT be present
+        assert "readUcFile" not in result
+        assert "updateUcFile" not in result
 
 
 class TestGetWorkflowInstructions:
@@ -278,6 +309,18 @@ class TestBuildInstructions:
         result = build_instructions()
 
         assert "### UC Merge Tools" not in result
+
+    def test_includes_workspace_instructions(self):
+        """Test building instructions includes workspace instructions by default."""
+        result = build_instructions(include_uc_merge=False)
+
+        assert "## Workspaces" in result or "workspace" in result.lower()
+
+    def test_includes_resource_instructions(self):
+        """Test building instructions includes resource instructions by default."""
+        result = build_instructions(include_uc_merge=False)
+
+        assert "## Resources" in result or "resource" in result.lower()
 
     def test_instructions_order(self):
         """Test instructions are in correct order."""

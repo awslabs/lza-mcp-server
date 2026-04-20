@@ -743,69 +743,6 @@ class TestResponseStructure:
 # ===========================================================================
 
 
-class TestToolRegistration:
-    def test_create_lza_config_file_registered(self):
-        from unittest.mock import Mock
-
-        server = Mock()
-        registered = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered[name] = {
-                    "name": name,
-                    "description": description,
-                    "function": func,
-                }
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-
-        from awslabs.lza_mcp_server.tools.config.manage_config_tools import (
-            register_config_tools,
-        )
-
-        register_config_tools(server)
-
-        assert "createLzaConfigFile" in registered
-        assert "create" in registered["createLzaConfigFile"]["description"].lower()
-        assert "json" in registered["createLzaConfigFile"]["description"].lower()
-        assert "yaml" in registered["createLzaConfigFile"]["description"].lower()
-
-    @pytest.mark.asyncio
-    async def test_registered_wrapper_delegates(self, mock_mcp_context, config_dir):
-        from unittest.mock import Mock
-
-        server = Mock()
-        registered = {}
-
-        def mock_tool_decorator(name=None, description=None):
-            def decorator(func):
-                registered[name] = func
-                return func
-
-            return decorator
-
-        server.tool = mock_tool_decorator
-
-        from awslabs.lza_mcp_server.tools.config.manage_config_tools import (
-            register_config_tools,
-        )
-
-        register_config_tools(server)
-
-        func = registered["createLzaConfigFile"]
-        with _patch_base_path(config_dir):
-            result = await func(
-                mock_mcp_context,
-                file_path="delegated.json",
-                content={"test": True},
-            )
-        assert result["success"] is True
-
-
 # ===========================================================================
 # Context logging tests
 # ===========================================================================

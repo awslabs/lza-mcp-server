@@ -15,158 +15,175 @@
 """Validate LZA installation is fresh and compatible with UC merge."""
 
 import logging
-from typing import Dict, Any
-import yaml
+from typing import Any, Dict
 
+import yaml
 from mcp.server.fastmcp import Context
 
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
-from .common import (
-    create_error_response,
-    create_success_response,
-    LZA_CONFIG_BASE_PATH,
+from awslabs.lza_mcp_server.utils.workspace_manager import (
+    WorkspaceManager,
+    WorkspaceNotFoundError,
+    WorkspaceStorageError,
+    WorkspaceValidationError,
 )
+
+from .common import create_error_response, create_success_response
 from .validation import (
     validate_fresh_installation_accounts,
-    validate_fresh_installation_network,
     validate_fresh_installation_iam,
+    validate_fresh_installation_network,
 )
 
 logger = logging.getLogger(__name__)
 
 
-async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
+async def validate_lza_for_uc_merge(
+    ctx: Context,
+    workspace_id: str,
+    path: str,
+    workspace_manager: WorkspaceManager,
+) -> Dict[str, Any]:
     """Validate that the LZA installation is fresh and compatible with UC merge.
 
-    This tool validates that the current LZA installation meets the requirements
-    for UC merge by checking:
-    - accounts-config.yaml has only 3 mandatory accounts (no workload accounts)
-    - network-config.yaml has minimal configuration (empty arrays)
-    - iam-config.yaml has minimal configuration (empty arrays)
+    Reads accounts-config.yaml, network-config.yaml, and iam-config.yaml from
+    the specified workspace via WorkspaceManager and validates each for a fresh
+    LZA installation.
 
-    Call this after getLzaConfiguration() to ensure the installation is
-    compatible with UC merge before proceeding.
+    Args:
+        ctx: MCP context for logging.
+        workspace_id: Workspace ID from getLzaConfiguration.
+        path: Optional path prefix within the workspace (defaults to "").
+        workspace_manager: WorkspaceManager instance for file I/O.
 
     Returns:
-        Dictionary with validation results:
-        {
-            "success": bool,
-            "validation_passed": bool,
-            "checks": {
-                "accounts": {"passed": bool, "message": str},
-                "network": {"passed": bool, "message": str},
-                "iam": {"passed": bool, "message": str}
-            },
-            "next_steps": str
-        }
+        Dictionary with validation results.
     """
+    if not workspace_id:
+        return create_error_response(
+            error_message=(
+                "workspace_id is required. "
+                "Provide the workspace_id returned by getLzaConfiguration()."
+            ),
+            error_code="MISSING_WORKSPACE_ID",
+            category=ErrorCategory.VALIDATION,
+            troubleshooting=[
+                "Call getLzaConfiguration() first to retrieve the LZA configuration into a workspace",
+                "Pass the workspace_id returned by getLzaConfiguration() to this tool",
+            ],
+            next_steps="Call getLzaConfiguration() to retrieve the LZA configuration.",
+        )
+
     try:
         await ctx.info("Validating LZA installation for UC merge compatibility")
 
-        # Check if configuration has been retrieved
-        base_directory = LZA_CONFIG_BASE_PATH / "retrieved-config"
+        # Build file paths with optional prefix
+        prefix = f"{path}/" if path else ""
 
-        if not base_directory.exists():
-            return create_error_response(
-                error_message=(
-                    "LZA configuration directory not found. "
-                    "Call getLzaConfiguration() first to retrieve the configuration."
-                ),
-                error_code="CONFIG_NOT_RETRIEVED",
-                category=ErrorCategory.CONFIGURATION,
-                troubleshooting=[
-                    "Call getLzaConfiguration() to retrieve the LZA configuration",
-                    "Verify the configuration was extracted successfully",
-                    "Ensure getLzaConfiguration() completed without errors",
-                ],
-                context={"expected_directory": str(base_directory)},
-                next_steps="Call getLzaConfiguration() to retrieve the LZA configuration.",
-            )
-
-        validation_results = {
+        validation_results: Dict[str, Dict[str, Any]] = {
             "accounts": {"passed": False, "message": ""},
             "network": {"passed": False, "message": ""},
             "iam": {"passed": False, "message": ""},
         }
 
         # Validate accounts-config.yaml
-        accounts_path = base_directory / "accounts-config.yaml"
-        if not accounts_path.exists():
-            return create_error_response(
-                error_message="accounts-config.yaml not found in LZA configuration",
-                error_code="FILE_NOT_FOUND",
-                category=ErrorCategory.FILE_NOT_FOUND,
-                troubleshooting=[
-                    "Verify getLzaConfiguration() extracted all files",
-                    "Check that accounts-config.yaml exists in the S3 configuration",
-                    "Ensure the LZA installation is complete",
-                ],
-                context={"file": "accounts-config.yaml"},
-                next_steps="Verify the LZA configuration is complete and retry.",
-            )
-
+        accounts_file = f"{prefix}accounts-config.yaml"
         try:
-            accounts_content = accounts_path.read_text(encoding="utf-8")
+            accounts_bytes = workspace_manager.read_file(workspace_id, accounts_file)
+            accounts_content = accounts_bytes.decode("utf-8")
             accounts_config = yaml.safe_load(accounts_content)
             is_valid, error_msg = validate_fresh_installation_accounts(accounts_config)
             validation_results["accounts"]["passed"] = is_valid
             validation_results["accounts"]["message"] = (
                 "Only mandatory accounts present" if is_valid else error_msg
             )
+        except WorkspaceNotFoundError as e:
+            error_str = str(e)
+            if "File" in error_str and "not found" in error_str:
+                return create_error_response(
+                    error_message="accounts-config.yaml not found in workspace",
+                    error_code="FILE_NOT_FOUND",
+                    category=ErrorCategory.FILE_NOT_FOUND,
+                    troubleshooting=[
+                        "Verify getLzaConfiguration() extracted all files",
+                        "Check that accounts-config.yaml exists in the S3 configuration",
+                        "Ensure the LZA installation is complete",
+                    ],
+                    context={
+                        "file": "accounts-config.yaml",
+                    },
+                    next_steps="Verify the LZA configuration is complete and retry.",
+                )
+            # Workspace itself not found — re-raise for outer handler
+            raise
+        except (WorkspaceValidationError, WorkspaceStorageError):
+            raise
         except Exception as e:
             validation_results["accounts"]["message"] = f"Failed to parse: {str(e)}"
 
         # Validate network-config.yaml
-        network_path = base_directory / "network-config.yaml"
-        if not network_path.exists():
-            return create_error_response(
-                error_message="network-config.yaml not found in LZA configuration",
-                error_code="FILE_NOT_FOUND",
-                category=ErrorCategory.FILE_NOT_FOUND,
-                troubleshooting=[
-                    "Verify getLzaConfiguration() extracted all files",
-                    "Check that network-config.yaml exists in the S3 configuration",
-                    "Ensure the LZA installation is complete",
-                ],
-                context={"file": "network-config.yaml"},
-                next_steps="Verify the LZA configuration is complete and retry.",
-            )
-
+        network_file = f"{prefix}network-config.yaml"
         try:
-            network_content = network_path.read_text(encoding="utf-8")
+            network_bytes = workspace_manager.read_file(workspace_id, network_file)
+            network_content = network_bytes.decode("utf-8")
             network_config = yaml.safe_load(network_content)
             is_valid, error_msg = validate_fresh_installation_network(network_config)
             validation_results["network"]["passed"] = is_valid
             validation_results["network"]["message"] = (
                 "Minimal network configuration" if is_valid else error_msg
             )
+        except WorkspaceNotFoundError as e:
+            error_str = str(e)
+            if "File" in error_str and "not found" in error_str:
+                return create_error_response(
+                    error_message="network-config.yaml not found in workspace",
+                    error_code="FILE_NOT_FOUND",
+                    category=ErrorCategory.FILE_NOT_FOUND,
+                    troubleshooting=[
+                        "Verify getLzaConfiguration() extracted all files",
+                        "Check that network-config.yaml exists in the S3 configuration",
+                        "Ensure the LZA installation is complete",
+                    ],
+                    context={
+                        "file": "network-config.yaml",
+                    },
+                    next_steps="Verify the LZA configuration is complete and retry.",
+                )
+            raise
+        except (WorkspaceValidationError, WorkspaceStorageError):
+            raise
         except Exception as e:
             validation_results["network"]["message"] = f"Failed to parse: {str(e)}"
 
         # Validate iam-config.yaml
-        iam_path = base_directory / "iam-config.yaml"
-        if not iam_path.exists():
-            return create_error_response(
-                error_message="iam-config.yaml not found in LZA configuration",
-                error_code="FILE_NOT_FOUND",
-                category=ErrorCategory.FILE_NOT_FOUND,
-                troubleshooting=[
-                    "Verify getLzaConfiguration() extracted all files",
-                    "Check that iam-config.yaml exists in the S3 configuration",
-                    "Ensure the LZA installation is complete",
-                ],
-                context={"file": "iam-config.yaml"},
-                next_steps="Verify the LZA configuration is complete and retry.",
-            )
-
+        iam_file = f"{prefix}iam-config.yaml"
         try:
-            iam_content = iam_path.read_text(encoding="utf-8")
+            iam_bytes = workspace_manager.read_file(workspace_id, iam_file)
+            iam_content = iam_bytes.decode("utf-8")
             iam_config = yaml.safe_load(iam_content)
             is_valid, error_msg = validate_fresh_installation_iam(iam_config)
             validation_results["iam"]["passed"] = is_valid
             validation_results["iam"]["message"] = (
                 "Minimal IAM configuration" if is_valid else error_msg
             )
+        except WorkspaceNotFoundError as e:
+            error_str = str(e)
+            if "File" in error_str and "not found" in error_str:
+                return create_error_response(
+                    error_message="iam-config.yaml not found in workspace",
+                    error_code="FILE_NOT_FOUND",
+                    category=ErrorCategory.FILE_NOT_FOUND,
+                    troubleshooting=[
+                        "Verify getLzaConfiguration() extracted all files",
+                        "Check that iam-config.yaml exists in the S3 configuration",
+                        "Ensure the LZA installation is complete",
+                    ],
+                    context={"file": "iam-config.yaml"},
+                    next_steps="Verify the LZA configuration is complete and retry.",
+                )
+            raise
+        except (WorkspaceValidationError, WorkspaceStorageError):
+            raise
         except Exception as e:
             validation_results["iam"]["message"] = f"Failed to parse: {str(e)}"
 
@@ -174,7 +191,6 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
         all_passed = all(check["passed"] for check in validation_results.values())
 
         if not all_passed:
-            # Find which checks failed
             failed_checks = [
                 name
                 for name, check in validation_results.items()
@@ -216,6 +232,42 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
             ),
         )
 
+    except WorkspaceNotFoundError:
+        return create_error_response(
+            error_message="Workspace not found.",
+            error_code="WORKSPACE_NOT_FOUND",
+            category=ErrorCategory.FILE_NOT_FOUND,
+            troubleshooting=[
+                "Verify workspace_id is correct",
+                "Use createWorkspace or getLzaConfiguration to create a workspace",
+            ],
+            context={"error_type": "WorkspaceNotFoundError"},
+            next_steps="Verify workspace_id, use getLzaConfiguration to create a workspace.",
+        )
+    except WorkspaceValidationError as e:
+        return create_error_response(
+            error_message=f"Workspace validation error: {str(e)}",
+            error_code="WORKSPACE_VALIDATION_ERROR",
+            category=ErrorCategory.VALIDATION,
+            troubleshooting=[
+                "Check path is relative, no traversal",
+                "Verify workspace_id format is valid",
+            ],
+            context={"error_type": type(e).__name__},
+            next_steps="Check path parameter and retry.",
+        )
+    except WorkspaceStorageError as e:
+        return create_error_response(
+            error_message=f"Workspace storage error: {str(e)}",
+            error_code="WORKSPACE_STORAGE_ERROR",
+            category=ErrorCategory.FILE_OPERATION,
+            troubleshooting=[
+                "Check storage adapter configuration",
+                "Verify workspace storage is accessible",
+            ],
+            context={"error_type": type(e).__name__},
+            next_steps="Check storage adapter configuration.",
+        )
     except Exception as e:
         logger.error(f"Unexpected error validating LZA installation: {str(e)}")
         return create_error_response(
@@ -224,7 +276,7 @@ async def validate_lza_for_uc_merge(ctx: Context) -> Dict[str, Any]:
             category=ErrorCategory.VALIDATION,
             troubleshooting=[
                 "Check system logs for more details",
-                "Verify the configuration directory is accessible",
+                "Verify the workspace is accessible",
                 "Ensure configuration files are valid YAML",
                 "Try calling getLzaConfiguration() again",
             ],
