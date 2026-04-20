@@ -61,7 +61,7 @@ class TestListLzaSupportedVersions:
         assert len(result["versions"]) == 2
         assert result["versions"][0]["version"] == "v1.13.0"
         assert result["versions"][1]["version"] == "v1.12.0"
-        assert "schemas_directory" in result
+        assert "schemas_directory" not in result
         assert "usage_hint" in result
 
     @pytest.mark.asyncio

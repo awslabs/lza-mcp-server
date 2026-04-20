@@ -36,7 +36,7 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
             return {
                 "success": False,
                 "error": "Schemas directory not found",
-                "message": f"The schemas directory does not exist at: {schemas_base}",
+                "message": "The schemas directory does not exist",
                 "hint": "Ensure the Docker container has been built with the download-lza-versions.sh script",
             }
 
@@ -80,12 +80,11 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
                 try:
                     file_size = os.path.getsize(combined_json_path)
                     file_size_mb = round(file_size / (1024 * 1024), 2)
-                except (OSError, IOError) as e:
+                except (OSError, IOError):
                     # File existed but can't be read - critical integrity issue
                     error_msg = (
-                        f"Schema file integrity issue: Cannot read {version_dir}/combined.json. "
-                        f"File passed validation at startup but is now inaccessible. "
-                        f"Error: {str(e)}"
+                        "Schema file integrity issue: Cannot read combined.json. "
+                        "File passed validation at startup but is now inaccessible."
                     )
                     await ctx.error(error_msg)
                     return {
@@ -113,7 +112,6 @@ async def tool_list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
             "success": True,
             "message": f"Found {len(versions_info)} LZA version(s)",
             "versions": versions_info,
-            "schemas_directory": schemas_base,
             "usage_hint": "Use the 'version' field value as the lza_version parameter in searchJsonSchema and getFullSchema",
         }
 
