@@ -448,7 +448,6 @@ class TestPipelineUtilities:
         is_valid, error = validate_execution_id_local("invalid-format")
         assert "Invalid execution ID format" in error
         assert "UUID format" in error
-        assert "invalid-format" in error  # Should include the invalid value
 
         is_valid, error = validate_execution_id_local("")
         assert "cannot be empty" in error

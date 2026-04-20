@@ -37,7 +37,7 @@ def validate_cidr_format(cidr: str) -> Tuple[bool, str]:
     if not re.match(cidr_pattern, cidr):
         return (
             False,
-            f"Invalid CIDR format: '{cidr}'. Expected format: X.X.X.X/Y (e.g., 10.0.0.0/8)",
+            "Invalid CIDR format. Expected format: X.X.X.X/Y (e.g., 10.0.0.0/8)",
         )
 
     # Validate octets and mask
@@ -59,7 +59,7 @@ def validate_cidr_format(cidr: str) -> Tuple[bool, str]:
             return (False, f"Invalid CIDR: mask value {mask} out of range (0-32)")
 
     except (ValueError, AttributeError):
-        return (False, f"Invalid CIDR format: '{cidr}'")
+        return (False, "Invalid CIDR format")
 
     return True, ""
 
@@ -294,7 +294,7 @@ def validate_network_model(network_model: str) -> Tuple[bool, str]:
     if not re.match(r"^[a-z0-9-]+$", network_model):
         return (
             False,
-            f"Invalid network model format: '{network_model}'. "
+            "Invalid network model format. "
             "Must contain only lowercase letters, numbers, and hyphens",
         )
 
@@ -322,8 +322,7 @@ def validate_uc_release(uc_release: str) -> Tuple[bool, str]:
     if not re.match(version_pattern, uc_release):
         return (
             False,
-            f"Invalid UC release format: '{uc_release}'. "
-            "Expected format: vX.Y.Z (e.g., v1.0.0)",
+            "Invalid UC release format. Expected format: vX.Y.Z (e.g., v1.0.0)",
         )
 
     return True, ""

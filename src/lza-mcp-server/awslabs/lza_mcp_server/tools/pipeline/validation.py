@@ -79,7 +79,7 @@ def validate_execution_id(execution_id: str) -> Tuple[bool, str]:
     if not re.match(uuid_pattern, execution_id):
         return (
             False,
-            f"Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012), got: {execution_id}",
+            "Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012)",
         )
 
     return True, ""
@@ -110,7 +110,7 @@ def validate_aws_region(region: str) -> Tuple[bool, str]:
     if not re.match(region_pattern, region):
         return (
             False,
-            f"Invalid AWS region format. Expected format like 'us-east-1', got: {region}",
+            "Invalid AWS region format. Expected format like 'us-east-1'",
         )
 
     return True, ""

@@ -119,7 +119,7 @@ async def tool_diagnose_deployment_errors(
     if not is_valid:
         return format_error_response(
             error=f"Invalid qualifier: {validation_error}",
-            message=f"Qualifier '{qualifier}' does not meet format requirements",
+            message="Qualifier does not meet format requirements",
             troubleshooting=[
                 "Qualifiers can only contain letters, numbers, and hyphens",
                 "Run checkAwsConnectivity to get valid qualifiers",
@@ -239,7 +239,7 @@ async def _diagnose_standard_pipeline(
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
-            message=f"Pipeline name '{pipeline_name}' does not meet AWS naming requirements",
+            message="Pipeline name does not meet AWS naming requirements",
             troubleshooting=[
                 "Pipeline names must be 1-100 characters long",
                 "Can only contain letters, numbers, periods, underscores, and hyphens",
@@ -265,7 +265,7 @@ async def _diagnose_standard_pipeline(
         if not is_valid:
             return format_error_response(
                 error=f"Invalid execution ID: {validation_error}",
-                message=f"Execution ID '{execution_id}' does not meet AWS format requirements",
+                message="Execution ID does not meet AWS format requirements",
                 troubleshooting=[
                     "Execution IDs must be valid UUIDs (36 characters with hyphens)",
                     "Format: 12345678-1234-1234-1234-123456789012",
