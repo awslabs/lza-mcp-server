@@ -98,7 +98,7 @@ def validate_execution_id_local(exec_id: str) -> tuple[bool, str]:
     if not re.match(uuid_pattern, exec_id):
         return (
             False,
-            f"Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012), got: {exec_id}",
+            "Invalid execution ID format. Expected UUID format (e.g., 12345678-1234-1234-1234-123456789012)",
         )
     return True, ""
 

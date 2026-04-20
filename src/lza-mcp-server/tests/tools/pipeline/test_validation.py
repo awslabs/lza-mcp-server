@@ -228,7 +228,6 @@ class TestValidateExecutionId:
             assert not is_valid, f"Expected '{exec_id}' to be invalid"
             assert "Invalid execution ID format" in error
             assert "UUID format" in error
-            assert exec_id in error
 
     def test_execution_id_missing_hyphens(self):
         """Test validation with execution ID missing hyphens."""
@@ -254,7 +253,6 @@ class TestValidateExecutionId:
         assert "Invalid execution ID format" in error
         assert "UUID format" in error
         assert "12345678-1234-1234-1234-123456789012" in error
-        assert "invalid-format" in error
 
 
 class TestValidateAwsRegion:
@@ -343,7 +341,6 @@ class TestValidateAwsRegion:
             is_valid, error = validate_aws_region(region)
             assert not is_valid, f"Expected '{region}' to be invalid"
             assert "Invalid AWS region format" in error
-            assert region in error
 
     def test_region_with_special_characters(self):
         """Test validation with region containing special characters."""
@@ -361,7 +358,6 @@ class TestValidateAwsRegion:
         is_valid, error = validate_aws_region("invalid-region")
         assert "Invalid AWS region format" in error
         assert "us-east-1" in error
-        assert "invalid-region" in error
 
 
 class TestValidationEdgeCases:
