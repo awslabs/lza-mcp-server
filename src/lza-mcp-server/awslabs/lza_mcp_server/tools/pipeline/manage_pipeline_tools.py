@@ -29,6 +29,7 @@ from ...constants import (
 from .start_deployment import tool_start_deployment
 from .get_deployment_status import tool_get_deployment_status
 from .diagnose_deployment_errors import tool_diagnose_deployment_errors
+from .submit_manual_approval import tool_submit_manual_approval
 from mcp.server.fastmcp import Context
 from awslabs.lza_mcp_server.utils.guidance_toggle import (
     strip_llm_guidance,
@@ -294,6 +295,33 @@ def register_pipeline_tools(mcp):
         return strip_llm_guidance(
             await tool_diagnose_deployment_errors(
                 ctx, qualifier, pipeline_name, execution_id
+            )
+        )
+
+    @mcp.tool(
+        name="submitManualApproval",
+        description=tool_description(**DESCRIPTIONS["submitManualApproval"]),
+    )  # nosemgrep: useless-inner-function
+    async def submit_manual_approval(
+        ctx: Context,
+        action: str,
+        token: str,
+        stage_name: str,
+        action_name: str,
+        qualifier: Optional[str] = None,
+        pipeline_name: str = DEFAULT_PIPELINE_NAME,
+        summary: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return strip_llm_guidance(
+            await tool_submit_manual_approval(
+                ctx,
+                action,
+                token,
+                stage_name,
+                action_name,
+                qualifier,
+                pipeline_name,
+                summary,
             )
         )
 

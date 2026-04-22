@@ -24,8 +24,9 @@ The server can be configured via environment variables in your MCP client config
 
 ### Pipeline Management
 - **startDeployment**: Start an LZA deployment (supports standard pipeline, external CodePipeline, and ECS container deployments)
-- **getDeploymentStatus**: Monitor deployment status with stage progression (supports both standard pipeline and ECS container deployments)
+- **getDeploymentStatus**: Monitor deployment status with stage progression (supports both standard pipeline and ECS container deployments). Also detects pending approval actions and returns the approval token and change context.
 - **diagnoseDeploymentErrors**: Diagnose failed LZA deployments (supports both standard pipeline and ECS container deployments)
+- **submitManualApproval**: Approve or reject a pending manual approval action (use the approval_token from getDeploymentStatus)
 
 ### Schema Management
 - **listLzaSupportedVersions**: List all supported LZA versions with schema information

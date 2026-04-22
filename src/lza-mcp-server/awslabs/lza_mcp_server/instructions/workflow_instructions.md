@@ -7,6 +7,7 @@
 3. Upload to S3 with `putLzaConfiguration`
 4. Deploy with `startDeployment`
 5. Monitor with `getDeploymentStatus`
+6. If `getDeploymentStatus` returns `approval_pending: true`, review the `review_diff` and use `submitManualApproval` with the returned `approval_token`, `approval_stage_name`, and `approval_action_name` to approve or reject
 
 ### Schema Query Workflow
 When working with LZA schemas, use this recommended workflow:

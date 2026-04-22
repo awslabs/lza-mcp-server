@@ -56,6 +56,27 @@ def is_resource_tools_disabled() -> bool:
     )
 
 
+def is_s3_diff_enabled() -> bool:
+    """Check if S3 diff retrieval should be enabled.
+
+    When enabled, the tool infers the S3 diff bucket name from the
+    deployment context using the naming convention:
+    {pipeline-prefix}-diff-{account_id}-{region}
+
+    This supports a planned future LZA feature that exports deployment
+    diffs to S3. Since the feature does not exist in any current LZA
+    version, this defaults to disabled.
+
+    Returns:
+        bool: True if S3 diff retrieval is enabled, False otherwise
+    """
+    return os.environ.get("ENABLE_S3_DIFF", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+
 def is_instruction_logging_enabled() -> bool:
     """Check if instruction logging should be enabled.
 

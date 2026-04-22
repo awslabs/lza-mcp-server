@@ -21,6 +21,7 @@ A Model Context Protocol (MCP) server that enables AI-assisted management of [La
 - [Universal Configuration](#universal-configuration)
 - [Configuration Operations](#configuration-operations)
 - [Pipeline Management](#pipeline-management)
+  - [Manual Approval (Optional)](#manual-approval-optional)
 - [Advanced Topics](#advanced-topics)
 - [Troubleshooting](#troubleshooting)
 
@@ -384,6 +385,7 @@ These flags mitigate container escape vulnerabilities. Keep Docker/Finch updated
 | `ENABLE_UC_MERGE` | Enable Universal Configuration merge tools | `false` (default), `true` |
 | `LOG_INSTRUCTIONS` | Log MCP server instructions at startup | `false` (default), `true` |
 | `DISABLE_LLM_GUIDANCE` | Strip LLM guidance keys from tool responses and disable server instructions. Use when an external entity owns workflow orchestration outside of the LZA MCP Server | `false` (default), `true` |
+| `ENABLE_S3_DIFF` | Enable S3 diff retrieval in deployment status (planned future LZA feature) | `false` (default), `true` |
 
 **Note:** Setting `ENABLE_UC_MERGE=true` enables 9 additional tools for UC merge workflows but consumes more of the available context window. Only enable this when you need UC merge functionality to keep context usage efficient.
 
@@ -454,10 +456,13 @@ Creates a new YAML or JSON configuration file in the extracted LZA configuration
 Starts an LZA deployment. Supports standard CodePipeline, external CodePipeline ({qualifier}-pipeline), and ECS container deployments ({qualifier}-RunEngine SSM Automation). When a qualifier is provided, checks both CodePipeline and SSM Automation and starts whichever exists.
 
 **getDeploymentStatus**  
-Monitors deployment status and execution progress. Supports both standard CodePipeline and ECS container deployments. Returns real-time status for all pipeline stages, and when a qualifier is provided, checks both CodePipeline and ECS container logs.
+Monitors deployment status and execution progress. Supports both standard CodePipeline and ECS container deployments. Returns real-time status for all pipeline stages, and when a qualifier is provided, checks both CodePipeline and ECS container logs. Also detects pending approval actions and returns the approval token, stage name, action name, review diff, and change context.
 
 **diagnoseDeploymentErrors**  
 Diagnoses failed LZA deployments. Supports both standard CodePipeline and ECS container deployments. Analyzes logs and provides troubleshooting guidance.
+
+**submitManualApproval**  
+Approves or rejects a pending manual approval action. Requires the `approval_token`, `approval_stage_name`, and `approval_action_name` from `getDeploymentStatus`.
 
 ### Schema Search
 
@@ -641,6 +646,72 @@ This ensures the server provides correct file paths for IDE access.
 ### Pipeline Monitoring
 
 The server provides real-time pipeline monitoring with stage-level details. See [AWS CodePipeline monitoring documentation](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) for execution state details.
+
+### Manual Approval
+
+The LZA CodePipeline includes an optional Review stage that runs CDK diff and presents a manual approval gate before infrastructure deployment. The MCP server automatically detects pending approvals and allows you to act on them without leaving the MCP workflow:
+
+- **getDeploymentStatus**: Detects pending approval actions and returns the `approval_token`, `approval_stage_name`, `approval_action_name`, review diff, and change context alongside the normal deployment status.
+- **submitManualApproval**: Approves or rejects a pending manual approval action using the values from `getDeploymentStatus`.
+
+#### Manual Approval IAM Policy
+
+The manual approval feature requires `codepipeline:GetPipelineState` and `codepipeline:PutApprovalResult` permissions. These are additive — do not modify the existing base pipeline policies in `iam-policies/`.
+
+**Standard CodePipeline deployment:**
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ManualApprovalAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codepipeline:GetPipelineState",
+                "codepipeline:PutApprovalResult"
+            ],
+            "Resource": "arn:${PARTITION}:codepipeline:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${ACCELERATOR_PREFIX}-Pipeline"
+        }
+    ]
+}
+```
+
+**External pipeline deployment:** Replace the resource ARN with:
+`arn:${PARTITION}:codepipeline:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:${QUALIFIER}-pipeline`
+
+#### S3 Diff Retrieval (Optional)
+
+When enabled, `getDeploymentStatus` also attempts to retrieve a deployment diff from an S3 bucket when a pending approval is detected. The bucket name is inferred from the deployment context using the naming convention `{pipeline-prefix}-diff-{account_id}-{region}`. This supports a planned future LZA feature that exports deployment diffs to S3. If retrieval fails, the tool still returns the approval metadata with a warning.
+
+Enable by adding the environment variable:
+
+```json
+"-e", "ENABLE_S3_DIFF=true"
+```
+
+**Standard CodePipeline deployment:**
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "S3DiffAccess",
+            "Effect": "Allow",
+            "Action": "s3:GetObject",
+            "Resource": "arn:${PARTITION}:s3:::${ACCELERATOR_PREFIX}-diff-${MANAGEMENT_ACCOUNT}-${HOME-REGION}/*"
+        }
+    ]
+}
+```
+
+**External pipeline deployment:** Replace the resource ARN with:
+`arn:${PARTITION}:s3:::${QUALIFIER}-diff-${ORCHESTRATION_ACCOUNT}-${HOME-REGION}/*`
+
+#### Review Stage Diff (CodeBuild Logs)
+
+When a pending approval is detected, `getDeploymentStatus` also retrieves CDK diff output from the Review stage's CodeBuild logs. This uses `codebuild:BatchGetBuilds` and `logs:GetLogEvents` permissions, which are already included in the existing pipeline IAM policies ([standard-codepipeline-policy.json](iam-policies/standard-codepipeline-policy.json) and [external-codepipeline-policy.json](iam-policies/external-codepipeline-policy.json)). No additional IAM policy is needed for this feature.
 
 [Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
