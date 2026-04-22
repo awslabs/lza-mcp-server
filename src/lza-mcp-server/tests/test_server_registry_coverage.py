@@ -67,3 +67,24 @@ class TestRegisterAllComponentsResourceTools:
         mock_logger.info.assert_any_call(
             "Resource workaround tools disabled (DISABLE_RESOURCE_TOOLS is set)"
         )
+
+
+class TestRegisterWorkspaceComponents:
+    """Test register_workspace_components directly."""
+
+    @patch("awslabs.lza_mcp_server.resources.workspace.register_workspace_resources")
+    @patch("awslabs.lza_mcp_server.tools.workspace.register_workspace_tools")
+    def test_registers_tools_and_resources(self, mock_tools, mock_resources):
+        """Test that workspace tools and resources are both registered."""
+        from awslabs.lza_mcp_server.server_registry import (
+            register_workspace_components,
+        )
+
+        mcp = Mock()
+        wm = Mock()
+        zu = Mock()
+
+        register_workspace_components(mcp, wm, zu)
+
+        mock_tools.assert_called_once_with(mcp, wm, zu)
+        mock_resources.assert_called_once_with(mcp, wm)

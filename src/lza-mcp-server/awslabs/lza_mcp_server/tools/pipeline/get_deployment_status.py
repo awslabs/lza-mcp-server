@@ -26,15 +26,21 @@ from .common import (
     validate_pipeline_name_local,
     validate_execution_id_local,
     validate_qualifier,
+    truncate_logs,
 )
 
 from ...aws_access import (
     format_error_response,
     get_codepipeline_client,
+    get_codebuild_client,
+    get_logs_client,
+    get_s3_client,
+    get_aws_account_id,
     get_ecs_client,
     retry_with_exponential_backoff,
     handle_aws_error,
 )
+from ...server_config import is_s3_diff_enabled
 from ...utils.input_validation import validate_string_input
 
 # ECS task statuses that indicate the task is not yet running
@@ -83,6 +89,306 @@ def get_action_description(action_name: str) -> str:
         "Network_VPCs": "Deploys VPCs, subnets, endpoints, and DNS resources",
     }
     return action_descriptions.get(action_name, f"Action: {action_name}")
+
+
+def infer_s3_diff_bucket_name(
+    pipeline_name: str, qualifier: Optional[str], account_id: str, region: str
+) -> str:
+    """Infer the S3 diff bucket name from the deployment context.
+
+    Naming convention:
+    - Standard deployments (no qualifier): extract prefix from pipeline name
+      by removing '-Pipeline' suffix (e.g., 'AWSAccelerator-Pipeline' -> 'AWSAccelerator')
+    - External deployments (with qualifier): use the qualifier as the prefix
+
+    The resulting bucket name is: {prefix}-diff-{account_id}-{region}
+
+    Args:
+        pipeline_name: The resolved pipeline name
+        qualifier: The qualifier string, or None for standard deployments
+        account_id: The AWS account ID
+        region: The AWS region
+
+    Returns:
+        The inferred S3 diff bucket name
+    """
+    if qualifier:
+        prefix = qualifier
+    else:
+        # Standard deployment: strip '-Pipeline' suffix to get the prefix
+        if pipeline_name.endswith("-Pipeline"):
+            prefix = pipeline_name[: -len("-Pipeline")]
+        else:
+            prefix = pipeline_name
+
+    return f"{prefix}-diff-{account_id}-{region}"
+
+
+async def _detect_pending_approval(
+    stage_states: list,
+    pipeline_name: str,
+    qualifier: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Detect a pending manual approval action in the pipeline stage states.
+
+    Scans stage states for an InProgress approval action (identified by the
+    presence of a token). When found, retrieves the Review stage diff from
+    CodeBuild logs and optionally the S3 diff.
+
+    Args:
+        stage_states: List of stage state dicts from GetPipelineState
+        pipeline_name: The resolved pipeline name
+        qualifier: The qualifier string, or None for standard deployments
+
+    Returns:
+        Dict with approval metadata if a pending approval is found, None otherwise
+    """
+    for stage in stage_states:
+        stage_name = stage.get("stageName", "")
+        for action_state in stage.get("actionStates", []):
+            latest_execution = action_state.get("latestExecution", {})
+            action_name = action_state.get("actionName", "")
+            status = latest_execution.get("status", "")
+
+            if status == "InProgress":
+                token = latest_execution.get("token")
+                if token is None:
+                    continue
+
+                pipeline_execution_id = latest_execution.get("pipelineExecutionId", "")
+                custom_data = latest_execution.get("summary", "")
+                external_entity_url = action_state.get("entityUrl", "")
+
+                approval_info: Dict[str, Any] = {
+                    "approval_pending": True,
+                    "approval_stage_name": stage_name,
+                    "approval_action_name": action_name,
+                    "approval_pipeline_execution_id": pipeline_execution_id,
+                    "approval_token": token,
+                }
+
+                if custom_data:
+                    approval_info["approval_custom_data"] = custom_data
+                if external_entity_url:
+                    approval_info["approval_external_entity_url"] = external_entity_url
+
+                # Review stage diff retrieval (CodeBuild logs — always attempted)
+                review_diff_result = await _retrieve_review_stage_diff(
+                    stage_states, stage_name
+                )
+                if review_diff_result.get("success"):
+                    approval_info["review_diff"] = review_diff_result["content"]
+                elif review_diff_result.get("warning"):
+                    approval_info["review_diff_warning"] = review_diff_result["warning"]
+
+                # S3 diff retrieval (optional, when ENABLE_S3_DIFF is enabled)
+                if is_s3_diff_enabled() and pipeline_execution_id:
+                    s3_diff_result = await _retrieve_s3_diff(
+                        pipeline_name, qualifier, pipeline_execution_id
+                    )
+                    if s3_diff_result.get("success"):
+                        approval_info["s3_diff_content"] = s3_diff_result["content"]
+                    elif s3_diff_result.get("warning"):
+                        approval_info["s3_diff_warning"] = s3_diff_result["warning"]
+
+                return approval_info
+
+    return None
+
+
+async def _retrieve_s3_diff(
+    pipeline_name: str,
+    qualifier: Optional[str],
+    pipeline_execution_id: str,
+) -> Dict[str, Any]:
+    """Retrieve deployment diff from S3 when ENABLE_S3_DIFF is enabled.
+
+    Infers the S3 bucket name from the deployment context and attempts
+    to retrieve the diff object. On failure, returns a warning instead
+    of raising an error.
+
+    Args:
+        pipeline_name: The resolved pipeline name
+        qualifier: The qualifier string, or None for standard deployments
+        pipeline_execution_id: The pipeline execution ID for the diff key
+
+    Returns:
+        Dict with 'success' and 'content' on success, or 'warning' on failure
+    """
+    try:
+        import re
+
+        is_valid, validation_error = validate_string_input(
+            pipeline_execution_id,
+            "pipeline_execution_id",
+            min_length=1,
+            max_length=200,
+        )
+        if not is_valid:
+            return {
+                "success": False,
+                "warning": f"Invalid pipeline execution ID for S3 diff retrieval: {validation_error}",
+            }
+
+        if not re.match(r"^[a-zA-Z0-9\-]+$", pipeline_execution_id):
+            return {
+                "success": False,
+                "warning": "Invalid pipeline execution ID format for S3 diff retrieval",
+            }
+
+        account_id = get_aws_account_id()
+        region = AWS_REGION
+
+        bucket_name = infer_s3_diff_bucket_name(
+            pipeline_name, qualifier, account_id, region
+        )
+        diff_key = f"{pipeline_execution_id}/diff.txt"
+
+        logger.info(f"Retrieving S3 diff from s3://{bucket_name}/{diff_key}")
+
+        s3_client = get_s3_client()
+        response = await retry_with_exponential_backoff(
+            s3_client.get_object, Bucket=bucket_name, Key=diff_key
+        )
+
+        if "Body" not in response:
+            logger.warning("S3 GetObject response missing Body field")
+            return {
+                "success": False,
+                "warning": "Could not retrieve deployment diff from S3: response missing content",
+            }
+
+        content = response["Body"].read().decode("utf-8")
+        return {"success": True, "content": content}
+
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "")
+        error_message = e.response.get("Error", {}).get("Message", str(e))
+        logger.warning(f"Failed to retrieve S3 diff: {error_code} - {error_message}")
+        return {
+            "success": False,
+            "warning": "Could not retrieve deployment diff from S3",
+        }
+    except Exception as e:
+        logger.warning(f"Failed to retrieve S3 diff: {str(e)}")
+        return {
+            "success": False,
+            "warning": "Could not retrieve deployment diff from S3",
+        }
+
+
+async def _retrieve_review_stage_diff(
+    stage_states: list,
+    approval_stage_name: str,
+) -> Dict[str, Any]:
+    """Retrieve CDK diff output from the Review stage's CodeBuild logs.
+
+    Scans the pipeline stage states for a CodeBuild action that ran before
+    the approval action (same stage or preceding stage), retrieves its
+    CloudWatch Logs, and returns the truncated log content.
+
+    Args:
+        stage_states: List of stage state dicts from GetPipelineState
+        approval_stage_name: Name of the stage containing the approval action
+
+    Returns:
+        Dict with 'success' and 'content' on success, or 'success'=False
+        and 'warning' on failure
+    """
+    try:
+        external_execution_id = None
+
+        # 1. Look in the same stage as the approval action
+        for stage in stage_states:
+            if stage.get("stageName") == approval_stage_name:
+                for action_state in stage.get("actionStates", []):
+                    latest = action_state.get("latestExecution", {})
+                    ext_id = latest.get("externalExecutionId")
+                    if ext_id:
+                        external_execution_id = ext_id
+                        break
+                break
+
+        # 2. If not found, look in preceding stages (reverse order — closest first)
+        if not external_execution_id:
+            found_stage_idx = -1
+            for idx, stage in enumerate(stage_states):
+                if stage.get("stageName") == approval_stage_name:
+                    found_stage_idx = idx
+                    break
+
+            for idx in range(found_stage_idx - 1, -1, -1):
+                stage = stage_states[idx]
+                for action_state in stage.get("actionStates", []):
+                    latest = action_state.get("latestExecution", {})
+                    ext_id = latest.get("externalExecutionId")
+                    if ext_id:
+                        external_execution_id = ext_id
+                        break
+                if external_execution_id:
+                    break
+
+        if not external_execution_id:
+            return {
+                "success": False,
+                "warning": "Could not retrieve Review stage diff: no CodeBuild action found in stage states",
+            }
+
+        # 3. Get build details from CodeBuild
+        codebuild = get_codebuild_client()
+        build_response = await retry_with_exponential_backoff(
+            codebuild.batch_get_builds, ids=[external_execution_id]
+        )
+
+        if not build_response.get("builds"):
+            logger.warning(
+                f"Could not retrieve Review stage diff: build '{external_execution_id}' not found"
+            )
+            return {
+                "success": False,
+                "warning": "Could not retrieve Review stage diff: build not found",
+            }
+
+        build = build_response["builds"][0]
+        if (
+            "logs" not in build
+            or "groupName" not in build["logs"]
+            or "streamName" not in build["logs"]
+        ):
+            return {
+                "success": False,
+                "warning": "Could not retrieve Review stage diff: build has no log information",
+            }
+
+        # 4. Retrieve logs from CloudWatch
+        logs_client = get_logs_client()
+        log_response = await retry_with_exponential_backoff(
+            logs_client.get_log_events,
+            logGroupName=build["logs"]["groupName"],
+            logStreamName=build["logs"]["streamName"],
+            startFromHead=True,
+            limit=2000,
+        )
+
+        log_events = log_response.get("events", [])
+        if not log_events:
+            return {
+                "success": False,
+                "warning": "Could not retrieve Review stage diff: no log events found",
+            }
+
+        # 5. Concatenate and truncate
+        logs_content = "\n".join(event["message"] for event in log_events)
+        truncated = truncate_logs(logs_content)
+
+        return {"success": True, "content": truncated}
+
+    except Exception as e:
+        logger.warning(f"Failed to retrieve Review stage diff: {str(e)}")
+        return {
+            "success": False,
+            "warning": "Could not retrieve Review stage diff",
+        }
 
 
 async def _check_ecs_task_status(
@@ -242,7 +548,9 @@ async def tool_get_deployment_status(
     # Branch A: Standard pipeline deployment (no qualifier)
     if qualifier is None:
         logger.info("No qualifier provided — using standard pipeline status path")
-        result = await _get_standard_pipeline_status(ctx, pipeline_name, execution_id)
+        result = await _get_standard_pipeline_status(
+            ctx, pipeline_name, execution_id, qualifier=None
+        )
 
         # If the pipeline wasn't found, hint about qualifier
         if (
@@ -296,7 +604,7 @@ async def tool_get_deployment_status(
     try:
         await ctx.info(f"Checking CodePipeline: {qualifier_pipeline_name}")
         pipeline_result = await _get_standard_pipeline_status(
-            ctx, qualifier_pipeline_name, execution_id
+            ctx, qualifier_pipeline_name, execution_id, qualifier=qualifier
         )
         if pipeline_result.get("error_code") != "PipelineNotFoundException":
             pipeline_status = pipeline_result
@@ -489,11 +797,19 @@ async def _get_standard_pipeline_status(
     ctx: Context,
     pipeline_name: str = DEFAULT_PIPELINE_NAME,
     execution_id: Optional[str] = None,
+    qualifier: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Get status for a standard CodePipeline deployment.
 
     Retrieves pipeline structure, execution details, and stage progression
-    for the specified CodePipeline.
+    for the specified CodePipeline. When manual approval is enabled,
+    also detects pending approval actions and includes approval metadata.
+
+    Args:
+        ctx: MCP context for logging and user feedback
+        pipeline_name: Name of the CodePipeline
+        execution_id: Specific execution ID (defaults to most recent)
+        qualifier: Optional qualifier for external pipeline deployments
     """
     logger.info(f"Getting pipeline status for: {pipeline_name}")
 
@@ -828,6 +1144,33 @@ async def _get_standard_pipeline_status(
 
         response = {"success": True, "message": message}
         response.update(response_data)
+
+        # Step 6: Detect pending manual approval
+        approval_info = await _detect_pending_approval(
+            stage_states, pipeline_name, qualifier=qualifier
+        )
+        if approval_info:
+            response.update(approval_info)
+            # Enhance message to indicate approval is pending
+            response["message"] = (
+                f"Pipeline is waiting for manual approval in stage "
+                f"'{approval_info['approval_stage_name']}'. "
+                f"Use submitManualApproval with the approval_token to approve or reject."
+            )
+            # Guide the agent to present changes and ask the user
+            response["llm_instructions"] = (
+                "IMPORTANT — Manual approval is pending. You MUST follow these steps:\n"
+                "1. Present the deployment changes to the user by summarizing the review_diff "
+                "(or s3_diff_content if available) in a clear, readable format. "
+                "Explain what infrastructure changes will be applied (resources added, modified, or removed).\n"
+                "2. Ask the user if they have any questions about the changes.\n"
+                "3. Ask the user whether they would like to approve or reject the deployment.\n"
+                "4. Only after the user explicitly confirms, call submitManualApproval with the "
+                "approval_token, approval_stage_name, and approval_action_name from this response.\n"
+                "Do NOT just tell the user that approval is pending and wait for instructions. "
+                "Proactively explain the changes and guide the user through the decision."
+            )
+
         return response
 
     except Exception as e:

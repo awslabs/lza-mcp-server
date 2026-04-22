@@ -37,13 +37,14 @@ class TestToolRegistration:
         register_pipeline_tools(mock_mcp)
 
         # Verify tool decorator was called for each tool
-        assert mock_mcp.tool.call_count == 3
+        assert mock_mcp.tool.call_count == 4
 
         # Verify tool names
         tool_calls = [call[1]["name"] for call in mock_mcp.tool.call_args_list]
         assert "startDeployment" in tool_calls
         assert "getDeploymentStatus" in tool_calls
         assert "diagnoseDeploymentErrors" in tool_calls
+        assert "submitManualApproval" in tool_calls
 
     def test_register_pipeline_tools_descriptions(self, mock_mcp):
         """Test that tools are registered with descriptions."""
@@ -264,8 +265,8 @@ class TestToolRegistrationEdgeCases:
         second_call_count = mock_mcp.tool.call_count
 
         # Should register tools both times
-        assert first_call_count == 3
-        assert second_call_count == 6  # 3 + 3
+        assert first_call_count == 4
+        assert second_call_count == 8  # 4 + 4
 
     def test_register_pipeline_tools_with_none_mcp(self):
         """Test registering tools with None MCP instance."""
@@ -334,6 +335,7 @@ class TestToolRegistrationIntegration:
             "startDeployment",
             "getDeploymentStatus",
             "diagnoseDeploymentErrors",
+            "submitManualApproval",
         ]
 
         for tool_name in expected_tools:

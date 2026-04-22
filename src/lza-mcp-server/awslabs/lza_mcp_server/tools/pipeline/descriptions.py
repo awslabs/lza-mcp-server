@@ -41,6 +41,14 @@ DESCRIPTIONS = {
         "standard": (
             "Get current deployment status and execution progress for LZA deployments. "
             "Returns a structured summary: deployment phase, stage progression, error detection, and the specific error message if failed. "
+            "Also detects pending manual approval actions and returns the approval token, "
+            "stage name, action name, pipeline execution ID, custom data, review diff, and external entity URL — "
+            "when a pending approval is detected, you MUST: "
+            "(1) present the review_diff or s3_diff_content to the user in a clear summary explaining what infrastructure changes will be applied, "
+            "(2) ask the user if they have any questions about the changes, "
+            "(3) ask the user whether they want to approve or reject the deployment, "
+            "(4) only call submitManualApproval after the user explicitly confirms. "
+            "Do NOT simply report that approval is pending and wait for instructions. "
             "Use this as the primary tool for monitoring deployments and identifying failures. "
             "For standard CodePipeline deployments: returns stage-by-stage progress (current stage, completed stages, current action). "
             "For ECS container deployments: checks ECS task status first (detects PROVISIONING/PENDING states), "
@@ -53,6 +61,8 @@ DESCRIPTIONS = {
         "disable_guidance": (
             "Get current deployment status and execution progress for LZA deployments. "
             "Returns a structured summary: deployment phase, stage progression, error detection, and the specific error message if failed. "
+            "Also detects pending manual approval actions and returns the approval token, "
+            "stage name, action name, review diff, and other approval metadata. "
             "For standard CodePipeline deployments: returns stage-by-stage progress (current stage, completed stages, current action). "
             "For ECS container deployments: checks ECS task status first (detects PROVISIONING/PENDING states), "
             "then analyzes CloudWatch Logs for deployment phase, status, and errors. "
@@ -86,6 +96,27 @@ DESCRIPTIONS = {
             "For ECS deployments, targets the most recent log stream by LastEventTime. "
             "For standard deployments, omit the qualifier. "
             "For external pipeline deployments, pass the qualifier."
+        ),
+    },
+    "submitManualApproval": {
+        "standard": (
+            "Approve or reject a pending manual approval action in an LZA CodePipeline deployment. "
+            "The action parameter accepts 'Approve' or 'Reject' (case-insensitive). "
+            "An optional summary comment can be included with the approval or rejection. "
+            "Call getDeploymentStatus first — when a pending approval is detected, it returns the "
+            "approval_token, approval_stage_name, and approval_action_name needed for this tool. "
+            "For standard deployments, omit the qualifier. "
+            "For external pipeline deployments, pass the qualifier "
+            "to target the {qualifier}-pipeline CodePipeline."
+        ),
+        "disable_guidance": (
+            "Approve or reject a pending manual approval action in an LZA CodePipeline deployment. "
+            "The action parameter accepts 'Approve' or 'Reject' (case-insensitive). "
+            "An optional summary comment can be included with the approval or rejection. "
+            "Use the approval_token, approval_stage_name, and approval_action_name from getDeploymentStatus. "
+            "For standard deployments, omit the qualifier. "
+            "For external pipeline deployments, pass the qualifier "
+            "to target the {qualifier}-pipeline CodePipeline."
         ),
     },
 }
