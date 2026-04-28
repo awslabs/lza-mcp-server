@@ -121,7 +121,7 @@ class TestRegisterConfigTools:
 
             result = await func(mock_mcp_context, "container-dev-1", "my-bucket")
             mock_instance.get_configuration.assert_called_once_with(
-                mock_mcp_context, "container-dev-1", "my-bucket", None, None
+                mock_mcp_context, "container-dev-1", "my-bucket", None, None, None, None
             )
             assert result["success"] is True
 
@@ -143,7 +143,7 @@ class TestRegisterConfigTools:
 
             result = await func(mock_mcp_context)
             mock_instance.get_configuration.assert_called_once_with(
-                mock_mcp_context, None, None, None, None
+                mock_mcp_context, None, None, None, None, None, None
             )
             assert result["success"] is True
 
@@ -168,6 +168,9 @@ class TestRegisterConfigTools:
                 "config",
                 "container-dev-1",
                 "my-bucket",
+                None,
+                None,
+                None,
             )
             assert result["success"] is True
 
@@ -188,6 +191,9 @@ class TestRegisterConfigTools:
                 mock_workspace_manager,
                 "ws-abc123",
                 "config",
+                None,
+                None,
+                None,
                 None,
                 None,
             )

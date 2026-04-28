@@ -64,7 +64,7 @@ def _make_config_zip(path):
 
 def _patch_identity():
     return patch(
-        "awslabs.lza_mcp_server.tools.config.get_lza_configuration.get_caller_identity",
+        "awslabs.lza_mcp_server.tools.config.get_config_from_s3.get_caller_identity",
         return_value=IDENTITY,
     )
 
@@ -158,7 +158,7 @@ class TestBucketVerification:
             with _patch_identity():
                 result = await retrieval.get_configuration(ctx)
                 assert result["success"] is False
-                assert f"aws-accelerator-config-{ACCOUNT}-{REGION}" in result["error"]
+                assert result["error_code"] == "BUCKET_NOT_FOUND"
 
     @pytest.mark.asyncio
     @pytest.mark.unit
@@ -168,7 +168,7 @@ class TestBucketVerification:
             with _patch_identity():
                 result = await retrieval.get_configuration(ctx, qualifier="env1")
                 assert result["success"] is False
-                assert "env1-config-" in result["error"]
+                assert result["error_code"] == "BUCKET_NOT_FOUND"
 
 
 # ---------------------------------------------------------------
@@ -341,7 +341,7 @@ class TestTempZipCleanupFailure:
                     return original_remove(path)
 
                 with patch(
-                    "awslabs.lza_mcp_server.tools.config.get_lza_configuration.os.remove",
+                    "awslabs.lza_mcp_server.tools.config.get_config_from_s3.os.remove",
                     side_effect=failing_remove,
                 ):
                     result = await retrieval.get_configuration(ctx)

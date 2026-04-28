@@ -12,34 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Upload LZA configuration to S3 for both standard and external pipeline deployments.
+"""Upload LZA configuration for both standard and external pipeline deployments.
 
-Supports:
-  - Standard deployments (management account, no qualifier)
-  - External pipeline deployments with qualifier (CodePipeline or ECS)
-
-Bucket / key resolution is delegated to config_s3_resolver.
-All file reads come from a workspace via WorkspaceManager.
+Orchestrates destination selection (CodeCommit or S3) and input validation.
+Implementation details are in put_config_to_codecommit and put_config_to_s3.
 """
 
-import io
 import logging
-import os
-import tempfile
-import zipfile
 from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import Context
 
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
-from awslabs.lza_mcp_server.orchestration.core.s3_manager import S3Manager
-from awslabs.lza_mcp_server.tools.config.config_s3_resolver import (
-    get_caller_identity,
-    resolve_config_location,
+from awslabs.lza_mcp_server.tools.config.config_codecommit_resolver import (
+    resolve_codecommit_location,
 )
+from awslabs.lza_mcp_server.tools.config.put_config_to_codecommit import (
+    put_config_to_codecommit,
+)
+from awslabs.lza_mcp_server.tools.config.put_config_to_s3 import put_config_to_s3
 from awslabs.lza_mcp_server.tools.pipeline.common import validate_qualifier
 from awslabs.lza_mcp_server.utils.error_handling import create_structured_error_response
-from awslabs.lza_mcp_server.utils.input_validation import validate_s3_bucket_name
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_s3_bucket_name,
+    validate_string_input,
+)
 from awslabs.lza_mcp_server.utils.workspace_manager import (
     WorkspaceManager,
     WorkspaceNotFoundError,
@@ -50,29 +47,6 @@ from awslabs.lza_mcp_server.utils.workspace_manager import (
 logger = logging.getLogger(__name__)
 
 
-async def _zip_workspace_files(
-    workspace_manager: WorkspaceManager,
-    workspace_id: str,
-    path: str,
-    context: Any = None,
-) -> bytes:
-    """Read all files under *path* in the workspace and return ZIP bytes."""
-    all_files = workspace_manager.list_files(workspace_id, context)
-
-    # Filter to files under the requested path prefix
-    prefix = path.rstrip("/") + "/" if path else ""
-    matching_files = [f for f in all_files if f.startswith(prefix) or not prefix]
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for file_path in matching_files:
-            content = workspace_manager.read_file(workspace_id, file_path, context)
-            # Archive name is relative to the base path
-            arcname = file_path[len(prefix) :] if prefix else file_path
-            zf.writestr(arcname, content)
-    return buf.getvalue()
-
-
 async def tool_put_lza_configuration(
     ctx: Context,
     workspace_manager: WorkspaceManager,
@@ -80,11 +54,16 @@ async def tool_put_lza_configuration(
     path: str,
     qualifier: Optional[str] = None,
     bucket_name: Optional[str] = None,
+    repository_name: Optional[str] = None,
+    branch: Optional[str] = None,
+    commit_message: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Upload LZA configuration from a workspace to S3.
+    """Upload LZA configuration from a workspace to S3 or CodeCommit.
 
-    Reads files from the specified workspace and path, creates a ZIP archive,
-    and uploads it to the appropriate S3 location.
+    Automatically selects the destination:
+    - If repository_name is provided, or if the pipeline's source action is
+      CodeCommit, files are committed via CreateCommit.
+    - Otherwise, a ZIP is created and uploaded to S3.
 
     Args:
         ctx: MCP context for logging and progress.
@@ -92,15 +71,15 @@ async def tool_put_lza_configuration(
         workspace_id: Workspace containing the configuration files.
         path: Relative path within the workspace where config files reside.
         qualifier: Accelerator Qualifier for external pipeline deployments.
-                   Omit for standard (management account) deployments.
-        bucket_name: Explicit bucket name override.
+        bucket_name: Explicit S3 bucket name override (S3 destination only).
+        repository_name: CodeCommit repository name override.
+        branch: CodeCommit branch to commit to (default: "main").
+        commit_message: Commit message for CodeCommit (default: auto-generated).
 
     Returns:
-        Dictionary with upload results.
+        Dictionary with upload/commit results.
     """
-    temp_zip_path: Optional[str] = None
     try:
-        # Normalize root-equivalent paths to empty string
         if path in ("/", "."):
             path = ""
 
@@ -118,7 +97,7 @@ async def tool_put_lza_configuration(
                         "Qualifier must contain only lowercase letters, numbers, and hyphens",
                         "Run checkAwsConnectivity() to see available qualifiers",
                     ],
-                    context={"qualifier": qualifier},
+                    context={},
                 )
 
         if bucket_name:
@@ -132,7 +111,33 @@ async def tool_put_lza_configuration(
                         "Bucket names must be 3-63 characters, lowercase",
                         "Must start and end with a letter or number",
                     ],
-                    context={"bucket_name": bucket_name},
+                    context={},
+                )
+
+        if repository_name:
+            is_valid, err = validate_string_input(
+                repository_name, "repository_name", min_length=1, max_length=100
+            )
+            if not is_valid:
+                return create_structured_error_response(
+                    error=f"Invalid repository name: {err}",
+                    category=ErrorCategory.CONFIGURATION,
+                    error_code="INVALID_REPOSITORY_NAME",
+                    troubleshooting=["Repository name must be 1-100 characters"],
+                    context={},
+                )
+
+        if branch:
+            is_valid, err = validate_string_input(
+                branch, "branch", min_length=1, max_length=256
+            )
+            if not is_valid:
+                return create_structured_error_response(
+                    error="Invalid branch name",
+                    category=ErrorCategory.CONFIGURATION,
+                    error_code="INVALID_BRANCH_NAME",
+                    troubleshooting=["Branch name must be 1-256 characters"],
+                    context={},
                 )
 
         # --- validate workspace ---
@@ -157,8 +162,7 @@ async def tool_put_lza_configuration(
 
         if not matching_files:
             return create_structured_error_response(
-                error="No files found in workspace"
-                + (f" at path '{path}'" if path else ""),
+                error="No configuration files found in workspace",
                 category=ErrorCategory.CONFIGURATION,
                 error_code="EMPTY_CONFIGURATION",
                 troubleshooting=[
@@ -166,64 +170,38 @@ async def tool_put_lza_configuration(
                     "Use getLzaConfiguration() to download config first",
                     "Check the path parameter points to the correct location",
                 ],
-                context={"path": path},
+                context={},
             )
 
-        # --- resolve S3 location ---
-        identity = get_caller_identity()
-        location = resolve_config_location(
-            account_id=identity["account_id"],
-            region=identity["region"],
+        # --- destination selection: CodeCommit or S3 ---
+        cc_location = resolve_codecommit_location(
             qualifier=qualifier,
-            bucket_name_override=bucket_name,
+            repository_name=repository_name,
+            branch=branch,
         )
 
-        await ctx.info(f"Target: s3://{location.bucket_name}/{location.object_key}")
+        if cc_location:
+            return await put_config_to_codecommit(
+                ctx=ctx,
+                workspace_manager=workspace_manager,
+                workspace_id=workspace_id,
+                path=path,
+                matching_files=matching_files,
+                prefix=prefix,
+                qualifier=qualifier,
+                cc_location=cc_location,
+                commit_message=commit_message,
+            )
 
-        # --- create ZIP from workspace files ---
-        await ctx.info(
-            "Creating ZIP from workspace" + (f" path '{path}'" if path else "")
+        return await put_config_to_s3(
+            ctx=ctx,
+            workspace_manager=workspace_manager,
+            workspace_id=workspace_id,
+            path=path,
+            matching_files=matching_files,
+            qualifier=qualifier,
+            bucket_name=bucket_name,
         )
-        zip_bytes = await _zip_workspace_files(
-            workspace_manager, workspace_id, path, ctx
-        )
-
-        # Write to temp file for S3Manager upload
-        temp_zip_fd, temp_zip_path = tempfile.mkstemp(
-            suffix=".zip", prefix="lza-config-upload-"
-        )
-        os.close(temp_zip_fd)
-        with open(temp_zip_path, "wb") as f:
-            f.write(zip_bytes)
-
-        zip_size = len(zip_bytes)
-        await ctx.info(f"ZIP created ({zip_size} bytes, {len(matching_files)} files)")
-
-        # --- upload ---
-        s3_manager = S3Manager()
-        upload_result = await s3_manager.upload_zip_file(
-            zip_path=temp_zip_path,
-            bucket_name=location.bucket_name,
-            key=location.object_key,
-        )
-
-        if not upload_result.get("success"):
-            return upload_result
-
-        await ctx.info(f"Uploaded to s3://{location.bucket_name}/{location.object_key}")
-
-        return {
-            "success": True,
-            "message": "Configuration uploaded successfully",
-            "workspace_id": workspace_id,
-            "path": path,
-            "bucket_name": location.bucket_name,
-            "object_key": location.object_key,
-            "qualifier": location.qualifier,
-            "zip_size": zip_size,
-            "file_count": len(matching_files),
-            "upload_details": upload_result,
-        }
 
     except (WorkspaceValidationError, WorkspaceStorageError) as e:
         logger.error("Workspace operation failed: %s", str(e))
@@ -235,9 +213,7 @@ async def tool_put_lza_configuration(
                 "Check workspace storage is accessible",
                 "Verify workspace_id and path are valid",
             ],
-            context={
-                "path": path,
-            },
+            context={},
         )
     except Exception as e:
         logger.error("putLzaConfiguration failed: %s", str(e))
@@ -246,18 +222,8 @@ async def tool_put_lza_configuration(
             category=ErrorCategory.INTEGRATION,
             error_code="UPLOAD_ERROR",
             troubleshooting=[
-                "Check AWS credentials and S3 permissions",
+                "Check AWS credentials and permissions",
                 "Verify network connectivity",
             ],
-            context={
-                "qualifier": qualifier,
-                "path": path,
-                "bucket_name": bucket_name,
-            },
+            context={},
         )
-    finally:
-        if temp_zip_path and os.path.exists(temp_zip_path):
-            try:
-                os.remove(temp_zip_path)
-            except Exception:  # nosec B110 - temp file cleanup is best-effort
-                pass

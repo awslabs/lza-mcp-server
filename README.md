@@ -58,9 +58,7 @@ The server operates as a containerized MCP endpoint, invoked by compatible IDEs 
 - Existing LZA deployment (for pipeline and configuration operations)
 
 > **📋 Supported LZA Deployments**  
-> This MCP server supports LZA deployments using **S3-based configuration storage**. The default LZA deployment stores configuration files in an S3 bucket (`aws-accelerator-config-*`), which this server accesses for configuration retrieval and upload operations.
-> 
-> **Note:** CodeCommit-based configuration repositories are not currently supported. If your LZA deployment uses CodeCommit for configuration storage, you'll need to migrate to S3-based storage to use this MCP server. See [LZA configuration file documentation](https://docs.aws.amazon.com/solutions/latest/landing-zone-accelerator-on-aws/using-configuration-files.html) for details on configuration storage options.
+> This MCP server supports LZA deployments using **S3-based or CodeCommit-based configuration storage**. The default LZA deployment stores configuration files in an S3 bucket (`aws-accelerator-config-*`). When your pipeline uses CodeCommit as its source, `getLzaConfiguration` and `putLzaConfiguration` automatically detect this and use the CodeCommit API instead of S3 — no extra configuration required. You can also explicitly target a CodeCommit repository by passing `repository_name` (and optionally `branch`) to either tool.
 
 ### 1. Build Container Image
 
@@ -301,14 +299,30 @@ Replace these placeholders with your deployment values:
 | **STS** | Identity verification for connectivity checks | [AWS STS Documentation](https://docs.aws.amazon.com/STS/latest/APIReference/welcome.html) |
 | **SSM** | Retrieve deployed LZA version, discover deployment qualifiers, and scan version parameters from Parameter Store | [AWS Systems Manager Parameters](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) |
 | **SSM Automation** | Start and monitor LZA deployments via SSM Automation documents (external pipelines only) | [SSM Automation](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) |
-| **S3** | Read/write LZA configuration files in config bucket | [S3 Bucket Policies](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-policies.html) |
+| **S3** | Read/write LZA configuration files in config bucket (S3-backed deployments) | [S3 Bucket Policies](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-policies.html) |
+| **CodeCommit** | Read and write LZA configuration files when the pipeline uses a CodeCommit source (`GetFolder`, `GetBlob`, `GetBranch`, `CreateCommit`); `GetPipeline` is used to auto-detect the source type | [AWS CodeCommit](https://docs.aws.amazon.com/codecommit/latest/userguide/welcome.html) |
 | **KMS** | Encrypt/decrypt configurations using LZA KMS key | [AWS KMS Key Policies](https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html) |
-| **CodePipeline** | Monitor and trigger LZA pipeline executions; list pipelines for deployment type detection (external pipelines) | [CodePipeline Monitoring](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) |
+| **CodePipeline** | Monitor and trigger LZA pipeline executions; list pipelines for deployment type detection (external pipelines); inspect source action to auto-detect CodeCommit repositories | [CodePipeline Monitoring](https://docs.aws.amazon.com/codepipeline/latest/userguide/monitoring.html) |
 | **CodeBuild** | Retrieve build project details for diagnostics (CodePipeline deployments only) | [CodeBuild Projects](https://docs.aws.amazon.com/codebuild/latest/userguide/builds-working.html) |
 | **ECS** | List clusters for deployment type detection; monitor ECS Fargate task status (ECS container deployments) | [Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html) |
 | **CloudWatch Logs** | Access build or deployment logs for error analysis | [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html) |
 
 **Note:** The KMS policy uses alias-based access control (`kms:ResourceAliases`) for maintainability. This approach allows key rotation without policy updates, following [AWS KMS best practices](https://docs.aws.amazon.com/kms/latest/developerguide/best-practices.html).
+
+### CodeCommit Configuration Source
+
+If your LZA pipeline uses CodeCommit as its source, the `CodeCommitConfigAccess` statement included in the standard and external CodePipeline policies grants the required permissions. Replace `${REPOSITORY_NAME}` with your CodeCommit repository name (e.g., `aws-accelerator-config`).
+
+| Action | Purpose |
+|--------|---------|
+| `codecommit:GetFolder` | Walk the repository directory tree to list up to 1,000 items |
+| `codecommit:GetBlob` | Fetch individual file contents by blob ID |
+| `codecommit:GetBranch` | Retrieve the HEAD commit ID before writing |
+| `codecommit:CreateCommit` | Commit all configuration files in a single operation |
+
+The `codepipeline:GetPipeline` permission (already present in both CodePipeline policies) is used to auto-detect whether the pipeline's source action is CodeCommit — no additional permissions are needed for auto-detection.
+
+> **Note:** CodeCommit is not applicable to ECS container deployments, which always use S3 for configuration storage.
 
 [Back to top](#landing-zone-accelerator-on-aws-lza-mcp-server)
 
@@ -436,10 +450,10 @@ Retrieves the currently deployed LZA version from SSM Parameter Store. Use this 
 Generates minimal LZA configuration templates for new deployments. Templates include required accounts and baseline settings.
 
 **getLzaConfiguration**  
-Retrieves current LZA configuration from S3 for inspection or modification. Supports standard and external pipeline deployments via qualifier. Extracts files to shared Docker volume for IDE access.
+Retrieves current LZA configuration for inspection or modification. Automatically selects the config source: if the pipeline's source action is CodeCommit (or `repository_name` is provided), files are fetched via the CodeCommit API; otherwise a ZIP is downloaded from S3. Supports standard and external pipeline deployments via qualifier. Accepts optional `repository_name` and `branch` parameters to target a specific CodeCommit repository directly.
 
 **putLzaConfiguration**  
-Uploads configuration files to the LZA S3 bucket. Supports standard and external pipeline deployments via qualifier.
+Uploads configuration files back to the LZA config source. Automatically selects the destination: CodeCommit (single `CreateCommit` with all files) or S3 (ZIP upload), matching the source used by `getLzaConfiguration`. Supports standard and external pipeline deployments via qualifier. Accepts optional `repository_name`, `branch`, and `commit_message` parameters for CodeCommit destinations.
 
 **readLzaConfigFile**  
 Reads a file from the extracted LZA configuration directory. Validates paths for security and provides context-aware guidance.

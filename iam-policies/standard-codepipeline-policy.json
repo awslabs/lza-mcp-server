@@ -76,6 +76,22 @@
             "Effect": "Allow",
             "Action": "logs:GetLogEvents",
             "Resource": "arn:${PARTITION}:logs:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:log-group:/aws/codebuild/${ACCELERATOR_PREFIX}-*:*"
+        },
+        {
+            "Sid": "CodeCommitConfigAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codecommit:GetFolder",
+                "codecommit:GetBlob",
+                "codecommit:GetBranch",
+                "codecommit:CreateCommit"
+            ],
+            "Resource": "arn:${PARTITION}:codecommit:${HOME-REGION}:${MANAGEMENT_ACCOUNT}:${REPOSITORY_NAME}",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "${HOME-REGION}"
+                }
+            }
         }
     ]
 }

@@ -96,6 +96,22 @@
                 "arn:${PARTITION}:ssm:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:document/${QUALIFIER}-*",
                 "arn:${PARTITION}:ssm:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:automation-execution/*"
             ]
+        },
+        {
+            "Sid": "CodeCommitConfigAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codecommit:GetFolder",
+                "codecommit:GetBlob",
+                "codecommit:GetBranch",
+                "codecommit:CreateCommit"
+            ],
+            "Resource": "arn:${PARTITION}:codecommit:${HOME-REGION}:${ORCHESTRATION_ACCOUNT}:${REPOSITORY_NAME}",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "${HOME-REGION}"
+                }
+            }
         }
     ]
 }

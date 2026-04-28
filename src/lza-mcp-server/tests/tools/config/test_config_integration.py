@@ -46,11 +46,11 @@ class TestPutLzaConfigurationIntegration:
         mock_ws_manager.read_file = Mock(return_value=b"content")
 
         with patch(
-            "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_caller_identity",
+            "awslabs.lza_mcp_server.tools.config.put_config_to_s3.get_caller_identity",
             return_value=IDENTITY,
         ):
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 from unittest.mock import AsyncMock
 
@@ -76,7 +76,7 @@ class TestPutLzaConfigurationIntegration:
         mock_ws_manager.read_file = Mock(return_value=b"content")
 
         with patch(
-            "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_caller_identity",
+            "awslabs.lza_mcp_server.tools.config.put_config_to_s3.get_caller_identity",
             side_effect=RuntimeError("boom"),
         ):
             result = await tool_put_lza_configuration(
