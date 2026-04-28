@@ -68,26 +68,43 @@ def register_config_tools(mcp, workspace_manager: WorkspaceManager):
         bucket_name: Optional[str] = None,
         workspace_id: Optional[str] = None,
         path: Optional[str] = None,
+        repository_name: Optional[str] = None,
+        branch: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieve LZA configuration from S3 into a workspace.
+        """Retrieve LZA configuration into a workspace.
 
-        For standard deployments (no qualifier):
+        Automatically selects the config source (CodeCommit or S3):
+        - If repository_name is provided, or if the pipeline's source action is
+          CodeCommit, files are fetched via GetFolder/GetBlob.
+        - Otherwise, a ZIP is downloaded from S3 and extracted.
+
+        For standard S3 deployments (no qualifier):
           - Bucket: aws-accelerator-config-{account_id}-{region}
           - Key: zipped/aws-accelerator-config.zip
 
-        For external pipeline deployments (with qualifier):
+        For external pipeline S3 deployments (with qualifier):
           - Bucket: {qualifier}-config-{account_id}-{region}
           - Key: lza/aws-accelerator-config.zip
 
         Args:
             qualifier: Accelerator Qualifier for external pipeline deployments.
-            bucket_name: Explicit bucket name override.
+            bucket_name: Explicit S3 bucket name override (S3 source only).
             workspace_id: Optional workspace ID. A new workspace is created if omitted.
             path: Optional relative path within the workspace to extract into.
+            repository_name: CodeCommit repository name. When provided, uses
+                             CodeCommit instead of S3. When omitted, auto-detection
+                             is attempted via the pipeline source action.
+            branch: CodeCommit branch to read from (default: "main").
         """
         return strip_llm_guidance(
             await lza_config_retrieval.get_configuration(
-                ctx, qualifier, bucket_name, workspace_id, path
+                ctx,
+                qualifier,
+                bucket_name,
+                workspace_id,
+                path,
+                repository_name,
+                branch,
             )
         )
 
@@ -101,14 +118,22 @@ def register_config_tools(mcp, workspace_manager: WorkspaceManager):
         path: str,
         qualifier: Optional[str] = None,
         bucket_name: Optional[str] = None,
+        repository_name: Optional[str] = None,
+        branch: Optional[str] = None,
+        commit_message: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Upload LZA configuration from a workspace to S3.
+        """Upload LZA configuration from a workspace to S3 or CodeCommit.
 
-        For standard deployments (no qualifier):
+        Automatically selects the destination (CodeCommit or S3):
+        - If repository_name is provided, or if the pipeline's source action is
+          CodeCommit, files are committed via CreateCommit.
+        - Otherwise, a ZIP is created and uploaded to S3.
+
+        For standard S3 deployments (no qualifier):
           - Bucket: aws-accelerator-config-{account_id}-{region}
           - Key: zipped/aws-accelerator-config.zip
 
-        For external pipeline deployments (with qualifier):
+        For external pipeline S3 deployments (with qualifier):
           - Bucket: {qualifier}-config-{account_id}-{region}
           - Key: lza/aws-accelerator-config.zip
 
@@ -116,11 +141,24 @@ def register_config_tools(mcp, workspace_manager: WorkspaceManager):
             workspace_id: Workspace containing the configuration files.
             path: Relative path within the workspace where config files reside.
             qualifier: Accelerator Qualifier for external pipeline deployments.
-            bucket_name: Explicit bucket name override.
+            bucket_name: Explicit S3 bucket name override (S3 destination only).
+            repository_name: CodeCommit repository name. When provided, uses
+                             CodeCommit instead of S3. When omitted, auto-detection
+                             is attempted via the pipeline source action.
+            branch: CodeCommit branch to commit to (default: "main").
+            commit_message: Commit message for CodeCommit (default: auto-generated).
         """
         return strip_llm_guidance(
             await tool_put_lza_configuration(
-                ctx, workspace_manager, workspace_id, path, qualifier, bucket_name
+                ctx,
+                workspace_manager,
+                workspace_id,
+                path,
+                qualifier,
+                bucket_name,
+                repository_name,
+                branch,
+                commit_message,
             )
         )
 

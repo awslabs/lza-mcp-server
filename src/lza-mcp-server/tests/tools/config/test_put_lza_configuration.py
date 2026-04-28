@@ -20,6 +20,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from awslabs.lza_mcp_server.tools.config.put_lza_configuration import (
     tool_put_lza_configuration,
+)
+from awslabs.lza_mcp_server.tools.config.put_config_to_s3 import (
     _zip_workspace_files,
 )
 from awslabs.lza_mcp_server.utils.workspace_manager import (
@@ -55,7 +57,7 @@ def mock_ws_manager():
 
 def _patch_identity():
     return patch(
-        "awslabs.lza_mcp_server.tools.config.put_lza_configuration.get_caller_identity",
+        "awslabs.lza_mcp_server.tools.config.put_config_to_s3.get_caller_identity",
         return_value=IDENTITY,
     )
 
@@ -110,7 +112,7 @@ class TestValidation:
         """Paths '/' and '.' should be treated as workspace root (empty string)."""
         with _patch_identity():
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 mock_mgr = MagicMock()
                 mock_mgr.upload_zip_file = AsyncMock(return_value={"success": True})
@@ -133,7 +135,8 @@ class TestZipWorkspaceFiles:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_zips_all_files_no_prefix(self, mock_ws_manager):
-        zip_bytes = await _zip_workspace_files(mock_ws_manager, "ws-123", "")
+        files = ["accounts-config.yaml", "global-config.yaml", "network-config.yaml"]
+        zip_bytes = await _zip_workspace_files(mock_ws_manager, "ws-123", "", files, "")
         assert len(zip_bytes) > 0
         assert mock_ws_manager.read_file.call_count == 3
 
@@ -145,7 +148,10 @@ class TestZipWorkspaceFiles:
             "config/global-config.yaml",
             "other/readme.md",
         ]
-        zip_bytes = await _zip_workspace_files(mock_ws_manager, "ws-123", "config")  # noqa: F841
+        matching = ["config/accounts-config.yaml", "config/global-config.yaml"]
+        await _zip_workspace_files(
+            mock_ws_manager, "ws-123", "config", matching, "config/"
+        )
         # Should only zip the 2 files under config/
         assert mock_ws_manager.read_file.call_count == 2
 
@@ -161,7 +167,7 @@ class TestResolve:
     async def test_standard_uses_correct_bucket(self, ctx, mock_ws_manager):
         with _patch_identity():
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 mock_mgr = MagicMock()
                 mock_mgr.upload_zip_file = AsyncMock(return_value={"success": True})
@@ -182,7 +188,7 @@ class TestResolve:
     async def test_qualifier_uses_correct_bucket(self, ctx, mock_ws_manager):
         with _patch_identity():
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 mock_mgr = MagicMock()
                 mock_mgr.upload_zip_file = AsyncMock(return_value={"success": True})
@@ -212,7 +218,7 @@ class TestSuccessfulUpload:
         ]
         with _patch_identity():
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 mock_mgr = MagicMock()
                 mock_mgr.upload_zip_file = AsyncMock(return_value={"success": True})
@@ -231,7 +237,7 @@ class TestSuccessfulUpload:
     async def test_upload_failure_propagated(self, ctx, mock_ws_manager):
         with _patch_identity():
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 mock_mgr = MagicMock()
                 mock_mgr.upload_zip_file = AsyncMock(
@@ -275,7 +281,7 @@ class TestZipCleanupFailure:
         """If os.remove fails on the temp zip in finally, it should not crash."""
         with _patch_identity():
             with patch(
-                "awslabs.lza_mcp_server.tools.config.put_lza_configuration.S3Manager"
+                "awslabs.lza_mcp_server.tools.config.put_config_to_s3.S3Manager"
             ) as mock_cls:
                 mock_mgr = MagicMock()
                 mock_mgr.upload_zip_file = AsyncMock(return_value={"success": True})
@@ -289,7 +295,7 @@ class TestZipCleanupFailure:
                     return original_remove(path)
 
                 with patch(
-                    "awslabs.lza_mcp_server.tools.config.put_lza_configuration.os.remove",
+                    "awslabs.lza_mcp_server.tools.config.put_config_to_s3.os.remove",
                     side_effect=failing_remove,
                 ):
                     result = await tool_put_lza_configuration(
