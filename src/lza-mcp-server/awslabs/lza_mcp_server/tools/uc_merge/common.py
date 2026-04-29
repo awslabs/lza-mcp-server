@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, Any, Tuple
 
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
+from awslabs.lza_mcp_server.utils.input_validation import validate_file_path
 
 
 # Default paths
@@ -56,10 +57,9 @@ def validate_path_security(
 ) -> Tuple[bool, str, Path | None]:
     """Validate file path for security concerns.
 
-    Checks for:
-    - Path traversal attempts (..)
-    - Absolute paths
-    - Paths outside base directory boundary
+    Delegates core checks (null bytes, path traversal, absolute paths,
+    boundary escape) to :func:`validate_file_path` in the central
+    input-validation module, then resolves and returns the full path.
 
     Args:
         file_path: File path to validate
@@ -69,32 +69,16 @@ def validate_path_security(
     Returns:
         Tuple of (is_valid, error_message, resolved_path)
     """
-    if not file_path:
-        return False, "File path cannot be empty", None
+    is_valid, error_msg = validate_file_path(
+        file_path, base_directory=base_directory, allow_absolute=False
+    )
+    if not is_valid:
+        return False, error_msg, None
 
-    if not isinstance(file_path, str):
-        return False, "File path must be a string", None
-
-    # Check for path traversal sequences
-    if ".." in file_path:
-        return (False, "Path traversal detected in file path", None)
-
-    # Check for absolute paths
-    path_obj = Path(file_path)
-    if path_obj.is_absolute():
-        return (False, "Absolute paths are not allowed", None)
-
-    # Resolve the full path
     try:
         resolved_path = (base_directory / file_path).resolve()
     except (OSError, ValueError):
-        return (False, "Invalid file path", None)
-
-    # Verify the resolved path is within the base directory
-    try:
-        resolved_path.relative_to(base_directory.resolve())
-    except ValueError:
-        return (False, "Path is outside allowed directory boundary", None)
+        return False, "Invalid file path", None
 
     return True, "", resolved_path
 

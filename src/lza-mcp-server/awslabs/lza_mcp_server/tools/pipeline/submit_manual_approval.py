@@ -20,14 +20,17 @@ from typing import Dict, Any, Optional
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_PIPELINE_NAME
-from .common import validate_pipeline_name_local, validate_qualifier
+from ...utils.input_validation import (
+    validate_pipeline_name,
+    validate_qualifier,
+    validate_string_input,
+)
 
 from ...aws_access import (
     format_error_response,
     get_codepipeline_client,
     retry_with_exponential_backoff,
 )
-from ...utils.input_validation import validate_string_input
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +161,7 @@ async def tool_submit_manual_approval(
             ],
         )
 
-    is_valid, validation_error = validate_pipeline_name_local(resolved_name)
+    is_valid, validation_error = validate_pipeline_name(resolved_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",

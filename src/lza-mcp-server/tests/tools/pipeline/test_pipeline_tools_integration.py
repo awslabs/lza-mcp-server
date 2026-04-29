@@ -294,9 +294,10 @@ class TestPipelineToolsIntegration:
         result = await diagnose_func(mock_context, execution_id="invalid-execution-id")
 
         assert result["success"] is False, "Invalid execution ID should fail"
-        assert "invalid execution id format" in result["error"].lower(), (
-            "Should mention invalid format"
-        )
+        assert (
+            "execution id" in result["error"].lower()
+            or "uuid" in result["error"].lower()
+        ), "Should mention invalid format"
         assert "troubleshooting" in result, "Should provide troubleshooting guidance"
 
         # Test with valid format but non-existent execution ID

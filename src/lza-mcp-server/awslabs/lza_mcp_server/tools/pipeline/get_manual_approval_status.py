@@ -21,7 +21,7 @@ from typing import Dict, Any, Optional
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
-from .common import validate_pipeline_name_local, validate_qualifier, truncate_logs
+from .common import truncate_logs
 
 from ...aws_access import (
     format_error_response,
@@ -34,7 +34,11 @@ from ...aws_access import (
     handle_aws_error,
 )
 from ...server_config import is_s3_diff_enabled
-from ...utils.input_validation import validate_string_input
+from ...utils.input_validation import (
+    validate_pipeline_name,
+    validate_qualifier,
+    validate_string_input,
+)
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -139,7 +143,7 @@ async def tool_get_manual_approval_status(
             ],
         )
 
-    is_valid, validation_error = validate_pipeline_name_local(resolved_name)
+    is_valid, validation_error = validate_pipeline_name(resolved_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",

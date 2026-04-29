@@ -513,7 +513,7 @@ class TestValidatePathSecurity:
                     )
                     # The symlink resolves outside base_dir
                     assert is_valid is False
-                    assert "outside" in error.lower()
+                    assert "escapes" in error.lower() or "outside" in error.lower()
                 except OSError:
                     # Symlinks may not be supported on all platforms
                     pytest.skip("Symlinks not supported")

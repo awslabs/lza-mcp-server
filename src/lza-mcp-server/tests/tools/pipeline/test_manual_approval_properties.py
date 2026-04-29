@@ -34,7 +34,7 @@ from awslabs.lza_mcp_server.tools.pipeline.submit_manual_approval import (
     tool_submit_manual_approval,
     VALID_ACTIONS,
 )
-from awslabs.lza_mcp_server.tools.pipeline.common import validate_qualifier
+from awslabs.lza_mcp_server.utils.input_validation import validate_qualifier
 from awslabs.lza_mcp_server.server_config import (
     is_s3_diff_enabled,
 )

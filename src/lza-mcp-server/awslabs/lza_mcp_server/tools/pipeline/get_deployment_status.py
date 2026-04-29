@@ -23,9 +23,6 @@ from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
 from .common import (
-    validate_pipeline_name_local,
-    validate_execution_id_local,
-    validate_qualifier,
     truncate_logs,
 )
 
@@ -41,7 +38,12 @@ from ...aws_access import (
     handle_aws_error,
 )
 from ...server_config import is_s3_diff_enabled
-from ...utils.input_validation import validate_string_input
+from ...utils.input_validation import (
+    validate_execution_id,
+    validate_pipeline_name,
+    validate_qualifier,
+    validate_string_input,
+)
 
 # ECS task statuses that indicate the task is not yet running
 _ECS_PENDING_STATUSES = {"PROVISIONING", "PENDING", "ACTIVATING"}
@@ -830,7 +832,7 @@ async def _get_standard_pipeline_status(
             ],
         )
 
-    is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
+    is_valid, validation_error = validate_pipeline_name(pipeline_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
@@ -856,7 +858,7 @@ async def _get_standard_pipeline_status(
                 ],
             )
 
-        is_valid, validation_error = validate_execution_id_local(execution_id)
+        is_valid, validation_error = validate_execution_id(execution_id)
         if not is_valid:
             return format_error_response(
                 error=f"Invalid execution ID: {validation_error}",

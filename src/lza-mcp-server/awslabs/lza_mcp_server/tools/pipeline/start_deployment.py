@@ -21,7 +21,11 @@ from typing import Dict, Any, Optional
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
-from .common import validate_pipeline_name_local, validate_qualifier
+from ...utils.input_validation import (
+    validate_pipeline_name,
+    validate_qualifier,
+    validate_string_input,
+)
 
 from ...aws_access import (
     format_error_response,
@@ -30,7 +34,6 @@ from ...aws_access import (
     retry_with_exponential_backoff,
     handle_aws_error,
 )
-from ...utils.input_validation import validate_string_input
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -264,7 +267,7 @@ async def _start_standard_pipeline(
             ],
         )
 
-    is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
+    is_valid, validation_error = validate_pipeline_name(pipeline_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",

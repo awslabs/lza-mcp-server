@@ -35,9 +35,9 @@ from awslabs.lza_mcp_server.tools.config.get_config_from_codecommit import (
     get_config_from_codecommit,
 )
 from awslabs.lza_mcp_server.tools.config.get_config_from_s3 import get_config_from_s3
-from awslabs.lza_mcp_server.tools.pipeline.common import validate_qualifier
 from awslabs.lza_mcp_server.utils.error_handling import create_structured_error_response
 from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_qualifier,
     validate_s3_bucket_name,
     validate_string_input,
 )

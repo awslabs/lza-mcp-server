@@ -23,9 +23,6 @@ from mcp.server.fastmcp import Context
 from ...constants import DEFAULT_REGION, DEFAULT_PIPELINE_NAME
 from .common import (
     truncate_logs,
-    validate_pipeline_name_local,
-    validate_execution_id_local,
-    validate_qualifier,
     extract_create_failed_error,
     determine_ecs_deployment_status,
 )
@@ -38,7 +35,12 @@ from ...aws_access import (
     retry_with_exponential_backoff,
     handle_aws_error,
 )
-from ...utils.input_validation import validate_string_input
+from ...utils.input_validation import (
+    validate_execution_id,
+    validate_pipeline_name,
+    validate_qualifier,
+    validate_string_input,
+)
 
 logger = logging.getLogger(__name__)
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
@@ -234,7 +236,7 @@ async def _diagnose_standard_pipeline(
             ],
         )
 
-    is_valid, validation_error = validate_pipeline_name_local(pipeline_name)
+    is_valid, validation_error = validate_pipeline_name(pipeline_name)
     if not is_valid:
         return format_error_response(
             error=f"Invalid pipeline name: {validation_error}",
@@ -260,7 +262,7 @@ async def _diagnose_standard_pipeline(
                 ],
             )
 
-        is_valid, validation_error = validate_execution_id_local(execution_id)
+        is_valid, validation_error = validate_execution_id(execution_id)
         if not is_valid:
             return format_error_response(
                 error=f"Invalid execution ID: {validation_error}",

@@ -513,19 +513,20 @@ def validate_pipeline_name(pipeline_name: str) -> Tuple[bool, str]:
     # - Letters, numbers, periods, underscores, and hyphens
     # - Cannot contain spaces
 
-    if len(pipeline_name) < 1:
-        return False, "Pipeline name must be at least 1 character"
-
     if len(pipeline_name) > 100:
         return (
             False,
-            f"Pipeline name exceeds maximum length of 100 characters (got {len(pipeline_name)})",
+            f"Pipeline name too long ({len(pipeline_name)} characters). Maximum is 100 characters",
         )
 
     if not re.match(r"^[A-Za-z0-9._-]+$", pipeline_name):
+        invalid_chars = set(pipeline_name) - set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+        )
         return (
             False,
-            "Pipeline name can only contain letters, numbers, periods, underscores, and hyphens",
+            f"Pipeline name contains invalid characters: {', '.join(sorted(invalid_chars))}. "
+            "Only letters, numbers, periods, underscores, and hyphens are allowed",
         )
 
     return True, ""
@@ -561,6 +562,65 @@ def validate_execution_id(execution_id: str) -> Tuple[bool, str]:
     return True, ""
 
 
+def validate_qualifier(qualifier: str) -> Tuple[bool, str]:
+    """Validate LZA Accelerator Qualifier format.
+
+    Qualifiers are alphanumeric with hyphens, used to scope external pipeline deployments.
+
+    Args:
+        qualifier: The qualifier string to validate
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(qualifier, str):
+        return False, "Qualifier must be a string"
+
+    if not qualifier:
+        return False, "Qualifier cannot be empty"
+
+    if len(qualifier) > 100:
+        return (
+            False,
+            f"Qualifier too long ({len(qualifier)} characters). Maximum is 100 characters",
+        )
+
+    if not re.match(r"^[a-zA-Z0-9-]+$", qualifier):
+        return (
+            False,
+            "Qualifier can only contain letters, numbers, and hyphens",
+        )
+
+    return True, ""
+
+
+def validate_aws_region(region: str) -> Tuple[bool, str]:
+    """Validate AWS region format.
+
+    Args:
+        region: The AWS region to validate
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(region, str):
+        return False, "AWS region must be a string"
+
+    if not region:
+        return False, "AWS region cannot be empty"
+
+    # AWS region format: us-east-1, eu-west-1, ap-southeast-2, us-gov-east-1, etc.
+    region_pattern = r"^[a-z]{2,4}(?:-[a-z]+)+-[1-9][0-9]?$"
+
+    if not re.match(region_pattern, region):
+        return (
+            False,
+            "Invalid AWS region format. Expected format like 'us-east-1'",
+        )
+
+    return True, ""
+
+
 # Validation registry for easy lookup
 VALIDATORS = {
     "string": validate_string_input,
@@ -577,4 +637,6 @@ VALIDATORS = {
     "account_id": validate_account_id,
     "pipeline_name": validate_pipeline_name,
     "execution_id": validate_execution_id,
+    "qualifier": validate_qualifier,
+    "aws_region": validate_aws_region,
 }
