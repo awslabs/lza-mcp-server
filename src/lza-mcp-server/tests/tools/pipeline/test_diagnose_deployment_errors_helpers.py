@@ -18,7 +18,7 @@ from awslabs.lza_mcp_server.tools.pipeline.diagnose_deployment_errors import (
     _extract_ecs_error_line,
     _extract_codebuild_error_line,
 )
-from awslabs.lza_mcp_server.tools.pipeline.common import validate_qualifier
+from awslabs.lza_mcp_server.utils.input_validation import validate_qualifier
 
 
 class TestExtractEcsErrorLine:

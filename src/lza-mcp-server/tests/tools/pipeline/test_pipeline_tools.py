@@ -20,8 +20,10 @@ from unittest.mock import Mock
 from awslabs.lza_mcp_server.tools.pipeline.common import (
     extract_create_failed_error,
     truncate_logs,
-    validate_pipeline_name_local,
-    validate_execution_id_local,
+)
+from awslabs.lza_mcp_server.utils.input_validation import (
+    validate_execution_id,
+    validate_pipeline_name,
 )
 
 
@@ -30,103 +32,97 @@ class TestValidationFunctions:
 
     def test_validate_execution_id_valid(self):
         """Test execution ID validation with valid IDs."""
-        is_valid, error = validate_execution_id_local(
-            "12345678-1234-1234-1234-123456789012"
-        )
+        is_valid, error = validate_execution_id("12345678-1234-1234-1234-123456789012")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_execution_id_local(
-            "abcdef12-3456-7890-abcd-ef1234567890"
-        )
+        is_valid, error = validate_execution_id("abcdef12-3456-7890-abcd-ef1234567890")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_execution_id_local(
-            "ABCDEF12-3456-7890-ABCD-EF1234567890"
-        )
+        is_valid, error = validate_execution_id("ABCDEF12-3456-7890-ABCD-EF1234567890")
         assert is_valid is True
         assert error == ""
 
     def test_validate_execution_id_invalid(self):
         """Test execution ID validation with invalid IDs."""
-        is_valid, error = validate_execution_id_local("")
+        is_valid, error = validate_execution_id("")
         assert is_valid is False
         assert "cannot be empty" in error
 
-        is_valid, error = validate_execution_id_local("invalid-id")
+        is_valid, error = validate_execution_id("invalid-id")
         assert is_valid is False
-        assert "Invalid execution ID format" in error
+        assert "UUID" in error or "execution" in error.lower()
 
-        is_valid, error = validate_execution_id_local(
+        is_valid, error = validate_execution_id(
             "12345678-1234-1234-1234-12345678901"
         )  # Too short
         assert is_valid is False
-        assert "Invalid execution ID format" in error
+        assert "UUID" in error or "execution" in error.lower()
 
-        is_valid, error = validate_execution_id_local(
+        is_valid, error = validate_execution_id(
             "12345678-1234-1234-1234-1234567890123"
         )  # Too long
         assert is_valid is False
-        assert "Invalid execution ID format" in error
+        assert "UUID" in error or "execution" in error.lower()
 
-        is_valid, error = validate_execution_id_local(None)
+        is_valid, error = validate_execution_id(None)
         assert is_valid is False
         assert "cannot be empty" in error
 
-        is_valid, error = validate_execution_id_local(123)
+        is_valid, error = validate_execution_id(123)
         assert is_valid is False
-        assert "cannot be empty" in error
+        assert "cannot be empty" in error or "must be a string" in error
 
     def test_validate_pipeline_name_valid(self):
         """Test pipeline name validation with valid names."""
-        is_valid, error = validate_pipeline_name_local("AWSAccelerator-Pipeline")
+        is_valid, error = validate_pipeline_name("AWSAccelerator-Pipeline")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_pipeline_name_local("test-pipeline")
+        is_valid, error = validate_pipeline_name("test-pipeline")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_pipeline_name_local("pipeline_123")
+        is_valid, error = validate_pipeline_name("pipeline_123")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_pipeline_name_local("pipeline.test")
+        is_valid, error = validate_pipeline_name("pipeline.test")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_pipeline_name_local("a")
+        is_valid, error = validate_pipeline_name("a")
         assert is_valid is True
         assert error == ""
 
-        is_valid, error = validate_pipeline_name_local("a" * 100)
+        is_valid, error = validate_pipeline_name("a" * 100)
         assert is_valid is True
         assert error == ""
 
     def test_validate_pipeline_name_invalid(self):
         """Test pipeline name validation with invalid names."""
-        is_valid, error = validate_pipeline_name_local("")
+        is_valid, error = validate_pipeline_name("")
         assert is_valid is False
         assert "cannot be empty" in error
 
-        is_valid, error = validate_pipeline_name_local("a" * 101)
+        is_valid, error = validate_pipeline_name("a" * 101)
         assert is_valid is False
         assert "too long" in error
 
-        is_valid, error = validate_pipeline_name_local("pipeline with spaces")
+        is_valid, error = validate_pipeline_name("pipeline with spaces")
         assert is_valid is False
         assert "invalid characters" in error
 
-        is_valid, error = validate_pipeline_name_local("pipeline@test")
+        is_valid, error = validate_pipeline_name("pipeline@test")
         assert is_valid is False
         assert "invalid characters" in error
 
-        is_valid, error = validate_pipeline_name_local("pipeline#test")
+        is_valid, error = validate_pipeline_name("pipeline#test")
         assert is_valid is False
         assert "invalid characters" in error
 
-        is_valid, error = validate_pipeline_name_local(None)
+        is_valid, error = validate_pipeline_name(None)
         assert is_valid is False
         assert "cannot be empty" in error
 
@@ -271,7 +267,7 @@ class TestPipelineToolsIntegration:
         ]
 
         for name in valid_names:
-            is_valid, error = validate_pipeline_name_local(name)
+            is_valid, error = validate_pipeline_name(name)
             assert is_valid, f"Expected {name} to be valid, but got error: {error}"
 
         # Test invalid names
@@ -284,7 +280,7 @@ class TestPipelineToolsIntegration:
         ]
 
         for name in invalid_names:
-            is_valid, error = validate_pipeline_name_local(name)
+            is_valid, error = validate_pipeline_name(name)
             assert not is_valid, f"Expected {name} to be invalid, but validation passed"
             assert error, f"Expected error message for invalid name: {name}"
 
@@ -298,7 +294,7 @@ class TestPipelineToolsIntegration:
         ]
 
         for exec_id in valid_ids:
-            is_valid, error = validate_execution_id_local(exec_id)
+            is_valid, error = validate_execution_id(exec_id)
             assert is_valid, f"Expected {exec_id} to be valid, but got error: {error}"
 
         # Test invalid UUIDs
@@ -311,7 +307,7 @@ class TestPipelineToolsIntegration:
         ]
 
         for exec_id in invalid_ids:
-            is_valid, error = validate_execution_id_local(exec_id)
+            is_valid, error = validate_execution_id(exec_id)
             assert not is_valid, (
                 f"Expected {exec_id} to be invalid, but validation passed"
             )
@@ -435,19 +431,19 @@ class TestPipelineUtilities:
     def test_validation_error_messages(self):
         """Test validation error message quality."""
         # Test pipeline name error messages
-        is_valid, error = validate_pipeline_name_local("pipeline with spaces")
+        is_valid, error = validate_pipeline_name("pipeline with spaces")
         assert "invalid characters" in error
         assert " " in error  # Should mention space as invalid character
 
-        is_valid, error = validate_pipeline_name_local("a" * 101)
+        is_valid, error = validate_pipeline_name("a" * 101)
         assert "too long" in error
         assert "101 characters" in error
         assert "100" in error  # Should mention the limit
 
         # Test execution ID error messages
-        is_valid, error = validate_execution_id_local("invalid-format")
-        assert "Invalid execution ID format" in error
+        is_valid, error = validate_execution_id("invalid-format")
+        assert "UUID" in error or "execution" in error.lower()
         assert "UUID format" in error
 
-        is_valid, error = validate_execution_id_local("")
+        is_valid, error = validate_execution_id("")
         assert "cannot be empty" in error

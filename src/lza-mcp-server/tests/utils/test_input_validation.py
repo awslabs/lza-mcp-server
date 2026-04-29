@@ -31,6 +31,8 @@ from awslabs.lza_mcp_server.utils.input_validation import (
     validate_account_id,
     validate_pipeline_name,
     validate_execution_id,
+    validate_qualifier,
+    validate_aws_region,
 )
 
 
@@ -522,17 +524,17 @@ class TestPipelineNameValidation:
         long_name = "a" * 101
         is_valid, error = validate_pipeline_name(long_name)
         assert not is_valid
-        assert "exceeds maximum length" in error
+        assert "too long" in error
 
     def test_pipeline_name_with_spaces(self):
         is_valid, error = validate_pipeline_name("My Pipeline")
         assert not is_valid
-        assert "can only contain" in error
+        assert "invalid characters" in error.lower()
 
     def test_pipeline_name_with_special_chars(self):
         is_valid, error = validate_pipeline_name("Pipeline@123")
         assert not is_valid
-        assert "can only contain" in error
+        assert "invalid characters" in error.lower()
 
 
 class TestExecutionIdValidation:
@@ -567,3 +569,101 @@ class TestExecutionIdValidation:
         is_valid, error = validate_execution_id("1234-1234-1234-1234")
         assert not is_valid
         assert "valid UUID format" in error
+
+
+class TestQualifierValidation:
+    """Test LZA Accelerator Qualifier validation."""
+
+    def test_valid_qualifier(self):
+        is_valid, error = validate_qualifier("my-qualifier")
+        assert is_valid
+        assert error == ""
+
+    def test_valid_qualifier_alphanumeric(self):
+        is_valid, error = validate_qualifier("qualifier123")
+        assert is_valid
+        assert error == ""
+
+    def test_empty_qualifier(self):
+        is_valid, error = validate_qualifier("")
+        assert not is_valid
+        assert "cannot be empty" in error
+
+    def test_none_qualifier(self):
+        is_valid, error = validate_qualifier(None)
+        assert not is_valid
+        assert "must be a string" in error
+
+    def test_non_string_qualifier(self):
+        is_valid, error = validate_qualifier(123)
+        assert not is_valid
+        assert "must be a string" in error
+
+    def test_qualifier_too_long(self):
+        is_valid, error = validate_qualifier("a" * 101)
+        assert not is_valid
+        assert "too long" in error
+
+    def test_qualifier_with_invalid_chars(self):
+        is_valid, error = validate_qualifier("my_qualifier")
+        assert not is_valid
+        assert "letters, numbers, and hyphens" in error
+
+    def test_qualifier_with_spaces(self):
+        is_valid, error = validate_qualifier("my qualifier")
+        assert not is_valid
+        assert "letters, numbers, and hyphens" in error
+
+
+class TestAwsRegionValidation:
+    """Test AWS region validation."""
+
+    def test_valid_region_us_east(self):
+        is_valid, error = validate_aws_region("us-east-1")
+        assert is_valid
+        assert error == ""
+
+    def test_valid_region_eu_west(self):
+        is_valid, error = validate_aws_region("eu-west-2")
+        assert is_valid
+        assert error == ""
+
+    def test_valid_region_ap_southeast(self):
+        is_valid, error = validate_aws_region("ap-southeast-1")
+        assert is_valid
+        assert error == ""
+
+    def test_valid_region_govcloud(self):
+        is_valid, error = validate_aws_region("us-gov-east-1")
+        assert is_valid
+        assert error == ""
+
+    def test_empty_region(self):
+        is_valid, error = validate_aws_region("")
+        assert not is_valid
+        assert "cannot be empty" in error
+
+    def test_none_region(self):
+        is_valid, error = validate_aws_region(None)
+        assert not is_valid
+        assert "must be a string" in error
+
+    def test_non_string_region(self):
+        is_valid, error = validate_aws_region(123)
+        assert not is_valid
+        assert "must be a string" in error
+
+    def test_invalid_region_format(self):
+        is_valid, error = validate_aws_region("invalid")
+        assert not is_valid
+        assert "Invalid AWS region format" in error
+
+    def test_region_with_uppercase(self):
+        is_valid, error = validate_aws_region("US-EAST-1")
+        assert not is_valid
+        assert "Invalid AWS region format" in error
+
+    def test_region_leading_zero(self):
+        is_valid, error = validate_aws_region("us-east-01")
+        assert not is_valid
+        assert "Invalid AWS region format" in error
