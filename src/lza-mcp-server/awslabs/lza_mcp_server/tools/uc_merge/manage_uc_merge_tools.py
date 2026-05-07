@@ -25,6 +25,7 @@ from .start_uc_merge_session import tool_start_uc_merge_session
 from .get_uc_network_customization_guide import get_uc_network_customization_guide
 from .copy_uc_to_lza_config import copy_uc_to_lza_config
 from .validate_lza_for_uc_merge import validate_lza_for_uc_merge
+from awslabs.lza_mcp_server.aws_access import current_tool
 from awslabs.lza_mcp_server.utils.guidance_toggle import (
     strip_llm_guidance,
     tool_description,
@@ -66,6 +67,7 @@ def register_uc_merge_tools(mcp, workspace_manager: WorkspaceManager):
     )
     async def validateLzaForUcMerge(ctx: Context, workspace_id: str, path: str = ""):
         """Validate that the LZA installation is fresh and compatible with UC merge."""
+        current_tool.set("validateLzaForUcMerge")
         return strip_llm_guidance(
             await validate_lza_for_uc_merge(ctx, workspace_id, path, _workspace_manager)
         )
@@ -75,6 +77,7 @@ def register_uc_merge_tools(mcp, workspace_manager: WorkspaceManager):
     )
     async def get_uc_releases(ctx: Context):
         """Discover available UC release versions."""
+        current_tool.set("get_uc_releases")
         return strip_llm_guidance(await tool_get_uc_releases(ctx))
 
     @mcp.tool(
@@ -82,6 +85,7 @@ def register_uc_merge_tools(mcp, workspace_manager: WorkspaceManager):
     )
     async def get_uc_network_models(ctx: Context, uc_release: str):
         """Get available UC network deployment models with comparison information."""
+        current_tool.set("get_uc_network_models")
         return strip_llm_guidance(await tool_get_uc_network_models(ctx, uc_release))
 
     @mcp.tool(
@@ -89,6 +93,7 @@ def register_uc_merge_tools(mcp, workspace_manager: WorkspaceManager):
     )
     async def start_uc_merge_session(ctx: Context, uc_release: str, network_model: str):
         """Start a new UC merge session with the selected release and network model."""
+        current_tool.set("start_uc_merge_session")
         return strip_llm_guidance(
             await tool_start_uc_merge_session(
                 ctx, uc_release, network_model, _workspace_manager
@@ -100,6 +105,7 @@ def register_uc_merge_tools(mcp, workspace_manager: WorkspaceManager):
     )
     async def getUcNetworkCustomizationGuide(ctx: Context, workspace_id: str):
         """Get network customization guidance and file list for the session's network model."""
+        current_tool.set("getUcNetworkCustomizationGuide")
         return strip_llm_guidance(
             get_uc_network_customization_guide(workspace_id, _workspace_manager)
         )
@@ -111,6 +117,7 @@ def register_uc_merge_tools(mcp, workspace_manager: WorkspaceManager):
         ctx: Context, uc_workspace_id: str, lza_workspace_id: str, path: str = ""
     ):
         """Copy UC configuration from UC workspace to LZA workspace."""
+        current_tool.set("copyUcToLzaConfig")
         return strip_llm_guidance(
             await copy_uc_to_lza_config(
                 ctx, uc_workspace_id, lza_workspace_id, _workspace_manager, path

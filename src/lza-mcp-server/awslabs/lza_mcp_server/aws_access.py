@@ -15,6 +15,7 @@
 import asyncio
 import logging
 import os
+from contextvars import ContextVar
 from typing import Dict, Any
 
 import boto3
@@ -36,6 +37,19 @@ from .utils.error_handling import (
 AWS_REGION = os.environ.get("AWS_REGION", DEFAULT_REGION)
 logger = logging.getLogger(__name__)
 
+# User-agent metadata for AWS API calls
+_MCP_SERVER_VERSION = "1.1"
+_UA_SERVER = f"md/lza-mcp-server#{_MCP_SERVER_VERSION}"
+current_tool: ContextVar[str] = ContextVar("current_tool", default="")
+
+
+def _inject_user_agent(request, **kwargs):
+    """Append MCP server and tool metadata to the User-Agent header."""
+    ua = request.headers.get("User-Agent", "")
+    tool = current_tool.get()
+    suffix = f" {_UA_SERVER} md/tool#{tool}" if tool else f" {_UA_SERVER}"
+    request.headers["User-Agent"] = f"{ua}{suffix}"
+
 
 def get_aws_account_id():
     """Get the AWS account ID for the current session."""
@@ -47,6 +61,9 @@ def get_aws_account_id():
 def get_aws_session() -> boto3.Session:
     """Create an AWS session using boto3's default credential provider chain.
 
+    Registers an event handler to inject MCP server and tool metadata into
+    the User-Agent header of all AWS API requests made through this session.
+
     Returns:
         boto3.Session: Configured AWS session with the specified region
 
@@ -54,7 +71,9 @@ def get_aws_session() -> boto3.Session:
         NoCredentialsError: If AWS credentials are not properly configured
     """
     logger.info(f"Creating AWS session with region: {AWS_REGION}")
-    return boto3.Session(region_name=AWS_REGION)
+    session = boto3.Session(region_name=AWS_REGION)
+    session.events.register("before-sign.*.*", _inject_user_agent)
+    return session
 
 
 def get_s3_client() -> boto3.client:

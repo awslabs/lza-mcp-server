@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import Context
 
+from awslabs.lza_mcp_server.aws_access import current_tool
 from awslabs.lza_mcp_server.error_categories import ErrorCategory
 from awslabs.lza_mcp_server.utils.error_handling import (
     create_structured_error_response,
@@ -93,6 +94,7 @@ def register_workspace_tools(
         description="Create a new workspace and return its unique ID.",
     )  # nosemgrep: useless-inner-function
     async def create_workspace(ctx: Context) -> Dict[str, Any]:
+        current_tool.set("createWorkspace")
         try:
             workspace_id = _workspace_manager.create_workspace()
             return {"success": True, "workspace_id": workspace_id}
@@ -104,6 +106,7 @@ def register_workspace_tools(
         description="Delete a workspace and all its contents.",
     )  # nosemgrep: useless-inner-function
     async def delete_workspace(ctx: Context, workspace_id: str) -> Dict[str, Any]:
+        current_tool.set("deleteWorkspace")
         try:
             _workspace_manager.delete_workspace(workspace_id)
             return {"success": True}
@@ -120,6 +123,7 @@ def register_workspace_tools(
     async def write_workspace_file(
         ctx: Context, workspace_id: str, path: str, content: str
     ) -> Dict[str, Any]:
+        current_tool.set("writeWorkspaceFile")
         try:
             _workspace_manager.write_file(workspace_id, path, content.encode("utf-8"))
             return {"success": True}
@@ -135,6 +139,7 @@ def register_workspace_tools(
     async def delete_workspace_file(
         ctx: Context, workspace_id: str, path: str
     ) -> Dict[str, Any]:
+        current_tool.set("deleteWorkspaceFile")
         try:
             _workspace_manager.delete_file(workspace_id, path)
             return {"success": True}
@@ -152,6 +157,7 @@ def register_workspace_tools(
     async def create_workspace_folder(
         ctx: Context, workspace_id: str, path: str
     ) -> Dict[str, Any]:
+        current_tool.set("createWorkspaceFolder")
         try:
             _workspace_manager.create_folder(workspace_id, path)
             return {"success": True}
@@ -167,6 +173,7 @@ def register_workspace_tools(
     async def delete_workspace_folder(
         ctx: Context, workspace_id: str, path: str
     ) -> Dict[str, Any]:
+        current_tool.set("deleteWorkspaceFolder")
         try:
             _workspace_manager.delete_folder(workspace_id, path)
             return {"success": True}
@@ -187,6 +194,7 @@ def register_workspace_tools(
         source_paths: List[str],
         destination_path: str,
     ) -> Dict[str, Any]:
+        current_tool.set("zipWorkspaceFiles")
         try:
             _zip_utility.create_zip(workspace_id, source_paths, destination_path)
             return {"success": True, "zip_path": destination_path}

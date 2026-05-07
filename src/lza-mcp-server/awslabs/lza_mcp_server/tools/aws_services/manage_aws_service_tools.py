@@ -18,6 +18,7 @@ import logging
 from typing import Dict, Any
 from mcp.server.fastmcp import Context
 
+from awslabs.lza_mcp_server.aws_access import current_tool
 from awslabs.lza_mcp_server.tools.aws_services.check_aws_connectivity import (
     tool_check_aws_connectivity,
 )
@@ -41,6 +42,7 @@ def register_aws_tools(mcp):
         description=tool_description(**DESCRIPTIONS["checkAwsConnectivity"]),
     )
     async def check_aws_connectivity(ctx: Context) -> Dict[str, Any]:
+        current_tool.set("checkAwsConnectivity")
         return strip_llm_guidance(await tool_check_aws_connectivity(ctx))
 
     @mcp.tool(
@@ -48,6 +50,7 @@ def register_aws_tools(mcp):
         description=tool_description(**DESCRIPTIONS["getDeployedLzaVersion"]),
     )
     async def get_deployed_lza_version(ctx: Context) -> Dict[str, Any]:
+        current_tool.set("getDeployedLzaVersion")
         return strip_llm_guidance(await tool_get_deployed_lza_version(ctx))
 
     logger.info("AWS tools registered successfully")
