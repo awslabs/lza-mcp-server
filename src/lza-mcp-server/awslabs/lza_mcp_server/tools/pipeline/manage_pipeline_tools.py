@@ -26,6 +26,7 @@ from ...constants import (
     DEFAULT_REGION,
     DEFAULT_PIPELINE_NAME,
 )
+from ...aws_access import current_tool
 from .start_deployment import tool_start_deployment
 from .get_deployment_status import tool_get_deployment_status
 from .diagnose_deployment_errors import tool_diagnose_deployment_errors
@@ -262,6 +263,7 @@ def register_pipeline_tools(mcp):
         qualifier: Optional[str] = None,
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
     ) -> Dict[str, Any]:
+        current_tool.set("startDeployment")
         return strip_llm_guidance(
             await tool_start_deployment(ctx, qualifier, pipeline_name)
         )
@@ -276,6 +278,7 @@ def register_pipeline_tools(mcp):
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
         execution_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        current_tool.set("getDeploymentStatus")
         return strip_llm_guidance(
             await tool_get_deployment_status(
                 ctx, qualifier, pipeline_name, execution_id
@@ -292,6 +295,7 @@ def register_pipeline_tools(mcp):
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
         execution_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        current_tool.set("diagnoseDeploymentErrors")
         return strip_llm_guidance(
             await tool_diagnose_deployment_errors(
                 ctx, qualifier, pipeline_name, execution_id
@@ -312,6 +316,7 @@ def register_pipeline_tools(mcp):
         pipeline_name: str = DEFAULT_PIPELINE_NAME,
         summary: Optional[str] = None,
     ) -> Dict[str, Any]:
+        current_tool.set("submitManualApproval")
         return strip_llm_guidance(
             await tool_submit_manual_approval(
                 ctx,

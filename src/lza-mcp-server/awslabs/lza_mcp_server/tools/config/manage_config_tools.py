@@ -19,6 +19,7 @@ from typing import Dict, Any, Optional
 
 from mcp.server.fastmcp import Context
 
+from awslabs.lza_mcp_server.aws_access import current_tool
 from awslabs.lza_mcp_server.tools.config.get_minimum_configuration import (
     tool_get_minimum_configuration,
 )
@@ -50,6 +51,7 @@ def register_config_tools(mcp, workspace_manager: WorkspaceManager):
         config_type: Optional[str] = None,
         workspace_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        current_tool.set("getMinimumConfiguration")
         return strip_llm_guidance(
             await tool_get_minimum_configuration(
                 ctx, workspace_manager, config_type, workspace_id
@@ -96,6 +98,7 @@ def register_config_tools(mcp, workspace_manager: WorkspaceManager):
                              is attempted via the pipeline source action.
             branch: CodeCommit branch to read from (default: "main").
         """
+        current_tool.set("getLzaConfiguration")
         return strip_llm_guidance(
             await lza_config_retrieval.get_configuration(
                 ctx,
@@ -148,6 +151,7 @@ def register_config_tools(mcp, workspace_manager: WorkspaceManager):
             branch: CodeCommit branch to commit to (default: "main").
             commit_message: Commit message for CodeCommit (default: auto-generated).
         """
+        current_tool.set("putLzaConfiguration")
         return strip_llm_guidance(
             await tool_put_lza_configuration(
                 ctx,

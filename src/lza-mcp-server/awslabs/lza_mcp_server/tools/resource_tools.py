@@ -28,6 +28,7 @@ import logging
 import re
 from typing import Any
 
+from awslabs.lza_mcp_server.aws_access import current_tool
 from awslabs.lza_mcp_server.utils.workspace_manager import (
     WorkspaceManager,
     WorkspaceNotFoundError,
@@ -87,6 +88,7 @@ def register_resource_tools(
         their files).  Template URIs are included only when template
         features are enabled.
         """
+        current_tool.set("listResources")
         routes: dict[str, str] = {
             "workspace://list": "List all workspace IDs",
             "workspace://{workspace_id}/files": (
@@ -108,6 +110,7 @@ def register_resource_tools(
         - workspace://{id}/files — list files in a workspace
         - workspace://{id}/file/{path} — read a file from a workspace
         """
+        current_tool.set("readResource")
         # workspace://list
         if _RE_WORKSPACE_LIST.match(uri):
             try:

@@ -22,6 +22,7 @@ from mcp.server.fastmcp import Context
 from .get_full_schema import tool_get_full_schema
 from .search_json_schema import tool_search_json_schema
 from .list_lza_versions import tool_list_lza_supported_versions
+from awslabs.lza_mcp_server.aws_access import current_tool
 from awslabs.lza_mcp_server.utils.guidance_toggle import strip_llm_guidance
 from awslabs.lza_mcp_server.utils.guidance_toggle import tool_description
 from .descriptions import DESCRIPTIONS
@@ -47,6 +48,7 @@ def register_schema_tools(mcp):
         filters: Optional[Dict] = None,
         format_level: str = "standard",
     ) -> Dict[str, Any]:
+        current_tool.set("searchJsonSchema")
         return strip_llm_guidance(
             await tool_search_json_schema(
                 ctx,
@@ -72,6 +74,7 @@ def register_schema_tools(mcp):
         property_path: Optional[str] = None,
         include_metadata: bool = True,
     ) -> Dict[str, Any]:
+        current_tool.set("getFullSchema")
         return strip_llm_guidance(
             await tool_get_full_schema(
                 ctx,
@@ -87,6 +90,7 @@ def register_schema_tools(mcp):
         description=tool_description(**DESCRIPTIONS["listLzaSupportedVersions"]),
     )  # nosemgrep: useless-inner-function
     async def list_lza_supported_versions(ctx: Context) -> Dict[str, Any]:
+        current_tool.set("listLzaSupportedVersions")
         return strip_llm_guidance(await tool_list_lza_supported_versions(ctx))
 
     logger.info("Schema tools registered successfully")
