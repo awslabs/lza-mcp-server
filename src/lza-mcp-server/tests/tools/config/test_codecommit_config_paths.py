@@ -105,6 +105,21 @@ def _patch_commit(result):
     )
 
 
+def _patch_list_all_files(remote_files=None):
+    """Mock list_all_files in put_config_to_codecommit to avoid real AWS calls.
+
+    Args:
+        remote_files: List of (path, blob_id) tuples representing remote files.
+                      Defaults to an empty list (no remote files).
+    """
+    if remote_files is None:
+        remote_files = []
+    return patch(
+        "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.list_all_files",
+        return_value=remote_files,
+    )
+
+
 def _patch_identity():
     return patch(
         "awslabs.lza_mcp_server.tools.config.put_config_to_s3.get_caller_identity",
@@ -316,6 +331,7 @@ class TestPutLzaConfigurationCodeCommit:
 
         with (
             _patch_resolve_cc_put(_CC_LOCATION),
+            _patch_list_all_files(),
             _patch_commit({"commitId": "abc123", "treeId": "tree456"}),
         ):
             result = await tool_put_lza_configuration(
@@ -342,6 +358,7 @@ class TestPutLzaConfigurationCodeCommit:
 
         with (
             _patch_resolve_cc_put(_CC_LOCATION_WITH_QUALIFIER),
+            _patch_list_all_files(),
             _patch_commit({"commitId": "abc123", "treeId": "tree456"}),
         ):
             result = await tool_put_lza_configuration(
@@ -364,6 +381,7 @@ class TestPutLzaConfigurationCodeCommit:
 
         with (
             _patch_resolve_cc_put(_CC_LOCATION) as _,
+            _patch_list_all_files(),
             _patch_commit({"commitId": "abc123", "treeId": "tree456"}) as mock_commit,
         ):
             await tool_put_lza_configuration(
@@ -388,6 +406,7 @@ class TestPutLzaConfigurationCodeCommit:
 
         with (
             _patch_resolve_cc_put(_CC_LOCATION) as _,
+            _patch_list_all_files(),
             _patch_commit({"commitId": "c1", "treeId": "t1"}) as mock_commit,
         ):
             result = await tool_put_lza_configuration(
@@ -412,6 +431,7 @@ class TestPutLzaConfigurationCodeCommit:
 
         with (
             _patch_resolve_cc_put(_CC_LOCATION) as _,
+            _patch_list_all_files(),
             _patch_commit({"commitId": "c1", "treeId": "t1"}) as mock_commit,
         ):
             await tool_put_lza_configuration(
@@ -427,11 +447,62 @@ class TestPutLzaConfigurationCodeCommit:
 
     @pytest.mark.asyncio
     @pytest.mark.unit
+    async def test_new_branch_skips_deletion_and_commits(self, ctx, mock_ws_manager):
+        """A missing remote branch means no deletions; commit still proceeds."""
+        mock_ws_manager.list_files.return_value = ["accounts-config.yaml"]
+        mock_ws_manager.read_file.return_value = b"accounts: []"
+
+        with _patch_resolve_cc_put(_CC_LOCATION):
+            with patch(
+                "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.list_all_files",
+                side_effect=_client_error("BranchDoesNotExistException"),
+            ):
+                with _patch_commit({"commitId": "c1", "treeId": "t1"}) as mock_commit:
+                    result = await tool_put_lza_configuration(
+                        ctx,
+                        mock_ws_manager,
+                        workspace_id="ws-123",
+                        path="",
+                        repository_name="lza-config-repo",
+                    )
+
+        assert result["success"] is True
+        # No deletions detected because the branch does not exist yet.
+        assert mock_commit.call_args[1]["delete_files"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.unit
+    async def test_list_files_access_denied_propagates(self, ctx, mock_ws_manager):
+        """Non-branch errors during deletion detection must not be swallowed."""
+        mock_ws_manager.list_files.return_value = ["accounts-config.yaml"]
+        mock_ws_manager.read_file.return_value = b"accounts: []"
+
+        with _patch_resolve_cc_put(_CC_LOCATION):
+            with patch(
+                "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.list_all_files",
+                side_effect=_client_error("AccessDeniedException"),
+            ):
+                with _patch_commit({"commitId": "c1", "treeId": "t1"}) as mock_commit:
+                    result = await tool_put_lza_configuration(
+                        ctx,
+                        mock_ws_manager,
+                        workspace_id="ws-123",
+                        path="",
+                        repository_name="lza-config-repo",
+                    )
+
+        # The error surfaces instead of being masked, and no commit is made.
+        assert result["success"] is False
+        assert "CodeCommit commit failed" in result["error"]
+        mock_commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_repository_not_found(self, ctx, mock_ws_manager):
         mock_ws_manager.list_files.return_value = ["accounts-config.yaml"]
         mock_ws_manager.read_file.return_value = b"content"
 
-        with _patch_resolve_cc_put(_CC_LOCATION):
+        with _patch_resolve_cc_put(_CC_LOCATION), _patch_list_all_files():
             with patch(
                 "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.commit_files",
                 side_effect=_client_error("RepositoryDoesNotExistException"),
@@ -453,7 +524,7 @@ class TestPutLzaConfigurationCodeCommit:
         mock_ws_manager.list_files.return_value = ["accounts-config.yaml"]
         mock_ws_manager.read_file.return_value = b"content"
 
-        with _patch_resolve_cc_put(_CC_LOCATION):
+        with _patch_resolve_cc_put(_CC_LOCATION), _patch_list_all_files():
             with patch(
                 "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.commit_files",
                 side_effect=_client_error("BranchDoesNotExistException"),
@@ -476,7 +547,7 @@ class TestPutLzaConfigurationCodeCommit:
         mock_ws_manager.list_files.return_value = ["accounts-config.yaml"]
         mock_ws_manager.read_file.return_value = b"content"
 
-        with _patch_resolve_cc_put(_CC_LOCATION):
+        with _patch_resolve_cc_put(_CC_LOCATION), _patch_list_all_files():
             with patch(
                 "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.commit_files",
                 side_effect=_client_error("ParentCommitIdOutdatedException"),
@@ -498,7 +569,7 @@ class TestPutLzaConfigurationCodeCommit:
         mock_ws_manager.list_files.return_value = ["accounts-config.yaml"]
         mock_ws_manager.read_file.return_value = b"content"
 
-        with _patch_resolve_cc_put(_CC_LOCATION):
+        with _patch_resolve_cc_put(_CC_LOCATION), _patch_list_all_files():
             with patch(
                 "awslabs.lza_mcp_server.tools.config.put_config_to_codecommit.commit_files",
                 side_effect=_client_error("AccessDeniedException"),
@@ -608,6 +679,7 @@ class TestPutLzaConfigurationCodeCommit:
 
         with (
             _patch_resolve_cc_put(_CC_LOCATION),
+            _patch_list_all_files(),
             _patch_commit({"commitId": "c1", "treeId": "t1"}),
         ):
             result = await tool_put_lza_configuration(

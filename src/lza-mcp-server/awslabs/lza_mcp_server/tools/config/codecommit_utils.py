@@ -24,9 +24,11 @@ Read path  — recursive GetFolder walk + GetBlob per file:
   repositories are well within this limit in practice.
 
 Write path — single CreateCommit with all workspace files:
-  All files are sent in one CreateCommit call as putFiles entries.  Git will
-  only record a diff for files whose content actually changed, so the commit
-  history remains clean regardless of how many files are included.
+  All files are sent in one CreateCommit call as putFiles entries.  Files that
+  exist in the remote branch but are absent from the workspace are included as
+  deleteFiles entries, ensuring deletions are tracked.  Git will only record a
+  diff for files whose content actually changed, so the commit history remains
+  clean regardless of how many files are included.
 """
 
 import logging
@@ -200,17 +202,43 @@ def get_branch_tip_commit(repository_name: str, branch: str) -> Optional[str]:
         raise
 
 
+def _normalise_repo_path(file_path: str) -> str:
+    """Normalise a path for CodeCommit and reject directory traversal.
+
+    Strips a leading slash, converts Windows separators to POSIX, and rejects
+    any path containing a "." or ".." component or an empty component (e.g.
+    from a leading/double slash).  Components are checked individually so that
+    legitimate names which merely contain dots (e.g. "abc..def") are allowed.
+
+    Args:
+        file_path: Raw file path from the workspace.
+
+    Returns:
+        The normalised POSIX-style path.
+
+    Raises:
+        ValueError: If the path contains a traversal or empty component.
+    """
+    normalised_path = file_path.lstrip("/").replace("\\", "/")
+    components = normalised_path.split("/")
+    if any(part in ("", ".", "..") for part in components):
+        raise ValueError(f"Invalid file path rejected: {file_path!r}")
+    return normalised_path
+
+
 def commit_files(
     repository_name: str,
     branch: str,
     files: Dict[str, bytes],
     commit_message: str,
+    delete_files: Optional[List[str]] = None,
     author_name: str = "LZA MCP Server",
-    author_email: str = "lza-mcp@amazon.com",
+    author_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Commit all workspace files to a CodeCommit branch in a single call.
 
-    Uses CreateCommit with a putFiles list containing every file.  Git records
+    Uses CreateCommit with a putFiles list containing every file and an
+    optional deleteFiles list for files that should be removed.  Git records
     a diff only for files whose content actually changed, so the commit history
     stays clean even when all files are included.
 
@@ -219,8 +247,9 @@ def commit_files(
         branch: Target branch name (e.g. "main").
         files: Dict mapping file path → raw bytes.
         commit_message: Commit message.
+        delete_files: Optional list of file paths to delete from the repo.
         author_name: Author display name for the commit.
-        author_email: Author email for the commit.
+        author_email: Optional author email for the commit.
 
     Returns:
         Dict with commitId and treeId from the CreateCommit response.
@@ -233,14 +262,10 @@ def commit_files(
     # Build the putFiles list — content must be base64-encoded bytes
     put_files = []
     for file_path, content in files.items():
-        # Normalise path separators and strip leading slash
-        normalised_path = file_path.lstrip("/").replace("\\", "/")
-
-        # Reject path traversal sequences — CodeCommit operates on a flat
-        # repository tree but we validate defensively to prevent any injection
-        # of absolute paths or traversal sequences into the commit.
-        if ".." in normalised_path.split("/") or normalised_path.startswith("/"):
-            raise ValueError(f"Invalid file path rejected: {file_path!r}")
+        # Normalise and reject any path traversal sequences — CodeCommit
+        # operates on a flat repository tree but we validate defensively to
+        # prevent injection of absolute paths or traversal sequences.
+        normalised_path = _normalise_repo_path(file_path)
 
         put_files.append(
             {
@@ -250,6 +275,13 @@ def commit_files(
             }
         )
 
+    # Build the deleteFiles list
+    delete_file_entries = []
+    if delete_files:
+        for file_path in delete_files:
+            normalised_path = _normalise_repo_path(file_path)
+            delete_file_entries.append({"filePath": normalised_path})
+
     # Retrieve the current HEAD commit so CreateCommit can detect conflicts
     parent_commit_id = get_branch_tip_commit(repository_name, branch)
 
@@ -258,18 +290,24 @@ def commit_files(
         "branchName": branch,
         "commitMessage": commit_message,
         "authorName": author_name,
-        "email": author_email,
         "putFiles": put_files,
     }
+
+    if author_email:
+        create_kwargs["email"] = author_email
+
+    if delete_file_entries:
+        create_kwargs["deleteFiles"] = delete_file_entries
 
     if parent_commit_id:
         create_kwargs["parentCommitId"] = parent_commit_id
 
     logger.info(
-        "CreateCommit: repo=%s branch=%s files=%d parent=%s",
+        "CreateCommit: repo=%s branch=%s put=%d delete=%d parent=%s",
         repository_name,
         branch,
         len(put_files),
+        len(delete_file_entries),
         parent_commit_id or "none",
     )
 
