@@ -20,6 +20,7 @@ from botocore.exceptions import ClientError
 
 from awslabs.lza_mcp_server.tools.config.codecommit_utils import (
     _get_codecommit_client,
+    _normalise_repo_path,
     list_all_files,
     get_blob_content,
     fetch_all_files,
@@ -443,4 +444,102 @@ class TestCommitFiles:
                 branch="main",
                 files={"f.yaml": b"data"},
                 commit_message="test",
+            )
+
+
+# ---------------------------------------------------------------------------
+# _normalise_repo_path — path traversal validation
+# ---------------------------------------------------------------------------
+
+
+class TestNormaliseRepoPath:
+    def test_strips_leading_slash(self):
+        assert _normalise_repo_path("/a/b.yaml") == "a/b.yaml"
+
+    def test_converts_windows_separators(self):
+        assert _normalise_repo_path("sub\\file.yaml") == "sub/file.yaml"
+
+    def test_allows_dotted_names(self):
+        # Legitimate names that merely contain dots must not be rejected.
+        assert _normalise_repo_path("abc..def/file.yaml") == "abc..def/file.yaml"
+        assert _normalise_repo_path("config.v2.yaml") == "config.v2.yaml"
+
+    def test_rejects_parent_traversal_component(self):
+        with pytest.raises(ValueError):
+            _normalise_repo_path("a/../b.yaml")
+
+    def test_rejects_leading_parent_traversal(self):
+        with pytest.raises(ValueError):
+            _normalise_repo_path("../escape.yaml")
+
+    def test_rejects_current_dir_component(self):
+        with pytest.raises(ValueError):
+            _normalise_repo_path("a/./b.yaml")
+
+    def test_rejects_empty_component_from_double_slash(self):
+        with pytest.raises(ValueError):
+            _normalise_repo_path("a//b.yaml")
+
+
+# ---------------------------------------------------------------------------
+# commit_files — deleteFiles support
+# ---------------------------------------------------------------------------
+
+
+class TestCommitFilesDeletions:
+    def test_delete_files_included_in_create_commit(self, mock_cc_client):
+        mock_cc_client.get_branch.return_value = {"branch": {"commitId": "p1"}}
+        mock_cc_client.create_commit.return_value = {"commitId": "c1", "treeId": "t1"}
+
+        commit_files(
+            repository_name="my-repo",
+            branch="main",
+            files={"keep.yaml": b"data"},
+            commit_message="test",
+            delete_files=["stale.yaml", "old/nested.yaml"],
+        )
+
+        call_kwargs = mock_cc_client.create_commit.call_args[1]
+        deleted_paths = [entry["filePath"] for entry in call_kwargs["deleteFiles"]]
+        assert deleted_paths == ["stale.yaml", "old/nested.yaml"]
+
+    def test_no_delete_files_key_when_none(self, mock_cc_client):
+        mock_cc_client.get_branch.return_value = {"branch": {"commitId": "p1"}}
+        mock_cc_client.create_commit.return_value = {"commitId": "c1", "treeId": "t1"}
+
+        commit_files(
+            repository_name="my-repo",
+            branch="main",
+            files={"keep.yaml": b"data"},
+            commit_message="test",
+        )
+
+        call_kwargs = mock_cc_client.create_commit.call_args[1]
+        assert "deleteFiles" not in call_kwargs
+
+    def test_no_delete_files_key_when_empty_list(self, mock_cc_client):
+        mock_cc_client.get_branch.return_value = {"branch": {"commitId": "p1"}}
+        mock_cc_client.create_commit.return_value = {"commitId": "c1", "treeId": "t1"}
+
+        commit_files(
+            repository_name="my-repo",
+            branch="main",
+            files={"keep.yaml": b"data"},
+            commit_message="test",
+            delete_files=[],
+        )
+
+        call_kwargs = mock_cc_client.create_commit.call_args[1]
+        assert "deleteFiles" not in call_kwargs
+
+    def test_rejects_traversal_in_delete_path(self, mock_cc_client):
+        mock_cc_client.get_branch.return_value = {"branch": {"commitId": "p1"}}
+
+        with pytest.raises(ValueError):
+            commit_files(
+                repository_name="my-repo",
+                branch="main",
+                files={"keep.yaml": b"data"},
+                commit_message="test",
+                delete_files=["../escape.yaml"],
             )
