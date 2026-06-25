@@ -559,7 +559,7 @@ getFullSchema(
 
 ## Universal Configuration
 
-The [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) provides enterprise-ready configuration templates that establish secure, scalable, and well-architected multi-account AWS environments. These templates enable rapid deployment of baseline environments supporting multiple global compliance frameworks.
+The [LZA Universal Configuration](https://github.com/aws/lza-universal-configuration) provides enterprise-ready configuration templates that establish secure, scalable, and well-architected multi-account AWS environments. These templates enable rapid deployment of baseline environments supporting multiple global compliance frameworks. For additional details, see the [LZA Universal Configuration blog post](https://aws.amazon.com/blogs/security/introducing-the-landing-zone-accelerator-on-aws-universal-configuration-and-lza-compliance-workbook/) and access the [LZA Compliance Workbook](https://us-east-1.console.aws.amazon.com/artifact/v2/reports/details/report-2qxiJVQcB8Y6i4h4) available on AWS Artifact.
 
 The MCP server includes UC release artifacts and specialized merge tools to streamline integration of these compliance-focused templates with existing LZA deployments.
 
