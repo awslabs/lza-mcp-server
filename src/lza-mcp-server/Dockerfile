@@ -54,9 +54,14 @@ COPY . /build/
 COPY lza-minimum-configuration/ /build/lza-minimum-configuration/
 
 # Install Python dependencies to a target directory
+# NOTE: mcp is pinned to <2.0.0. The 2.x line removed the mcp.server.fastmcp
+# module (replaced by mcp.server.mcpserver), which this codebase imports in ~33
+# modules. This pin must stay until that migration is done.
+# The floor mirrors the `mcp[cli] >=1.23.0` constraint in pyproject.toml, which
+# is NOT otherwise enforced because the app below is installed with --no-deps.
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --target /build/deps \
-    loguru pydantic pyyaml mcp fastapi uvicorn psutil boto3
+    loguru pydantic pyyaml "mcp[cli]>=1.23.0,<2.0.0" fastapi uvicorn psutil boto3
 
 # Install the application package
 RUN pip install --no-cache-dir --target /build/deps --no-deps -e .
