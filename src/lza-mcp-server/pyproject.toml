@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lza-mcp-server"
-version = "1.1.0"
+version = "1.1.1"
 description = "An Model Context Protocol (MCP) server for Landing Zone Accelerator on AWS"
 authors = ["Amazon Web Services"]
 license = "Apache-2.0"
@@ -20,7 +20,8 @@ classifiers = [
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
 boto3 = ">=1.37.27"
-mcp = {extras = ["cli"], version = ">=1.23.0"}
+# mcp 2.x removed mcp.server.fastmcp, which this codebase imports.
+mcp = {extras = ["cli"], version = ">=1.23.0,<2.0.0"}
 PyYAML = ">=6.0"
 
 # Security overrides - Force minimum versions higher than transitive requirements
@@ -38,7 +39,9 @@ pytest-xdist = ">=3.5.0"
 pytest-timeout = ">=2.2.0"
 coverage = {extras = ["toml"], version = ">=7.4.0"}
 moto = {extras = ["s3", "codepipeline", "cloudformation"], version = ">=4.2.0"}
-ruff = ">=0.1.0"
+# poetry.lock is gitignored, so CI resolves dev tools fresh on every run. ruff
+# 0.16 widened its default rule set and fails the lint job on existing code.
+ruff = ">=0.15.20,<0.16.0"
 mypy = ">=1.8.0"
 bandit = ">=1.7.0"
 pip-audit = ">=2.7.0"
