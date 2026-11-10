@@ -21,7 +21,7 @@ LZA_MIN_VERSION ?= v1.12.0
 LZA_MAX_VERSION ?=
 DOCKER_IMAGE_NAME ?= lza-mcp-server:local
 
-.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage test-file clean-cache release lint format security-check type-check py-compile build
+.PHONY: help test test-fast test-parallel test-incremental test-unit test-integration test-coverage test-file clean-cache release lint format security-check type-check py-compile build lock-check install update-deps
 
 # Default target
 help:
@@ -57,8 +57,9 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  clean-cache        Clear all test caches and temporary files"
-	@echo "  clean-lock         Remove poetry.lock for fresh dependency resolution"
-	@echo "  update-deps        Update dependencies to latest compatible versions"
+	@echo "  lock-check         Fail if poetry.lock does not match pyproject.toml"
+	@echo "  install            Install exactly the versions in poetry.lock"
+	@echo "  update-deps        Update poetry.lock to the newest versions pyproject.toml allows"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make test-fast     # Quick feedback during development"
@@ -73,15 +74,14 @@ py-compile:
 	@echo "✅ Python syntax validation complete"
 
 # Complete pre-commit verification pipeline
-release: clean-cache clean-lock update-deps py-compile format lint type-check security-check test-coverage
+# Tests the committed poetry.lock. It does not re-resolve dependencies.
+release: clean-cache lock-check install py-compile format lint type-check security-check test-coverage
 	@echo "🔒 Running dependency vulnerability scan..."
-	# TEMPORARY: ignoring CVE-2026-4539 in pygments 2.19.2 (transitive dep via pytest/rich).
-	# No fix version available yet. Remove --ignore-vuln once pygments releases a patch.
-	@poetry run pip-audit --ignore-vuln CVE-2026-4539
+	@poetry run pip-audit
 	@echo "✅ Release verification complete - ready for code review!"
 	@echo ""
 	@echo "📋 Verification Summary:"
-	@echo "  ✓ Dependencies updated to latest compatible versions"
+	@echo "  ✓ poetry.lock matches pyproject.toml, dependencies installed from it"
 	@echo "  ✓ Python syntax validated"
 	@echo "  ✓ Code formatted with ruff"
 	@echo "  ✓ Code linted with ruff"
@@ -232,18 +232,24 @@ clean-cache:
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✅ Cache cleanup complete"
 
-# Clean lock file to ensure fresh dependency resolution
-clean-lock:
-	@echo "🔓 Removing poetry.lock for fresh dependency resolution..."
-	@rm -f poetry.lock
-	@echo "✅ Lock file removed"
+# Fail if poetry.lock is missing or does not match pyproject.toml
+lock-check:
+	@echo "🔐 Checking poetry.lock against pyproject.toml..."
+	@poetry check --lock
+	@echo "✅ poetry.lock is consistent"
 
-# Update dependencies to latest compatible versions
-update-deps: clean-lock
-	@echo "📦 Updating dependencies to latest compatible versions..."
-	@poetry lock
-	@poetry install
-	@echo "✅ Dependencies updated"
+# Install exactly the versions in poetry.lock and remove anything else from the venv
+install:
+	@echo "📦 Installing dependencies from poetry.lock..."
+	@poetry sync
+	@echo "✅ Dependencies installed"
+
+# Deliberately update poetry.lock to the newest versions pyproject.toml allows.
+# Review and commit the resulting poetry.lock diff.
+update-deps:
+	@echo "📦 Updating poetry.lock to the newest compatible versions..."
+	@poetry update
+	@echo "✅ poetry.lock updated, review and commit it"
 	@echo ""
 	@echo "📋 Updated Dependencies:"
 	@poetry show --outdated || echo "  All dependencies are up to date!"

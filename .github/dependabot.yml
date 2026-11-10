@@ -1,0 +1,24 @@
+# Dependabot version and security updates for the LZA MCP Server.
+# Security updates stay ungrouped: the Dependabot Auto-Merge app does not
+# merge grouped pull requests.
+# No target-branch: updates go to the default branch, release/v1.1.1.
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/src/lza-mcp-server"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
+    ignore:
+      # mcp 2.x removes mcp.server.fastmcp, which this codebase imports.
+      - dependency-name: "mcp"
+        versions: [">=2.0.0"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7

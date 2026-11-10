@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+* Commit `src/lza-mcp-server/poetry.lock` again, written by Poetry 2.5.1. `make release`, GitLab CI, GitHub CI and the Docker image install from it.
+* `make release` checks the lock with `poetry check --lock` and installs it with `poetry sync`. It no longer deletes and re-resolves the lock. `make update-deps` runs `poetry update` to update the lock on purpose.
+* The Dockerfile installs runtime dependencies from the lock with `pip install --require-hashes`. The image no longer contains `fastapi`, `loguru` or `psutil`, which no code imports. It now contains `werkzeug`, which `pyproject.toml` declares as a main dependency.
+* Raise the supported Python floor to 3.11. Python 3.10 is end of life, and it held `filelock` at a version with known CVEs.
+* Remove the `pip-audit` exception for CVE-2026-4539. The locked pygments 2.21.0 is patched.
+
+### Added
+
+* GitHub Actions workflow `.github/workflows/ci.yml` with the GitLab CI checks, a container build with a stdio smoke test, and a `gate` job that fails unless every job succeeded.
+* `.github/dependabot.yml` for pip and GitHub Actions updates.
+
 ## [v1.1.1]
 
 ### Fixed
