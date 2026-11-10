@@ -1,3 +1,7 @@
+# Ignore local virtualenvs and Poetry caches
+.venv/
+.cache/
+
 # Ignore temp files and caches
 **/__pycache__
 **/*.pyc

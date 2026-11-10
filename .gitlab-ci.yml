@@ -7,17 +7,30 @@ stages:
   - security
   - test
 
+# Poetry version that wrote poetry.lock. Keep in step with .github/workflows/ci.yml
+# and the Dockerfile.
+variables:
+  POETRY_VERSION: "2.5.1"
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  POETRY_CACHE_DIR: "$CI_PROJECT_DIR/src/lza-mcp-server/.cache/pypoetry"
+
 # Default configuration for all jobs
 default:
   image: public.ecr.aws/docker/library/python:3.11
   before_script:
     - cd src/lza-mcp-server
-    - pip install poetry
-    - poetry install
+    - pip install "poetry==${POETRY_VERSION}"
+    # Fail if poetry.lock is stale, then install exactly what it pins.
+    - poetry check --lock
+    - poetry sync
 
-# Cache Poetry dependencies across jobs
+# Cache Poetry dependencies across jobs, keyed on the branch and the lock file.
+# The branch prefix stops one branch from restoring a .venv another branch wrote.
 cache:
-  key: ${CI_COMMIT_REF_SLUG}
+  key:
+    prefix: ${CI_COMMIT_REF_SLUG}
+    files:
+      - src/lza-mcp-server/poetry.lock
   paths:
     - src/lza-mcp-server/.venv
     - src/lza-mcp-server/.cache/pypoetry
@@ -91,7 +104,7 @@ dependency-audit:
   stage: security
   script:
     - echo "🔒 Running dependency vulnerability scan..."
-    - poetry run pip-audit --ignore-vuln CVE-2026-4539 # No fix version available yet. Remove --ignore-vuln once pygments releases a patch.
+    - poetry run pip-audit
   artifacts:
     when: on_failure
     expire_in: 1 week

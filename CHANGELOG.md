@@ -10,7 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Pin `mcp[cli]` to `>=1.23.0,<2.0.0` in both `src/lza-mcp-server/Dockerfile` and `src/lza-mcp-server/pyproject.toml`. `mcp` 2.x removes the `mcp.server.fastmcp` module that this codebase imports, so builds and installs resolved `mcp` 2.x and failed on import. The Dockerfile needs its own pin because the manual `pip install` line had no constraint and the application is installed with `--no-deps`, which skips the `pyproject.toml` metadata.
-* Pin `ruff` to `>=0.15.20,<0.16.0`. `poetry.lock` is gitignored, so CI resolved the newest ruff on every run. Ruff 0.16 widened its default rule set, which failed the `code-lint` and `code-format` jobs on code that was already merged.
+* Pin `ruff` to `>=0.15.20,<0.16.0`. `poetry.lock` was gitignored, so CI resolved the newest ruff on every run. Ruff 0.16 widened its default rule set, which failed the `code-lint` and `code-format` jobs on code that was already merged.
+
+### Changed
+
+* Dependencies are pinned in a committed `src/lza-mcp-server/poetry.lock`. CI, `make release` and the Docker image install from it.
+* GitHub Actions CI runs the same checks as GitLab CI and reports a single `gate` check. Dependabot is configured for pip and GitHub Actions updates.
+* The minimum supported Python version is 3.11.
+* The Docker image no longer contains `fastapi`, `loguru` or `psutil`. No code imports them.
 
 ## [v1.1.0]
 

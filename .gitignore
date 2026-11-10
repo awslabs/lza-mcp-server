@@ -82,7 +82,3 @@ json-output/
 src/lza-mcp-server/htmlcov/
 src/lza-mcp-server/.coverage
 src/lza-mcp-server/coverage.xml
-
-# Poetry lock file - not committed for public-facing projects
-# Users will resolve dependencies to latest compatible versions
-src/lza-mcp-server/poetry.lock

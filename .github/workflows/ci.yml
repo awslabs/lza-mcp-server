@@ -1,0 +1,140 @@
+# CI for the LZA MCP Server. Runs the same checks as .gitlab-ci.yml.
+# The `gate` job is the single required status check for release/v1.1.1.
+#
+# Hardening: read-only token, `pull_request` only (never `pull_request_target`),
+# actions pinned by commit SHA, no secrets and no AWS credentials.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [release/v1.1.1]
+  push:
+    branches: [release/v1.1.1]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Poetry version that wrote poetry.lock. Keep in step with .gitlab-ci.yml
+  # and src/lza-mcp-server/Dockerfile.
+  POETRY_VERSION: "2.5.1"
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  PYTHON_VERSION: "3.11"
+
+defaults:
+  run:
+    working-directory: src/lza-mcp-server
+
+jobs:
+  quality:
+    name: lock, syntax, format, lint, types
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        run: pip install "poetry==${POETRY_VERSION}"
+      - name: Check poetry.lock matches pyproject.toml
+        run: poetry check --lock
+      - name: Install from poetry.lock
+        run: poetry sync
+      - name: Python syntax
+        run: make py-compile
+      - name: ruff format
+        run: poetry run ruff format --check .
+      - name: ruff check
+        run: poetry run ruff check .
+      - name: mypy
+        run: poetry run mypy awslabs/ --ignore-missing-imports --no-strict-optional
+
+  security:
+    name: bandit, pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        run: pip install "poetry==${POETRY_VERSION}"
+      - name: Check poetry.lock matches pyproject.toml
+        run: poetry check --lock
+      - name: Install from poetry.lock
+        run: poetry sync
+      - name: bandit
+        run: poetry run bandit -r awslabs/ --severity-level medium
+      - name: pip-audit
+        run: poetry run pip-audit
+
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        run: pip install "poetry==${POETRY_VERSION}"
+      - name: Check poetry.lock matches pyproject.toml
+        run: poetry check --lock
+      - name: Install from poetry.lock
+        run: poetry sync
+      - name: pytest with coverage
+        run: |
+          poetry run pytest tests/ \
+            --cov=awslabs.lza_mcp_server \
+            --cov-report=term-missing \
+            --cov-branch \
+            --cov-fail-under=97 \
+            --tb=short
+
+  container:
+    name: container build and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: make build
+        run: make build CONTAINER_RUNTIME=docker DOCKER_IMAGE_NAME=lza-mcp-server:ci
+      - name: Smoke test (MCP initialize and tools/list over stdio)
+        run: python3 ../../scripts/smoke_test_image.py docker lza-mcp-server:ci
+
+  gate:
+    name: gate
+    if: ${{ always() }}
+    needs: [quality, security, test, container]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every job succeeded
+        working-directory: .
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: ${RESULTS}"
+          for r in ${RESULTS}; do
+            if [ "$r" != "success" ]; then
+              echo "gate: a required job did not succeed (${r})"
+              exit 1
+            fi
+          done
+          echo "gate: all jobs succeeded"
