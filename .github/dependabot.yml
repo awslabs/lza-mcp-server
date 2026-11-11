@@ -1,12 +1,17 @@
-# Dependabot version and security updates for the LZA MCP Server.
+# Dependabot updates for the LZA MCP Server: security updates only for pip,
+# version and security updates for GitHub Actions.
 # Security updates stay ungrouped: the Dependabot Auto-Merge app does not
 # merge grouped pull requests.
-# No target-branch: updates go to the default branch, release/v1.1.1.
+# No target-branch: updates go to the repository's default branch.
 
 version: 2
 updates:
   - package-ecosystem: "pip"
     directory: "/src/lza-mcp-server"
+    # 0 turns off routine version-update PRs. Security-update PRs still open
+    # while Dependabot security updates are enabled in the repository settings.
+    # schedule and cooldown below apply to version updates only.
+    open-pull-requests-limit: 0
     schedule:
       interval: "daily"
     cooldown:
